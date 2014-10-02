@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/eventfd.h>
 
 #include <netinet/in.h>
 
@@ -246,6 +247,8 @@ usock_close(struct vr_usocket *usockp)
     int i;
     struct vr_usocket *parent;
 
+    RTE_SET_USED(parent);
+
     if (!usockp)
         return;
 
@@ -401,8 +404,10 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
         pmbuf->data = usockp->usock_rx_buf;
         pmbuf->data_len = usockp->usock_read_len;
         pmbuf->pkt_len = usockp->usock_read_len;
+        /* TODO: rebase on RSS commit
         dpdk_burst_rx(1, &usockp->usock_mbuf, usockp->usock_vif,
                 "pkt0", 0);
+        */
     } else {
         rte_pktmbuf_free(usockp->usock_mbuf);
     }
@@ -417,6 +422,7 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
 static struct rte_mbuf *
 vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
 {
+    /* TODO: rebase on RSS commit
     int ret;
     void *objp;
     struct vr_interface *vif = usockp->usock_vif;
@@ -430,6 +436,8 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
         return NULL;
 
     return (struct rte_mbuf *)objp;
+    */
+    return NULL;
 }
 
 static int
@@ -490,7 +498,7 @@ usock_read_init(struct vr_usocket *usockp)
             return -ENOMEM;
 
         usockp->usock_rx_buf = rte_pktmbuf_mtod(usockp->usock_mbuf,
-                unsigned char *);
+                char *);
         usockp->usock_buf_len = PKT0_MBUF_PACKET_SIZE;
         usockp->usock_read_len = PKT0_MBUF_PACKET_SIZE;
         usockp->usock_state = READING_DATA;
@@ -514,7 +522,7 @@ __usock_read(struct vr_usocket *usockp)
 
     struct nlmsghdr *nlh;
     unsigned int proto = usockp->usock_proto;
-    unsigned char *buf = usockp->usock_rx_buf;
+    char *buf = usockp->usock_rx_buf;
 
     if (toread > usockp->usock_buf_len) {
         toread = usockp->usock_buf_len - offset;
@@ -580,6 +588,8 @@ usock_alloc(unsigned short proto, unsigned short type)
     struct vr_usocket *usockp = NULL, *child;
     bool is_socket = true;
     unsigned short sock_type;
+
+    RTE_SET_USED(child);
 
     switch (type) {
     case TCP:
@@ -666,7 +676,8 @@ usock_alloc(unsigned short proto, unsigned short type)
             usockp->usock_mbuf_pool = rte_mempool_create("pkt0_mbuf_pool",
                     PKT0_MBUF_POOL_SIZE, PKT0_MBUF_PACKET_SIZE,
                     VR_DPDK_MPOOL_CACHE_SZ, sizeof(struct rte_pktmbuf_pool_private),
-                    rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
+                    /* TODO: rebase on RSS commit */
+                    rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
                     rte_socket_id(), 0);
             if (!usockp->usock_mbuf_pool)
                 goto error_exit;
@@ -798,7 +809,7 @@ vr_usocket_read(struct vr_usocket *usockp)
     int ret;
 
     if (!usockp || usockp->usock_fd < 0)
-        return;
+        return -1;
 
     switch (usockp->usock_state) {
     case LISTENING:
@@ -827,7 +838,7 @@ vr_usocket_read(struct vr_usocket *usockp)
         break;
 
     default:
-        return;
+        return -1;
     }
 
     return ret;
@@ -836,7 +847,6 @@ vr_usocket_read(struct vr_usocket *usockp)
 static int
 vr_usocket_connect(struct vr_usocket *usockp)
 {
-    int ret;
     struct sockaddr_un sun;
 
     if (usockp->usock_proto != PACKET)
@@ -956,6 +966,8 @@ void *
 vr_usocket(int proto, int type)
 {
     struct vr_usocket *usockp = NULL;
+
+    RTE_SET_USED(usockp);
 
     if (!valid_usock(proto, type))
         return NULL;
