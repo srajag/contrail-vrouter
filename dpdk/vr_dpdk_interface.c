@@ -472,7 +472,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     }
 
 #ifdef VR_DPDK_TX_PKT_DUMP
-    rte_pktmbuf_dump(m, 0x60);
+    rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
     tx_queue->txq_ops.f_tx(tx_queue->txq_queue_h, m);
@@ -499,7 +499,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     m->pkt.pkt_len = pkt_head_len(pkt);
 
 #ifdef VR_DPDK_TX_PKT_DUMP
-    rte_pktmbuf_dump(m, 0x60);
+    rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
     tx_queue->txq_ops.f_tx(tx_queue->txq_queue_h, m);
