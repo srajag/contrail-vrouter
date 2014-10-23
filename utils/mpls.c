@@ -77,7 +77,7 @@ vr_response_process(void *s)
     }
 }
 
-static int 
+static int
 vr_mpls_op(void)
 {
     vr_mpls_req mpls_req;
@@ -116,9 +116,9 @@ op_retry:
     }
 
     attr_len = nl_get_attr_hdr_size();
-     
+
     error = 0;
-    ret = sandesh_encode(&mpls_req, "vr_mpls_req", vr_find_sandesh_info, 
+    ret = sandesh_encode(&mpls_req, "vr_mpls_req", vr_find_sandesh_info,
                              (nl_get_buf_ptr(cl) + attr_len),
                              (nl_get_buf_len(cl) - attr_len), &error);
 
@@ -259,7 +259,7 @@ parse_long_opts(int opt_index, char *opt_arg)
 static void
 validate_options(void)
 {
-    int sum_op = create_set + delete_set + dump_set + get_set; 
+    int sum_op = create_set + delete_set + dump_set + get_set;
 
     if (sum_op > 1 || mpls_op < 0)
         Usage();
@@ -285,7 +285,7 @@ int main(int argc, char *argv[])
 
     nh_id = 0;
     label = -1;
-    while ((opt = getopt_long(argc, argv, "bcdgn:l:", 
+    while ((opt = getopt_long(argc, argv, "bcdgn:l:",
                     long_options, &option_index)) >= 0) {
             switch (opt) {
             case 'c':

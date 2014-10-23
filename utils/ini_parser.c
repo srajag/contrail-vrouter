@@ -79,7 +79,7 @@ parse_ini_file(void)
 }
 
 bool
-read_value(const char *section, const char *key) 
+read_value(const char *section, const char *key)
 {
     const char *section_start = NULL;
     const char *section_end = NULL;
@@ -95,7 +95,7 @@ read_value(const char *section, const char *key)
     snprintf(section_buffer, sizeof(section_buffer), "[%s]", section);
     /*
      * Check if section is present
-     */ 
+     */
     section_start = strstr(ini_data, section_buffer);
 
     /*
@@ -132,7 +132,7 @@ read_value(const char *section, const char *key)
 }
 
 int
-read_int(const char *section, const char *key) 
+read_int(const char *section, const char *key)
 {
     if (read_value(section, key) == false) {
         return 0;
@@ -141,7 +141,7 @@ read_int(const char *section, const char *key)
 }
 
 const char*
-read_string(const char *section, const char *key) 
+read_string(const char *section, const char *key)
 {
     if (read_value(section, key) == false) {
         return NULL;
@@ -150,14 +150,14 @@ read_string(const char *section, const char *key)
 }
 
 uint32_t
-read_ip(const char *section, const char *key) 
+read_ip(const char *section, const char *key)
 {
     struct in_addr ip;
 
     if (read_value(section, key) == false) {
         return 0;
     }
-   
+
     if (inet_pton(AF_INET, value, &ip) == 1) {
         return ntohl(ip.s_addr);
     }
@@ -168,7 +168,7 @@ int
 get_domain()
 {
     const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
-    if (platform && 
+    if (platform &&
        (strcmp(platform, PLATFORM_DPDK) == 0 ||
         strcmp(platform, PLATFORM_NIC) == 0)) {
         return AF_INET;
@@ -180,7 +180,7 @@ int
 get_type()
 {
     const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
-    if (platform && 
+    if (platform &&
         (strcmp(platform, PLATFORM_DPDK) == 0 ||
          strcmp(platform, PLATFORM_NIC) == 0)) {
         return SOCK_STREAM;
@@ -192,7 +192,7 @@ uint16_t
 get_port()
 {
     const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
-    if (platform && 
+    if (platform &&
         (strcmp(platform, PLATFORM_DPDK) == 0 ||
          strcmp(platform, PLATFORM_NIC) == 0)) {
         return 20914;

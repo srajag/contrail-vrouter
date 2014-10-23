@@ -72,7 +72,7 @@ vr_find_free_mcast_entry(struct vr_mcast_entry_key *key)
 
 static struct vr_nexthop *
 mcast_lookup(unsigned int vrf_id, struct vr_route_req *rt,
-        struct vr_packet *pkt) 
+        struct vr_packet *pkt)
 {
     struct vr_mcast_entry *ent;
     struct vr_mcast_entry_key key;
@@ -131,7 +131,7 @@ mcast_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     key.vrf_id = rt->rtr_req.rtr_vrf_id;
     key.src_ip = rt->rtr_req.rtr_src;
     key.dst_ip = rt->rtr_req.rtr_prefix;
-   
+
     ent = vr_find_mcast_entry(&key);
     if (!ent)
         return -ENOENT;
@@ -141,7 +141,7 @@ mcast_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
 }
 
 static int
-__mcast_add(struct vr_route_req *rt) 
+__mcast_add(struct vr_route_req *rt)
 {
     struct vr_nexthop *old_nh;
     struct vr_mcast_entry *ent;
@@ -229,7 +229,7 @@ __mcast_dump(struct vr_message_dumper *dumper)
             } else {
                 mcast_make_req(&resp, ent);
                 ret = vr_message_dump_object(dumper, VR_ROUTE_OBJECT_ID, &resp);
-                if (ret <= 0) 
+                if (ret <= 0)
                     return ret;
             }
         }
@@ -309,7 +309,7 @@ vr_l2_mcast_control_data_add(struct vr_packet *pkt)
     unsigned int *data;
 
     if (pkt_head_space(pkt) < VR_L2_MCAST_CTRL_DATA_LEN) {
-        pkt = vr_pexpand_head(pkt, VR_L2_MCAST_CTRL_DATA_LEN - 
+        pkt = vr_pexpand_head(pkt, VR_L2_MCAST_CTRL_DATA_LEN -
                                                 pkt_head_space(pkt));
         if (!pkt)
             return false;
@@ -326,7 +326,7 @@ vr_l2_mcast_control_data_add(struct vr_packet *pkt)
 }
 
 unsigned int
-vr_mcast_forward(struct vrouter *router, unsigned short vrf, 
+vr_mcast_forward(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
     struct vr_route_req rt;

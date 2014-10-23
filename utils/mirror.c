@@ -92,7 +92,7 @@ vr_response_process(void *s)
     return;
 }
 
-static int 
+static int
 vr_mirror_op(void)
 {
     vr_mirror_req mirror_req;
@@ -131,9 +131,9 @@ op_retry:
     }
 
     attr_len = nl_get_attr_hdr_size();
-     
+
     error = 0;
-    ret = sandesh_encode(&mirror_req, "vr_mirror_req", vr_find_sandesh_info, 
+    ret = sandesh_encode(&mirror_req, "vr_mirror_req", vr_find_sandesh_info,
                              (nl_get_buf_ptr(cl) + attr_len),
                              (nl_get_buf_len(cl) - attr_len), &error);
 

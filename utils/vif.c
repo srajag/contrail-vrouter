@@ -327,7 +327,7 @@ vhost_create(void)
 static int
 vr_intf_send_msg(void *request, char *request_string)
 {
-    int ret, error, attr_len; 
+    int ret, error, attr_len;
     struct nl_response *resp;
     struct nlmsghdr *nlh;
 
@@ -409,11 +409,11 @@ vr_vrf_assign_dump_request(void)
 
     return 0;
 }
- 
-static int 
+
+static int
 vr_intf_op(unsigned int op)
 {
-    int ret; 
+    int ret;
     vr_interface_req intf_req;
 
     if (create_set)
@@ -744,7 +744,7 @@ int
 main(int argc, char *argv[])
 {
     int ret, opt, option_index;
-    /* 
+    /*
      * the proto of the socket changes based on whether we are creating an
      * interface in linux or doing an operation in vrouter
      */
@@ -794,12 +794,12 @@ main(int argc, char *argv[])
                 parse_long_opts(VRF_OPT_INDEX, optarg);
                 break;
 
-            case 'p':  
+            case 'p':
                 policy_set = 1;
                 parse_long_opts(POLICY_OPT_INDEX, NULL);
                 break;
 
-            case 'D':  
+            case 'D':
                 pmd_set = 1;
                 parse_long_opts(PMD_OPT_INDEX, NULL);
                 break;

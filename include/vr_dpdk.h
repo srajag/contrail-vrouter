@@ -43,18 +43,24 @@
  */
 
 /* lcore mask */
-#define VR_DPDK_LCORE_MASK          "0x3f"
+#define VR_DPDK_LCORE_MASK          "0xf"
 /* Number of service lcores */
 #define VR_DPDK_NB_SERVICE_LCORES   2
 /* Minimum number of lcores */
 #define VR_DPDK_MIN_LCORES          2
 /* Memory to allocate at startup in MB */
-#define VR_DPDK_MAX_MEM             "256"
+#define VR_DPDK_MAX_MEM             "512"
+/* Number of memory channels to use */
+#define VR_DPDK_MAX_MEMCHANNELS     "4"
+/* Use UDP source port hashing */
+#define VR_DPDK_USE_MPLS_UDP_ECMP   false
 /* Use hardware filtering (Flow Director) */
-#define VR_DPDK_USE_HW_FILTERING    false
+#define VR_DPDK_USE_HW_FILTERING    true
 /* KNI generates random MACs for e1000e NICs, so we need this
  * option enabled for the development on servers with those NICs */
 #define VR_DPDK_ENABLE_PROMISC      false
+/* Maximum number of RX queues per lcore (must be less than 64) */
+#define VR_DPDK_MAX_LCORE_RX_QUEUES 32
 /* Maximum number of hardware RX queues to use for RSS and filtering
  * (limited by NIC and number of per queue TX/RX descriptors) */
 #define VR_DPDK_MAX_NB_RX_QUEUES    11
@@ -66,10 +72,10 @@
 #define VR_DPDK_NB_RXD              256
 /* Number of hardware TX ring descriptors */
 #define VR_DPDK_NB_TXD              512
-/* Offset to MPLS label for hardware filtering */
-#define VR_DPDK_MPLS_OFFSET         (VR_ETHER_HLEN          \
-                                    + sizeof(struct vr_ip)  \
-                                    + sizeof(struct vr_udp))
+/* Offset to MPLS label for hardware filtering (in 16-bit word units) */
+#define VR_DPDK_MPLS_OFFSET         ((VR_ETHER_HLEN             \
+                                    + sizeof(struct vr_ip)      \
+                                    + sizeof(struct vr_udp))/2)
 /* Maximum number of rings per lcore (maximum is VR_MAX_INTERFACES*RTE_MAX_LCORE) */
 #define VR_DPDK_MAX_RINGS           (VR_MAX_INTERFACES*2)
 /* Max size of a single packet */
@@ -98,7 +104,7 @@
 /* How many objects (mbufs) to keep in per-lcore RSS mempool cache */
 #define VR_DPDK_RSS_MEMPOOL_CACHE_SZ    (VR_DPDK_MAX_BURST_SZ*8)
 /* Number of VM mempools */
-#define VR_DPDK_MAX_VM_MEMPOOLS     (VR_DPDK_MAX_NB_RX_QUEUES - VR_DPDK_MIN_LCORES)*2
+#define VR_DPDK_MAX_VM_MEMPOOLS     (VR_DPDK_MAX_NB_RX_QUEUES*2 - VR_DPDK_MIN_LCORES)
 /* Number of mbufs in VM mempool */
 #define VR_DPDK_VM_MEMPOOL_SZ       1024
 /* How many objects (mbufs) to keep in per-lcore VM mempool cache */
@@ -108,8 +114,6 @@
 /* TX flush timeout (in loops or US if USE_TIMER defined) */
 #define VR_DPDK_TX_FLUSH_LOOPS      5
 #define VR_DPDK_TX_FLUSH_US         100
-/* Lcore ID to create timers on */
-#define VR_DPDK_TIMER_LCORE_ID      0
 /* Sleep time in US if there are no queues to poll */
 #define VR_DPDK_SLEEP_NO_QUEUES_US  10000
 /* Sleep (in US) or yield if no packets received (use 0 to disable) */
@@ -134,7 +138,6 @@
  */
 
 struct vr_dpdk_rx_queue {
-    SLIST_ENTRY(vr_dpdk_rx_queue) rxq_next;
     /* RX queue operators */
     struct rte_port_in_ops rxq_ops;
     /* Queue handler */
@@ -162,32 +165,29 @@ struct vr_dpdk_ring_to_push {
     struct vr_dpdk_tx_queue *rtp_tx_queue;
 };
 
-SLIST_HEAD(vr_dpdk_rx_slist, vr_dpdk_rx_queue);
 SLIST_HEAD(vr_dpdk_tx_slist, vr_dpdk_tx_queue);
 
 struct vr_dpdk_lcore {
-    /* Global stop flag */
-    rte_atomic16_t lcore_stop_flag;
-    /* Pointer to memory pool */
-    struct rte_mempool *pktmbuf_pool;
-    /* Number of RX queues assigned to the lcore (for the scheduler) */
-    uint16_t lcore_nb_rx_queues;
-    /* RX queues head */
-    struct vr_dpdk_rx_slist lcore_rx_head;
+    /* Mask of enabled RX queues */
+    uint64_t lcore_rx_queues_mask;
     /* List of RX queues */
-    struct vr_dpdk_rx_queue lcore_rx_queues[VR_MAX_INTERFACES];
+    struct vr_dpdk_rx_queue lcore_rx_queues[VR_DPDK_MAX_LCORE_RX_QUEUES];
     /* TX queues head */
     struct vr_dpdk_tx_slist lcore_tx_head;
     /* Table of TX queues */
     struct vr_dpdk_tx_queue lcore_tx_queues[VR_MAX_INTERFACES];
     /* Number of rings to push for the lcore */
     uint16_t lcore_nb_rings_to_push;
-    /* List of rings to push */
-    struct vr_dpdk_ring_to_push lcore_rings_to_push[VR_DPDK_MAX_RINGS];
     /* Number of free rings available for the lcore */
     uint16_t lcore_nb_free_rings;
+    /* List of rings to push */
+    struct vr_dpdk_ring_to_push lcore_rings_to_push[VR_DPDK_MAX_RINGS];
     /* List of free rings */
     struct rte_ring *lcore_free_rings[VR_DPDK_MAX_RINGS];
+    /* Global stop flag */
+    rte_atomic16_t lcore_stop_flag;
+    /* Number of RX queues assigned to the lcore (for the scheduler) */
+    uint16_t lcore_nb_rx_queues;
 };
 
 /* Hardware RX queue state */
@@ -305,6 +305,7 @@ vr_dpdk_mbuf_to_pkt(struct rte_mbuf *mbuf)
  * vr_dpdk_mbuf_reset - if the mbuf changes, possibley due to
  * pskb_may_pull, reset fields of the pkt structure that point at
  * the mbuf fields.
+ * Note: we do not reset pkt->data here
  */
 static inline void
 vr_dpdk_mbuf_reset(struct vr_packet *pkt)
@@ -312,10 +313,11 @@ vr_dpdk_mbuf_reset(struct vr_packet *pkt)
     struct rte_mbuf *mbuf = vr_dpdk_pkt_to_mbuf(pkt);
 
     pkt->vp_head = mbuf->buf_addr;
-    pkt->vp_data = mbuf->pkt.data - mbuf->buf_addr;
-    pkt->vp_len = mbuf->pkt.data_len;
-    pkt->vp_tail = pkt->vp_data + pkt->vp_len;
+    pkt->vp_tail = rte_pktmbuf_headroom(mbuf) + mbuf->pkt.data_len;
     pkt->vp_end = mbuf->buf_len;
+    pkt->vp_len = pkt->vp_tail - pkt->vp_data;
+
+    return;
 }
 
 /*
@@ -339,6 +341,9 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 int vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *);
 /* Get free queue ID */
 int vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif);
+/* Add hardware filter */
+int vr_dpdk_ethdev_filter_add(struct vr_interface *vif, unsigned queue_id,
+    unsigned dst_ip, unsigned mpls_label);
 
 /*
  * vr_dpdk_flow_mem.c
@@ -379,6 +384,9 @@ int vr_dpdk_lcore_launch(void *dummy);
 int vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     uint16_t nb_rx_queues, vr_dpdk_rx_queue_init_op rx_queue_init_op,
     uint16_t nb_tx_queues, vr_dpdk_tx_queue_init_op tx_queue_init_op);
+/* Schedule an MPLS label queue */
+int vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
+    unsigned mpls_label);
 /* Returns the least used lcore or RTE_MAX_LCORE */
 unsigned vr_dpdk_lcore_least_used_get(void);
 

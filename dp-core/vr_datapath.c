@@ -14,7 +14,7 @@ static inline bool
 well_known_mac(unsigned char *dmac)
 {
     if (!memcmp(&dmac[VR_ETHER_PROTO_MAC_OFF], vr_well_known_mac_infix,
-                            VR_ETHER_PROTO_MAC_LEN)) 
+                            VR_ETHER_PROTO_MAC_LEN))
         if (!*dmac || (*dmac == 0x1))
             return true;
 
@@ -43,7 +43,7 @@ vr_handle_arp_request(struct vrouter *router, unsigned short vrf,
     unsigned int dpa, rt_flags;
     bool should_proxy = false;
 
-    /* 
+    /*
      * still @ l2 level, and hence we can use the mode of the interface
      * to figure out whether we need to xconnect or not. in the xconnect
      * mode, just pass it to the peer so that he can handle the arp requests
@@ -276,7 +276,7 @@ vr_l3_input(unsigned short vrf, struct vr_packet *pkt,
     pkt_set_network_header(pkt, pkt->vp_data);
     pkt_set_inner_network_header(pkt, pkt->vp_data);
     if (eth_proto == VR_ETH_PROTO_IP) {
-        if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj && 
+        if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj &&
                                              vif_is_virtual(vif)) {
             if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, VROUTER_OVERLAY_LEN))) {
                 vr_pfree(pkt, reason);

@@ -435,7 +435,7 @@ flow_table_map(vr_flow_req *req)
 
 #ifdef __DPDK__
     ft->ft_entries = (struct vr_flow_entry *)vr_shmem_alloc(
-		VR_FLOW_SHMEM_NAME, req->fr_ftable_size);
+        VR_FLOW_SHMEM_NAME, req->fr_ftable_size);
 #else
     if (req->fr_ftable_dev < 0)
         exit(ENODEV);

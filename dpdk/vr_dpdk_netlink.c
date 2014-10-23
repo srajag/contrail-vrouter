@@ -67,7 +67,7 @@ dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
         resp_nlh->nlmsg_seq = seq;
         resp_nlh->nlmsg_pid = 0;
 
-        resp_genlh = (struct genlmsghdr *)((unsigned char *)resp_nlh + 
+        resp_genlh = (struct genlmsghdr *)((unsigned char *)resp_nlh +
                 NLMSG_HDRLEN);
         memcpy(resp_genlh, genlh, sizeof(*genlh));
 

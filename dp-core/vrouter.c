@@ -73,7 +73,7 @@ static struct vr_module modules[] = {
         .init           =       vr_vxlan_init,
         .exit           =       vr_vxlan_exit,
     },
-    
+
 };
 
 
@@ -227,7 +227,7 @@ vrouter_exit(bool soft_reset)
 
     return;
 }
-    
+
 int
 vrouter_init(void)
 {
@@ -275,7 +275,7 @@ vrouter_ops_process(void *s_req)
     switch (ops->h_op) {
     case SANDESH_OP_RESET:
         vr_printf("vrouter soft reset start\n");
-        ret = vrouter_soft_reset();        
+        ret = vrouter_soft_reset();
         vr_printf("vrouter soft reset done(%d)\n", ret);
         break;
     default:

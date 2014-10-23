@@ -20,6 +20,7 @@
 
 #include <rte_port_ethdev.h>
 #include <rte_errno.h>
+#include <rte_byteorder.h>
 
 static struct rte_eth_conf ethdev_conf = {
     .link_speed = 0,    /* ETH_LINK_SPEED_10[0|00|000], or 0 for autonegotation */
@@ -55,11 +56,12 @@ static struct rte_eth_conf ethdev_conf = {
     .fdir_conf = {
 #if VR_DPDK_USE_HW_FILTERING
         .mode = RTE_FDIR_MODE_PERFECT,          /* Flow Director mode. */
+        .status = RTE_FDIR_REPORT_STATUS,       /* How to report FDIR hash. */
 #else
         .mode = RTE_FDIR_MODE_NONE,
+        .status = RTE_FDIR_NO_REPORT_STATUS,
 #endif
         .pballoc = RTE_FDIR_PBALLOC_64K,        /* Space for FDIR filters. */
-        .status = RTE_FDIR_NO_REPORT_STATUS,    /* How to report FDIR hash. */
         /* Offset of flexbytes field in RX packets (in 16-bit word units). */
         .flexbytes_offset = VR_DPDK_MPLS_OFFSET,
         /* RX queue of packets matching a "drop" filter in perfect mode. */
@@ -104,6 +106,35 @@ static const struct rte_eth_txconf tx_queue_conf = {
         | ETH_TXQ_FLAGS_NOXSUMTCP
 };
 
+/* Add hardware filter */
+int
+vr_dpdk_ethdev_filter_add(struct vr_interface *vif, unsigned queue_id,
+    unsigned dst_ip, unsigned mpls_label)
+{
+    uint8_t port_id = vif->vif_os_idx;
+    struct rte_fdir_filter filter;
+
+    /* accept 2-byte labels only */
+    if (mpls_label > 0xffff)
+        return -EINVAL;
+
+    if (queue_id > VR_DPDK_MAX_NB_RX_QUEUES)
+        return -EINVAL;
+
+    memset(&filter, 0, sizeof(filter));
+    filter.iptype = RTE_FDIR_IPTYPE_IPV4;
+    filter.l4type = RTE_FDIR_L4TYPE_UDP;
+    filter.ip_dst.ipv4_addr = dst_ip;
+    filter.port_dst = rte_cpu_to_be_16((uint16_t)VR_MPLS_OVER_UDP_DST_PORT);
+    filter.flex_bytes = rte_cpu_to_be_16((uint16_t)mpls_label);
+
+    RTE_LOG(DEBUG, VROUTER, "%s: ip_dst=0x%x port_dst=%d flex_bytes=%d\n", __func__,
+        (unsigned)dst_ip, (unsigned)VR_MPLS_OVER_UDP_DST_PORT, (unsigned)mpls_label);
+
+    return rte_eth_dev_fdir_add_perfect_filter(port_id, &filter, (uint16_t)mpls_label,
+        (uint8_t)queue_id, 0);
+}
+
 /* Get a ready queue ID */
 int
 vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif)
@@ -131,7 +162,10 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
     struct vr_dpdk_ethdev *ethdev;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
+    struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[0];
+
+    /* find empty RX queue */
+    while (rx_queue->rxq_queue_h) rx_queue++;
 
     ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
     port_id = ethdev->ethdev_port_id;
@@ -408,7 +442,7 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
      * KNI generates random MACs for e1000e NICs, so we need this
      * option enabled for the development on servers with those NICs
      */
-#if VR_DPDK_ENABLE_PROMISC == true
+#if VR_DPDK_ENABLE_PROMISC
     rte_eth_promiscuous_enable(port_id);
 #endif
 

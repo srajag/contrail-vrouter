@@ -110,7 +110,7 @@ vr_fragment_add(struct vrouter *router, unsigned short vrf, struct vr_ip *iph,
 
 struct vr_fragment *
 vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *iph)
-{   
+{
     unsigned int hash, index, i;
     struct vr_fragment_key key;
     struct vr_fragment *fe;
@@ -261,7 +261,7 @@ vr_fragment_table_scanner_exit(struct vrouter *router)
 
 void
 vr_fragment_table_exit(struct vrouter *router)
-{   
+{
     vr_fragment_table_scanner_exit(router);
 
     if (router->vr_fragment_table)

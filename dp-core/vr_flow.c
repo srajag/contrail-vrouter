@@ -55,7 +55,7 @@ static void vr_flush_entry(struct vrouter *, struct vr_flow_entry *,
         struct vr_flow_md *, struct vr_forwarding_md *);
 
 static void
-vr_flow_reset_mirror(struct vrouter *router, struct vr_flow_entry *fe, 
+vr_flow_reset_mirror(struct vrouter *router, struct vr_flow_entry *fe,
                                                             unsigned int index)
 {
     if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
@@ -236,7 +236,7 @@ vr_find_free_entry(struct vrouter *router, struct vr_flow_key *key,
         }
         index++;
     }
-        
+
     if (!fe) {
         index = hash % vr_oflow_entries;
         for (i = 0; i < vr_oflow_entries; i++) {
@@ -400,7 +400,7 @@ static int
 vr_flow_nat(unsigned short vrf, struct vr_flow_entry *fe, struct vr_packet *pkt,
         unsigned short proto, struct vr_forwarding_md *fmd)
 {
-    unsigned int ip_inc, inc = 0; 
+    unsigned int ip_inc, inc = 0;
     unsigned short *t_sport, *t_dport;
     struct vrouter *router = pkt->vp_if->vif_router;
     struct vr_flow_entry *rfe;
@@ -516,7 +516,7 @@ vr_flow_set_forwarding_md(struct vrouter *router, struct vr_flow_entry *fe,
 }
 
 static int
-vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe, 
+vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         unsigned int index, struct vr_packet *pkt,
         unsigned short proto, struct vr_forwarding_md *fmd)
 {
@@ -638,7 +638,7 @@ vr_do_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         fe->fe_stats.flow_bytes_oflow++;
 
     new_stats = __sync_add_and_fetch(&fe->fe_stats.flow_packets, 1);
-    if (!new_stats) 
+    if (!new_stats)
         fe->fe_stats.flow_packets_oflow++;
 
     if (fe->fe_action == VR_FLOW_ACTION_HOLD) {
@@ -732,16 +732,16 @@ vr_flow_lookup(struct vrouter *router, unsigned short vrf,
         vr_flow_entry_set_hold(router, flow_e);
         vr_do_flow_action(router, flow_e, fe_index, pkt, proto, fmd);
         return 0;
-    } 
-    
+    }
+
 
     return vr_do_flow_action(router, flow_e, fe_index, pkt, proto, fmd);
 }
 
 
 /*
- * This inline function decides whether to trap the packet, or bypass 
- * flow table or not. 
+ * This inline function decides whether to trap the packet, or bypass
+ * flow table or not.
  */
 inline unsigned int
 vr_flow_parse(struct vrouter *router, struct vr_flow_key *key,
@@ -751,7 +751,7 @@ vr_flow_parse(struct vrouter *router, struct vr_flow_key *key,
    /* without any data, the result has to be BYPASS, right? */
    unsigned int res = VR_FLOW_BYPASS;
 
-    /* 
+    /*
      * if the packet has already done one round of flow lookup, there
      * is no point in doing it again, eh?
      */
@@ -875,7 +875,7 @@ vr_flow_inet_input(struct vrouter *router, unsigned short vrf,
             if (vr_ip_fragment_tail(ip))
                 vr_fragment_del(frag);
         } else {
-            /* 
+            /*
              * since there is no other way of deriving a key, set the
              * key_p to NULL, indicating to code below that there is
              * indeed no need for flow lookup
@@ -912,7 +912,7 @@ vr_flow_inet_input(struct vrouter *router, unsigned short vrf,
         return vr_flow_lookup(router, vrf, key_p, pkt, proto, fmd);
     }
 
-    /* 
+    /*
      * ...come here, when there is not enough information to do a
      * flow lookup
      */
@@ -939,7 +939,7 @@ vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
         }
 
         pkt = pnode->pl_packet;
-        /* 
+        /*
          * this is only a security check and not a catch all check. one note
          * of caution. please do not access pkt->vp_if till the if block is
          * succesfully bypassed
@@ -974,7 +974,7 @@ vr_flow_flush(void *arg)
     struct vrouter *router;
     struct vr_flow_entry *fe;
     struct vr_forwarding_md fmd;
-    struct vr_flow_md *flmd = 
+    struct vr_flow_md *flmd =
                 (struct vr_flow_md *)arg;
 
     router = flmd->flmd_router;
@@ -992,7 +992,7 @@ vr_flow_flush(void *arg)
 
     if (!(flmd->flmd_flags & VR_FLOW_FLAG_ACTIVE)) {
         vr_reset_flow_entry(router, fe, flmd->flmd_index);
-    } 
+    }
 
     return;
 }
@@ -1005,7 +1005,7 @@ vr_flow_set_mirror(struct vrouter *router, vr_flow_req *req,
 
     if (!(req->fr_flags & VR_FLOW_FLAG_MIRROR) &&
             (fe->fe_flags & VR_FLOW_FLAG_MIRROR)) {
-    	vr_flow_reset_mirror(router, fe, req->fr_index);
+        vr_flow_reset_mirror(router, fe, req->fr_index);
         return;
     }
 
@@ -1126,7 +1126,7 @@ vr_flow_req_is_invalid(struct vrouter *router, vr_flow_req *req,
             return -EINVAL;
     }
 
-    /* 
+    /*
      * for delete, we need not validate nh_index from incoming request
      */
     if (req->fr_flags & VR_FLOW_FLAG_ACTIVE) {
@@ -1220,7 +1220,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     }
 
     fe->fe_vrf = req->fr_flow_vrf;
-    if (req->fr_flags & VR_FLOW_FLAG_VRFT) 
+    if (req->fr_flags & VR_FLOW_FLAG_VRFT)
         fe->fe_dvrf = req->fr_flow_dvrf;
 
     fe->fe_ecmp_nh_index = req->fr_ecmp_nh_index;
@@ -1228,7 +1228,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     fe->fe_action = req->fr_action;
     if (fe->fe_action == VR_FLOW_ACTION_DROP)
         fe->fe_drop_reason = (uint8_t)req->fr_drop_reason;
-    fe->fe_flags = req->fr_flags; 
+    fe->fe_flags = req->fr_flags;
 
 
     return vr_flow_schedule_transition(router, req, fe);

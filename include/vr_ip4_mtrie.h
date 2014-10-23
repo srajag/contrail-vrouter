@@ -1,5 +1,5 @@
 /*
- * vr_ip4_mtrie.h -- 
+ * vr_ip4_mtrie.h --
  *
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
@@ -28,7 +28,7 @@ struct ip4_bucket_entry {
         struct vr_nexthop *nexthop_p;
         struct ip4_bucket *bucket_p;
         unsigned long      long_i;
-    } entry_data;                  
+    } entry_data;
 
     unsigned int entry_prefix_len:8;
     unsigned int entry_label_flags:4;

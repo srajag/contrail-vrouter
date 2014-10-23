@@ -107,7 +107,7 @@ struct vr_nexthop {
                                            struct vr_packet *,
                                            struct vr_nexthop *,
                                            struct vr_forwarding_md *);
-    int                 (*nh_reach_nh)(unsigned short, 
+    int                 (*nh_reach_nh)(unsigned short,
                                        struct vr_packet *,
                                        struct vr_nexthop *,
                                        struct vr_forwarding_md *);

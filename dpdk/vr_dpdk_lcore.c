@@ -46,32 +46,12 @@ void
 dpdk_lcore_rx_queue_add(unsigned lcore_id, struct vr_dpdk_rx_queue *rx_queue)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    unsigned vif_idx = rx_queue->rxq_vif->vif_idx;
-    struct vr_dpdk_rx_queue *prev_rx_queue;
-    struct vr_dpdk_rx_queue *cur_rx_queue;
+    uint8_t queue_id = rx_queue - &lcore->lcore_rx_queues[0];
 
-    /* write barrier */
     rte_wmb();
 
-    /* add queue to the list */
-    if (SLIST_EMPTY(&lcore->lcore_rx_head)) {
-        /* insert first queue */
-        SLIST_INSERT_HEAD(&lcore->lcore_rx_head, rx_queue, rxq_next);
-    } else {
-        /* sort RX queues by vif_idx to optimize CPU cache usage */
-        prev_rx_queue = NULL;
-        SLIST_FOREACH(cur_rx_queue, &lcore->lcore_rx_head, rxq_next) {
-            if (cur_rx_queue->rxq_vif->vif_idx < vif_idx)
-                prev_rx_queue = cur_rx_queue;
-            else
-                break;
-        }
-        /* insert new queue */
-        if (prev_rx_queue == NULL)
-            SLIST_INSERT_HEAD(&lcore->lcore_rx_head, rx_queue, rxq_next);
-        else
-            SLIST_INSERT_AFTER(prev_rx_queue, rx_queue, rxq_next);
-    }
+    /* set mask to enable the queue */
+    lcore->lcore_rx_queues_mask |= 1ULL << queue_id;
 
     /* increase the number of RX queues */
     lcore->lcore_nb_rx_queues++;
@@ -108,6 +88,42 @@ dpdk_lcore_tx_queue_add(unsigned lcore_id, struct vr_dpdk_tx_queue *tx_queue)
         else
             SLIST_INSERT_AFTER(prev_tx_queue, tx_queue, txq_next);
     }
+}
+
+/* Schedule an MPLS label queue */
+int
+vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
+    unsigned mpls_label)
+{
+    int queue_id, ret;
+    struct vr_dpdk_rx_queue *rx_queue;
+    unsigned least_used_id = vr_dpdk_lcore_least_used_get();
+
+    if (least_used_id == RTE_MAX_LCORE) {
+        RTE_LOG(ERR, VROUTER, "\terror getting the least used lcore ID\n");
+        return -EFAULT;
+    }
+
+    queue_id = vr_dpdk_ethdev_ready_queue_id_get(vif);
+    if (queue_id < 0)
+        return -ENOMEM;
+
+    /* add hardware filter */
+    ret = vr_dpdk_ethdev_filter_add(vif, queue_id, dst_ip, mpls_label);
+    if (ret < 0)
+        return ret;
+
+    /* init RX queue */
+    RTE_LOG(INFO, VROUTER, "\tlcore %u RX from filtering queue %d MPLS %u\n",
+        least_used_id, queue_id, mpls_label);
+    rx_queue = vr_dpdk_ethdev_rx_queue_init(least_used_id, vif, queue_id);
+    if (rx_queue == NULL)
+        return -EFAULT;
+
+    /* add the queue to the lcore */
+    dpdk_lcore_rx_queue_add(least_used_id, rx_queue);
+
+    return 0;
 }
 
 /* Schedule an interface */
@@ -243,29 +259,54 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
     }
 }
 
+/* Forwarding lcore RX */
+static inline uint32_t
+dpdk_lcore_fwd_rx(struct vr_dpdk_lcore *lcore, struct rte_mbuf **pkts,
+    uint64_t *rx_queues_mask)
+{
+    struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[0];
+    uint64_t cur_queues_mask = *rx_queues_mask;
+    uint64_t cur_queue = 1;
+    uint32_t nb_pkts = 0;
+
+    /* for all RX queues */
+    while (cur_queues_mask) {
+        rte_prefetch0(rx_queue);
+        if (likely(cur_queues_mask & cur_queue)) {
+            /* burst RX */
+            nb_pkts = rx_queue->rxq_ops.f_rx(rx_queue->rxq_queue_h, pkts,
+                rx_queue->rxq_burst_size);
+            cur_queues_mask &= ~cur_queue;
+            if (likely(nb_pkts > 0)) {
+                /* transmit packets to vrouter */
+                dpdk_vroute(rx_queue->rxq_vif, pkts, nb_pkts);
+            } else {
+                /* mark the queue as empty */
+                *rx_queues_mask &= ~cur_queue;
+            }
+        }
+        cur_queue <<= 1;
+        rx_queue++;
+    }
+    return nb_pkts;
+}
+
 /* Forwarding lcore IO */
 static inline void
 dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
 {
-    struct vr_dpdk_rx_queue *rx_queue;
-    uint32_t nb_pkts;
+    uint64_t rx_queues_mask = lcore->lcore_rx_queues_mask;
     uint64_t total_pkts = 0;
     struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ];
+    uint32_t nb_pkts;
     int i;
     struct vr_dpdk_ring_to_push *rtp;
 
-    /* for all RX queues */
-    SLIST_FOREACH(rx_queue, &lcore->lcore_rx_head, rxq_next) {
-        /* burst RX */
-        nb_pkts = rx_queue->rxq_ops.f_rx(rx_queue->rxq_queue_h, pkts,
-            rx_queue->rxq_burst_size);
-        if (unlikely(nb_pkts == 0))
-            continue;
-
-        total_pkts += nb_pkts;
-        /* transmit packets to vrouter */
-        dpdk_vroute(rx_queue->rxq_vif, pkts, nb_pkts);
-    }
+    total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
+    total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
+    total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
+    total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
+    total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
 
     rcu_quiescent_state();
 
@@ -315,7 +356,6 @@ dpdk_lcore_init(void)
     }
 
     /* init lcore lists */
-    SLIST_INIT(&lcore->lcore_rx_head);
     SLIST_INIT(&lcore->lcore_tx_head);
 
     vr_dpdk.lcores[lcore_id] = lcore;
@@ -348,7 +388,7 @@ dpdk_lcore_fwd_loop(struct vr_dpdk_lcore *lcore)
     uint64_t cur_cycles = 0;
     uint64_t diff_cycles;
     uint64_t last_tx_cycles = 0;
-#if VR_DPDK_USE_TIMER == true
+#if VR_DPDK_USE_TIMER
     /* calculate timeouts in CPU cycles */
     const uint64_t tx_flush_cycles = (rte_get_timer_hz() + US_PER_S - 1)
         * VR_DPDK_TX_FLUSH_US / US_PER_S;
@@ -358,11 +398,11 @@ dpdk_lcore_fwd_loop(struct vr_dpdk_lcore *lcore)
 
     RTE_LOG(DEBUG, VROUTER, "Hello from forwarding lcore %u\n", rte_lcore_id());
 
-    while (likely(1)) {
+    while (1) {
         rte_prefetch0(lcore);
 
         /* update cycles counter */
-#if VR_DPDK_USE_TIMER == true
+#if VR_DPDK_USE_TIMER
         cur_cycles = rte_get_timer_cycles();
 #else
         cur_cycles++;
@@ -411,7 +451,7 @@ dpdk_lcore_service_loop(struct vr_dpdk_lcore *lcore, unsigned netlink_lcore_id,
     if (lcore_id == packet_lcore_id)
         vr_dpdk.packet_lcore_id = packet_lcore_id;
 
-    while (likely(1)) {
+    while (1) {
         rte_prefetch0(lcore);
 
         if (lcore_id == netlink_lcore_id) {

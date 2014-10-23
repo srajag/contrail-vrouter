@@ -55,7 +55,7 @@ vr_btable_get_address(struct vr_btable *table, unsigned int offset)
         if (!partition)
             break;
 
-        if (offset >= partition->vb_offset && 
+        if (offset >= partition->vb_offset &&
                 offset < partition->vb_offset + partition->vb_mem_size)
             return table->vb_mem[i] + (offset - partition->vb_offset);
     }

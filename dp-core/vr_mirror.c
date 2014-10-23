@@ -31,7 +31,7 @@ vrouter_get_mirror(unsigned int rid, unsigned int index)
 }
 
 int
-vrouter_put_mirror(struct vrouter *router, unsigned int index) 
+vrouter_put_mirror(struct vrouter *router, unsigned int index)
 {
     struct vr_mirror_entry *mirror;
 
@@ -314,7 +314,7 @@ vr_mirror_meta_entry_destroy(unsigned int index, void *arg)
 
 int
 vr_mirror_meta_entry_set(struct vrouter *router, unsigned int index,
-                         unsigned int mir_sip, unsigned short mir_sport, 
+                         unsigned int mir_sip, unsigned short mir_sport,
                          void *meta_data, unsigned int meta_data_len,
                          unsigned short mirror_vrf)
 {
@@ -342,7 +342,7 @@ vr_mirror_meta_entry_set(struct vrouter *router, unsigned int index,
     me_old = vr_itable_set(router->vr_mirror_md, index, me);
     if (me_old && me_old != VR_ITABLE_ERR_PTR)
         vr_mirror_meta_entry_destroy(index, (void *)me_old);
-    
+
     return 0;
 }
 
@@ -359,7 +359,7 @@ vr_mirror_meta_entry_del(struct vrouter *router, unsigned int index)
 }
 
 int
-vr_mirror(struct vrouter *router, uint8_t mirror_id, 
+vr_mirror(struct vrouter *router, uint8_t mirror_id,
           struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
     unsigned char *buf;
@@ -408,10 +408,10 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
 
             reset = false;
             if (vr_pcow(pkt,  VR_MIRROR_PKT_HEAD_SPACE + mirror_md_len +
-                    pkt_nh->nh_encap_len)) 
+                    pkt_nh->nh_encap_len))
                 goto fail;
 
-            if (!pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, pkt, 
+            if (!pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, pkt,
                     pkt_nh->nh_data, pkt_nh->nh_encap_len))
                 goto fail;
         }
@@ -433,7 +433,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
         goto fail;
 
     captured_len = htonl(pkt_len(pkt));
-    if (mirror_md_len) 
+    if (mirror_md_len)
         memcpy(buf, mirror_md, mirror_md_len);
 
     if (mirror->mir_flags & VR_MIRROR_PCAP) {
@@ -441,10 +441,10 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
         pcap = (struct vr_pcap *)pkt_push(pkt, sizeof(struct vr_pcap));
         if (!pcap)
             goto fail;
-        
+
         pcap->pcap_incl_len = captured_len;
         pcap->pcap_orig_len = captured_len;
-        
+
         /* Get the time stamp in seconds and nanoseconds*/
         vr_get_time(&pcap->pcap_ts_sec, &pcap->pcap_ts_usec);
         pcap->pcap_ts_sec = htonl(pcap->pcap_ts_sec);
@@ -465,7 +465,7 @@ vr_mirror_exit(struct vrouter *router, bool soft_reset)
 {
     unsigned int i;
 
-    if (router->vr_mirrors) 
+    if (router->vr_mirrors)
         for (i = 0; i < router->vr_max_mirror_indices; i++)
             if (router->vr_mirrors[i])
                 vrouter_put_mirror(router, i);
@@ -478,7 +478,7 @@ vr_mirror_exit(struct vrouter *router, bool soft_reset)
 
     if (!soft_reset) {
         vr_free(router->vr_mirrors);
-        router->vr_mirrors = NULL; 
+        router->vr_mirrors = NULL;
         router->vr_max_mirror_indices = 0;
     }
 

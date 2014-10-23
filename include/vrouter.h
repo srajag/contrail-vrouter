@@ -96,15 +96,18 @@ struct host_os {
                                    unsigned short, unsigned short *,
                                    int (*is_label_l2)(unsigned int,
                                        unsigned int, unsigned short *));
-    int  (*hos_pcow)(struct vr_packet *, unsigned short); 
-    __u16 (*hos_get_udp_src_port)(struct vr_packet *, 
+    int  (*hos_pcow)(struct vr_packet *, unsigned short);
+    __u16 (*hos_get_udp_src_port)(struct vr_packet *,
                                   struct vr_forwarding_md *, unsigned short);
     int (*hos_pkt_from_vm_tcp_mss_adj)(struct vr_packet *, unsigned short);
     int  (*hos_pull_inner_headers_fast)(struct vr_packet *,
                                         unsigned char, int
                                         (*is_label_l2)(unsigned int,
-                                            unsigned int, unsigned short *), 
+                                            unsigned int, unsigned short *),
                                         int *, int *);
+
+    void (*hos_add_mpls)(struct vrouter *, unsigned);
+    void (*hos_del_mpls)(struct vrouter *, unsigned);
 };
 
 #define vr_malloc                       vrouter_host->hos_malloc

@@ -8,7 +8,7 @@
 #include "vr_os.h"
 
 void
-vr_response_process(void *s_req) 
+vr_response_process(void *s_req)
 {
 }
 

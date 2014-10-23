@@ -73,16 +73,16 @@ vr_route_add(vr_route_req *req)
 }
 
 static struct vr_rtable *
-vr_get_inet_table(struct vrouter *router, int id) 
+vr_get_inet_table(struct vrouter *router, int id)
 {
     if (!router)
         return NULL;
 
-    if (id == RT_UCAST) 
+    if (id == RT_UCAST)
         return router->vr_inet_rtable;
-    else if (id == RT_MCAST) 
+    else if (id == RT_MCAST)
         return router->vr_inet_mcast_rtable;
-    
+
     return NULL;
 }
 
@@ -108,7 +108,7 @@ vr_route_get(vr_route_req *req)
     struct vrouter *router;
     struct vr_rtable *rtable;
     int ret = 0;
-   
+
     vr_req.rtr_req = *req;
     router = vrouter_get(req->rtr_rid);
     if (!router) {
@@ -137,7 +137,7 @@ vr_route_dump(vr_route_req *req)
     struct vrouter *router;
     struct vr_rtable *rtable = NULL;
     int ret;
-   
+
     vr_req.rtr_req = *req;
     router = vrouter_get(req->rtr_rid);
     if (!router) {
@@ -213,7 +213,7 @@ vr_inet_vrf_stats_dump(struct vrouter *router, vr_vrf_stats_req *req)
 
 generate_error:
     vr_send_response(ret);
-    return; 
+    return;
 }
 
 static void
@@ -229,7 +229,7 @@ vr_inet_vrf_stats_get(struct vrouter *router, vr_vrf_stats_req *req)
         goto generate_error;
     }
 
-    if (req->vsr_vrf >= 0 && 
+    if (req->vsr_vrf >= 0 &&
             (unsigned int)req->vsr_vrf >= rtable->algo_max_vrfs) {
         ret = -EINVAL;
         goto generate_error;
@@ -279,7 +279,7 @@ vr_vrf_stats_op(vr_vrf_stats_req *req)
         goto generate_error;
     }
 
-    return; 
+    return;
 
 generate_error:
     vr_send_response(ret);
@@ -304,7 +304,7 @@ vr_vrf_stats_req_process(void *s_req)
     return;
 }
 
-    
+
 #define VR_INET_MAX_PLEN    32
 
 int
@@ -355,17 +355,17 @@ inet_route_del(struct rtable_fspec *fs, struct vr_route_req *req)
 }
 
 static void
-inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router, 
+inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
                                                         bool soft_reset)
 {
-	struct vr_rtable *rtable;
+    struct vr_rtable *rtable;
     int i;
 
     for (i = 0; i < RT_MAX; i++) {
         rtable = vr_get_inet_table(router, i);
         if (rtable) {
             fs->algo_deinit[i](rtable, fs, soft_reset);
-            if (i == RT_UCAST) { 
+            if (i == RT_UCAST) {
                 vr_free(rtable);
                 vr_put_inet_table(router, i, NULL);
             }
@@ -375,7 +375,7 @@ inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
             }
         }
     }
-   
+
     return;
 }
 
@@ -395,7 +395,7 @@ inet_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
             continue;
 
         table = vr_zalloc(sizeof(struct vr_rtable));
-        if (!table) 
+        if (!table)
             return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, i);
 
         ret = fs->algo_init[i](table, fs);
@@ -449,7 +449,7 @@ bridge_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
 {
     int ret;
     struct vr_rtable *table = NULL;
-    
+
     if (router->vr_bridge_rtable)
         return 0;
 
@@ -469,7 +469,7 @@ bridge_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
 }
 
 static void
-bridge_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router, 
+bridge_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
                                                             bool soft_reset)
 {
 
@@ -525,7 +525,7 @@ vr_fib_exit(struct vrouter *router, bool soft_reset)
     return;
 }
 
-int 
+int
 vr_fib_init(struct vrouter *router)
 {
     int i;

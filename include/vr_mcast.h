@@ -16,7 +16,7 @@
         ((ntohl(ip) & METADATA_IP_MASK) == METADATA_IP_SUBNET)
 
 #define IS_BMCAST_IP(ip) \
-        (((ntohl(ip) & MCAST_IP_MASK) == MCAST_IP) || (ip == 0xFFFFFFFF)) 
+        (((ntohl(ip) & MCAST_IP_MASK) == MCAST_IP) || (ip == 0xFFFFFFFF))
 
 #define IS_MCAST_LINK_LOCAL(ip) \
         (((ntohl(ip) & MCAST_LINK_LOCAL_IP_MASK)) == MCAST_IP)
@@ -29,7 +29,7 @@
 
 unsigned int vr_mcast_forward(struct vrouter *, unsigned short,
         struct vr_packet *, struct vr_forwarding_md *);
-    
+
 bool vr_l2_mcast_control_data_add(struct vr_packet *);
 
 #endif /* __VR_MCAST_H__ */

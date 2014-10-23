@@ -31,10 +31,12 @@ static int no_daemon_set;
 struct vr_dpdk_global vr_dpdk;
 
 /* TODO: default commandline params */
-static char *dpdk_argv[] = {"dpdk",
+static char *dpdk_argv[] = {
+    "dpdk",
     "-m", VR_DPDK_MAX_MEM,
     "-c", VR_DPDK_LCORE_MASK,
-    "-n", "2" };
+    "-n", VR_DPDK_MAX_MEMCHANNELS
+};
 static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv);
 
 /* Pktmbuf constructor with vr_packet support */

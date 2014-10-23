@@ -18,9 +18,9 @@ static int eth_rx(struct vr_interface *, struct vr_packet *, unsigned short);
 extern struct vr_host_interface_ops *vr_host_interface_init(void);
 extern void  vr_host_interface_exit(void);
 extern void vr_host_vif_init(struct vrouter *);
-extern unsigned int vr_l3_input(unsigned short, struct vr_packet *, 
+extern unsigned int vr_l3_input(unsigned short, struct vr_packet *,
                                               struct vr_forwarding_md *);
-extern unsigned int vr_l2_input(unsigned short, struct vr_packet *, 
+extern unsigned int vr_l2_input(unsigned short, struct vr_packet *,
                                                struct vr_forwarding_md *);
 extern void vhost_remove_xconnect(void);
 
@@ -61,8 +61,8 @@ vif_drop_pkt(struct vr_interface *vif, struct vr_packet *pkt, bool input)
 }
 
 /*
- * vr_interface_input() is invoked if a packet ingresses an interface. 
- * This function demultiplexes the packet to right input 
+ * vr_interface_input() is invoked if a packet ingresses an interface.
+ * This function demultiplexes the packet to right input
  * function depending on the protocols enabled on the VIF
  */
 static unsigned int
@@ -223,7 +223,7 @@ int
 vif_xconnect(struct vr_interface *vif, struct vr_packet *pkt)
 {
     struct vr_interface *bridge;
-    
+
     if (!vif)
         goto free_pkt;
 
@@ -302,13 +302,13 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
     vr_pset_data(pkt, pkt->vp_data);
     if (ntohs(hdr->hdr_cmd) & AGENT_CMD_ROUTE) {
         /*
-         * XXX 
-         * Packet with command "route" from agent may 
-         * result in flow setup, this breaks the 
+         * XXX
+         * Packet with command "route" from agent may
+         * result in flow setup, this breaks the
          * assumption that all packets for a flow will
          * reach same CPU. Need a better way to handle this
          */
-        agent_vif = __vrouter_get_interface(vrouter_get(0), 
+        agent_vif = __vrouter_get_interface(vrouter_get(0),
                                             ntohs(hdr->hdr_ifindex));
         if (!agent_vif) {
             agent_vif = vif;
@@ -325,7 +325,7 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
 
         pkt->vp_type = VP_TYPE_AGENT;
         pkt_set_network_header(pkt, pkt->vp_data + sizeof(struct vr_eth));
-        pkt_set_inner_network_header(pkt, 
+        pkt_set_inner_network_header(pkt,
                                      pkt->vp_data + sizeof(struct vr_eth));
         return vif->vif_tx(vif, pkt);
     }
@@ -764,7 +764,7 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt)
         fmd.fmd_dvrf = vif->vif_vrf;
         vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &fmd);
     }
-        
+
     ret = hif_ops->hif_tx(vif, pkt);
     if (ret != 0) {
         ret = 0;
@@ -815,7 +815,7 @@ eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
                 sizeof(struct vr_interface *));
         if (!pvif->vif_sub_interfaces)
             return -ENOMEM;
-        /* 
+        /*
          * we are not going to free this memory, since it is not guaranteed
          * that we will get contiguous memory. so hold on to it for the life
          * time of the interface
@@ -1091,7 +1091,7 @@ vrouter_set_rewrite(struct vr_interface *vif)
     unsigned char *ptr;
 
     ptr = vif->vif_rewrite;
-    /* 
+    /*
      * the DMAC would already have been set as part of
      * driver add
      */
@@ -1169,7 +1169,7 @@ vif_detach(struct vr_interface *vif)
     if (vif_drivers[vif->vif_type].drv_delete)
         vif_drivers[vif->vif_type].drv_delete(vif);
 
-    return; 
+    return;
 }
 
 static void

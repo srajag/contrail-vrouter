@@ -23,9 +23,9 @@
 #define VR_IP_PROTO_IGMP        2
 #define VR_IP_PROTO_TCP         6
 #define VR_IP_PROTO_UDP         17
-#define	VR_IP_PROTO_GRE         47
+#define VR_IP_PROTO_GRE         47
 #define VR_GRE_FLAG_CSUM        (ntohs(0x8000))
-#define VR_GRE_FLAG_KEY         (ntohs(0x2000)) 
+#define VR_GRE_FLAG_KEY         (ntohs(0x2000))
 
 /* Size of basic GRE header */
 #define VR_GRE_BASIC_HDR_LEN    4
@@ -68,7 +68,7 @@
 /* Attempt to do segmentation on inner packet */
 #define VP_FLAG_GSO             (1 << 7)
 
-/* 
+/*
  * possible 256 values of what a packet can be. currently, this value is
  * used only as an aid in fragmentation
  */
@@ -80,15 +80,15 @@
 #define VP_TYPE_L2OIP           5
 #define VP_TYPE_VXLAN           6
 #define VP_TYPE_AGENT           7
-#define VP_TYPE_MAX             8 
+#define VP_TYPE_MAX             8
 
 /*
  * Values to define how to proceed with handling a packet.
  */
-#define PKT_RET_FAST_PATH 			1
-#define PKT_RET_SLOW_PATH 			2
-#define PKT_RET_ERROR     			3
-#define PKT_RET_FALLBACK_BRIDGING 		4
+#define PKT_RET_FAST_PATH           1
+#define PKT_RET_SLOW_PATH           2
+#define PKT_RET_ERROR               3
+#define PKT_RET_FALLBACK_BRIDGING   4
 
 /*
  * Values to define the MPLS tunnel type
@@ -448,7 +448,7 @@ struct vr_pcap {
     /* timestamp microseconds */
     unsigned int pcap_ts_usec;
     /* number of octets of packet saved in file */
-    unsigned int pcap_incl_len;         
+    unsigned int pcap_incl_len;
     /* actual length of packet */
     unsigned int pcap_orig_len;
 };
@@ -585,7 +585,7 @@ pkt_get_inner_network_header_off(struct vr_packet *pkt)
 
 }
 
-static inline void 
+static inline void
 pkt_set_network_header(struct vr_packet *pkt, unsigned short off)
 {
     pkt->vp_network_h = off;
@@ -605,7 +605,6 @@ pkt_network_header(struct vr_packet *pkt)
         return pkt->vp_head + pkt->vp_network_h;
 
     return vr_network_header(pkt);
-    
 }
 
 static inline unsigned char *
@@ -636,7 +635,7 @@ static inline unsigned char *
 pkt_push(struct vr_packet *pkt, unsigned int len)
 {
     if (len > pkt->vp_data)
-	    return NULL;
+        return NULL;
 
     pkt->vp_data -= len;
     pkt->vp_len += len;

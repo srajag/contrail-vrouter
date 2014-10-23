@@ -91,7 +91,7 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
 
 
     strcpy(ptr,"");
-    for(i = 1, mask = 1; (i < 16); i++, mask = mask << 1) { 
+    for(i = 1, mask = 1; (i < 16); i++, mask = mask << 1) {
         switch(flags & mask) {
         case NH_FLAG_VALID:
             strcat(ptr, "Valid, ");
@@ -100,7 +100,7 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
         case NH_FLAG_POLICY_ENABLED:
             strcat(ptr, "Policy, ");
             break;
-        
+
         case NH_FLAG_RELAXED_POLICY:
             strcat(ptr, "Policy(R), ");
             break;
@@ -178,10 +178,10 @@ vr_nexthop_req_process(void *s_req)
         strcpy(fam, "AF_BRIDGE");
     else if (req->nhr_family == AF_UNSPEC)
         strcpy(fam, "AF_UNSPEC");
-    else 
+    else
         strcpy(fam, "N/A");
 
-    printf("Id:%03d  Type:%-8s  Fmly:%8s  Flags:%s  Rid:%d  Ref_cnt:%d\n", 
+    printf("Id:%03d  Type:%-8s  Fmly:%8s  Flags:%s  Rid:%d  Ref_cnt:%d\n",
                 req->nhr_id, nh_type(req->nhr_type), fam,
                 nh_flags(req->nhr_flags, req->nhr_type, flags_mem), req->nhr_rid, req->nhr_ref_cnt);
 
@@ -209,7 +209,7 @@ vr_nexthop_req_process(void *s_req)
         printf("  Dip:%s\n", inet_ntoa(a));
 
         if (req->nhr_flags & NH_FLAG_TUNNEL_UDP) {
-            printf("        Sport:%d Dport:%d\n", ntohs(req->nhr_tun_sport), 
+            printf("        Sport:%d Dport:%d\n", ntohs(req->nhr_tun_sport),
                                                   ntohs(req->nhr_tun_dport));
         }
     }
@@ -261,8 +261,8 @@ vr_response_process(void *s)
     return;
 }
 
-int 
-vr_nh_op(int opt, int mode, uint32_t nh_id, uint32_t if_id, uint32_t vrf_id, 
+int
+vr_nh_op(int opt, int mode, uint32_t nh_id, uint32_t if_id, uint32_t vrf_id,
         int8_t *dst, int8_t  *src, struct in_addr sip, struct in_addr dip, uint32_t flags)
 {
     vr_nexthop_req nh_req;
@@ -288,7 +288,7 @@ op_retry:
         nh_req.nhr_tun_sport = htons(sport);
         nh_req.nhr_tun_dport = htons(dport);
         nh_req.nhr_nh_list_size = 0;
-        if ((mode == NH_TUNNEL) || 
+        if ((mode == NH_TUNNEL) ||
                 ((mode == NH_ENCAP) && !(flags & NH_FLAG_ENCAP_L2))) {
             nh_req.nhr_encap_size = 14;
             buf = calloc(1, nh_req.nhr_encap_size);
@@ -323,12 +323,12 @@ op_retry:
 
     nh_req.nhr_id = nh_id;
     nh_req.nhr_rid = 0;
-    if ((mode == NH_ENCAP) && (flags & NH_FLAG_ENCAP_L2)) 
+    if ((mode == NH_ENCAP) && (flags & NH_FLAG_ENCAP_L2))
         nh_req.nhr_family = AF_BRIDGE;
     else if ((mode == NH_COMPOSITE) && (flags &
                 NH_FLAG_COMPOSITE_MULTI_PROTO))
         nh_req.nhr_family = AF_UNSPEC;
-    else 
+    else
         nh_req.nhr_family = AF_INET;
 
     nh_req.nhr_type = mode;
@@ -345,9 +345,9 @@ op_retry:
     }
 
     attr_len = nl_get_attr_hdr_size();
-     
+
     error = 0;
-    ret = sandesh_encode(&nh_req, "vr_nexthop_req", vr_find_sandesh_info, 
+    ret = sandesh_encode(&nh_req, "vr_nexthop_req", vr_find_sandesh_info,
                              (nl_get_buf_ptr(cl) + attr_len),
                              (nl_get_buf_len(cl) - attr_len), &error);
 
@@ -533,7 +533,7 @@ parse_long_opts(int ind, char *opt_arg)
             break;
         case OIF_OPT_IND:
             if_id = strtoul(opt_arg, NULL, 0);
-            if (errno) 
+            if (errno)
                 usage();
             break;
         case SMAC_OPT_IND:
@@ -552,12 +552,12 @@ parse_long_opts(int ind, char *opt_arg)
             break;
         case VRF_OPT_IND:
             vrf_id = strtoul(opt_arg, NULL, 0);
-            if (errno) 
+            if (errno)
                 usage();
             break;
         case TYPE_OPT_IND:
             type = strtoul(opt_arg, NULL, 0);
-            if (errno) 
+            if (errno)
                 usage();
             break;
         case SIP_OPT_IND:
@@ -568,7 +568,7 @@ parse_long_opts(int ind, char *opt_arg)
             break;
         case SPORT_OPT_IND:
             sport = strtoul(opt_arg, NULL, 0);
-            if (errno) 
+            if (errno)
                 usage();
             break;
         case CNI_OPT_IND:
@@ -582,7 +582,7 @@ parse_long_opts(int ind, char *opt_arg)
                 usage();
         case DPORT_OPT_IND:
             dport = strtoul(opt_arg, NULL, 0);
-            if (errno) 
+            if (errno)
                 usage();
     }
 }
@@ -627,7 +627,7 @@ validate_options()
                 if (memcmp(opt, zero_opt, sizeof(opt)))
                     cmd_usage();
             } else if (type == NH_ENCAP) {
-                if (!opt_set(OIF_OPT_IND)) 
+                if (!opt_set(OIF_OPT_IND))
                     cmd_usage();
 
                 if (!opt_set(EL2_OPT_IND)) {
@@ -647,9 +647,10 @@ validate_options()
                 }
 
                 if (opt_set(UDP_OPT_IND)) {
-                    flags |= NH_FLAG_TUNNEL_UDP;
                     if (!opt_set(SPORT_OPT_IND) || !opt_set(DPORT_OPT_IND))
-                        cmd_usage();
+                        flags |= NH_FLAG_TUNNEL_UDP_MPLS;
+                    else
+                        flags |= NH_FLAG_TUNNEL_UDP;
                 } else if (opt_set(VXLAN_OPT_IND)) {
                     flags |= NH_FLAG_TUNNEL_VXLAN;
                     if (!opt_set(SPORT_OPT_IND) || !opt_set(DPORT_OPT_IND))

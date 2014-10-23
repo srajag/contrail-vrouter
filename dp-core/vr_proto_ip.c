@@ -47,7 +47,7 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     struct vr_ip *ip;
     struct vr_forwarding_md rt_fmd;
 
-    if (pkt->vp_flags & VP_FLAG_MULTICAST) { 
+    if (pkt->vp_flags & VP_FLAG_MULTICAST) {
         return vr_mcast_forward(router, vrf, pkt, fmd);
     }
 
@@ -66,8 +66,8 @@ vr_forward(struct vrouter *router, unsigned short vrf,
             fmd = &rt_fmd;
         }
         fmd->fmd_label = rt.rtr_req.rtr_label;
-    } 
-    
+    }
+
     return nh_output(vrf, pkt, nh, fmd);
 }
 
@@ -104,7 +104,7 @@ vr_udp_input(struct vrouter *router, struct vr_packet *pkt,
         /* Fall through to the slower path */
         ASSERT(ret == PKT_RET_SLOW_PATH);
     }
-   
+
     udph = (struct vr_udp *)vr_pheader_pointer(pkt, sizeof(struct vr_udp),
                                                 &udp);
     if (udph == NULL) {
@@ -242,7 +242,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
      * me or not. there are two ways a packet can reach here. either through
      *
      * route lookup->receive nexthop->vr_ip_rcv or through
-     * VP_FLAG_TO_ME(NO route lookup(!vp->vp_nh))->vr_ip_rcv 
+     * VP_FLAG_TO_ME(NO route lookup(!vp->vp_nh))->vr_ip_rcv
      */
     if ((pkt->vp_nh) || (!pkt->vp_nh &&
                     vr_myip(pkt->vp_if, ip->ip_saddr))) {
@@ -262,7 +262,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
              * lets subject it to flow processing.
              */
             if (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY) {
-                if (!(pkt->vp_flags & VP_FLAG_FLOW_SET) && 
+                if (!(pkt->vp_flags & VP_FLAG_FLOW_SET) &&
                     !(pkt->vp_flags & (VP_FLAG_TO_ME | VP_FLAG_FROM_DP))) {
                     /* Force the flow lookup */
                     pkt->vp_flags |= VP_FLAG_FLOW_GET;
@@ -316,13 +316,13 @@ drop_pkt:
 }
 
 int
-vr_ip_input(struct vrouter *router, unsigned short vrf, 
+vr_ip_input(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
     struct vr_ip *ip;
 
     ip = (struct vr_ip *)pkt_data(pkt);
-    if (ip->ip_version != 4 || ip->ip_hl < 5) 
+    if (ip->ip_version != 4 || ip->ip_hl < 5)
         goto corrupt_pkt;
 
     return vr_forward(router, vrf, pkt, fmd);
@@ -361,7 +361,7 @@ vr_ip_update_csum(struct vr_packet *pkt, unsigned int ip_inc, unsigned int inc)
          */
         if (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL) {
             csum = (*csump) & 0xffff;
-            inc = ip_inc; 
+            inc = ip_inc;
         } else {
             csum = ~(*csump) & 0xffff;
         }
@@ -466,7 +466,7 @@ vr_should_proxy(struct vr_interface *vif, unsigned int dip,
      * requests
      */
     if (vif_is_virtual(vif)) {
-        /* 
+        /*
          * some OSes send arp queries with zero SIP before taking ownership
          * of the DIP
          */

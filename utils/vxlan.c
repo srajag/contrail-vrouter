@@ -85,7 +85,7 @@ vr_response_process(void *s)
     }
 }
 
-static int 
+static int
 vr_vxlan_op(void)
 {
     vr_vxlan_req vxlan_req;
@@ -124,9 +124,9 @@ op_retry:
     }
 
     attr_len = nl_get_attr_hdr_size();
-     
+
     error = 0;
-    ret = sandesh_encode(&vxlan_req, "vr_vxlan_req", vr_find_sandesh_info, 
+    ret = sandesh_encode(&vxlan_req, "vr_vxlan_req", vr_find_sandesh_info,
                              (nl_get_buf_ptr(cl) + attr_len),
                              (nl_get_buf_len(cl) - attr_len), &error);
 

@@ -27,6 +27,7 @@
 #include <rte_jhash.h>
 #include <rte_timer.h>
 #include <rte_cycles.h>
+#include <rte_errno.h>
 
 #include "vr_dpdk.h"
 #include "vr_sandesh.h"
@@ -398,7 +399,7 @@ dpdk_create_timer(struct vr_timer *vtimer)
     /* reset timer */
     hz = rte_get_timer_hz();
     ticks = hz * vtimer->vt_msecs / 1000;
-    if (rte_timer_reset(timer, ticks, PERIODICAL, VR_DPDK_TIMER_LCORE_ID,
+    if (rte_timer_reset(timer, ticks, PERIODICAL, rte_get_master_lcore(),
         dpdk_timer, vtimer) == -1) {
         RTE_LOG(ERR, VROUTER, "Error resetting timer\n");
         rte_free(timer);
@@ -628,7 +629,7 @@ dpdk_pcow(struct vr_packet *pkt, unsigned short head_room)
  * will be used in the future to detect whether it is a L2/L3 packet.
  * Returns 0 on error, valid source port otherwise.
  */
-static uint16_t
+uint16_t
 dpdk_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     unsigned short vrf)
 {
@@ -867,6 +868,36 @@ dpdk_pgso_size(struct vr_packet *pkt)
     return 0;
 }
 
+static void
+dpdk_add_mpls(struct vrouter *router, unsigned mpls_label)
+{
+    int ret;
+
+    if (!router->vr_eth_if) {
+        RTE_LOG(ERR, VROUTER, "Error accelerating MPLS %u: no physical interface added\n",
+            mpls_label);
+        return;
+    }
+    RTE_LOG(INFO, VROUTER, "Enabling hardware acceleration on vif %u for MPLS %u\n",
+        (unsigned)router->vr_eth_if->vif_idx, mpls_label);
+    if (!router->vr_ip) {
+        RTE_LOG(ERR, VROUTER, "\terror accelerating MPLS %u: no IP address set\n",
+            mpls_label);
+        return;
+    }
+
+    ret = vr_dpdk_lcore_mpls_schedule(router->vr_eth_if, router->vr_ip, mpls_label);
+    if (ret != 0)
+        RTE_LOG(INFO, VROUTER, "\terror accelerating MPLS %u: %s (%d)\n", mpls_label,
+            rte_strerror(-ret), -ret);
+}
+
+static void
+dpdk_del_mpls(struct vrouter *router, unsigned mpls_label)
+{
+    /* TODO: not implemented */
+}
+
 struct host_os dpdk_host = {
     .hos_malloc                     =    dpdk_malloc,
     .hos_zalloc                     =    dpdk_zalloc,
@@ -905,8 +936,13 @@ struct host_os dpdk_host = {
     .hos_pull_inner_headers         =    NULL,  /* not necessary */
     .hos_pcow                       =    dpdk_pcow,
     .hos_pull_inner_headers_fast    =    NULL,  /* not necessary */
+#if VR_DPDK_USE_MPLS_UDP_ECMP
     .hos_get_udp_src_port           =    dpdk_get_udp_src_port,
+#endif
     .hos_pkt_from_vm_tcp_mss_adj    =    dpdk_pkt_from_vm_tcp_mss_adj,
+
+    .hos_add_mpls                   =    dpdk_add_mpls,
+    .hos_del_mpls                   =    dpdk_del_mpls, /* not implemented */
 };
 
 struct host_os *

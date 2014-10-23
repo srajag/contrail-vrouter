@@ -29,6 +29,7 @@ int
 vr_mpls_del(vr_mpls_req *req)
 {
     struct vrouter *router;
+    struct vr_nexthop *nh;
     int ret = 0;
 
     router = vrouter_get(req->mr_rid);
@@ -42,8 +43,14 @@ vr_mpls_del(vr_mpls_req *req)
         goto generate_resp;
     }
 
-    if (router->vr_ilm[req->mr_label])
-        vrouter_put_nexthop(router->vr_ilm[req->mr_label]);
+    nh = router->vr_ilm[req->mr_label];
+    if (nh) {
+        if (vrouter_host->hos_del_mpls
+            && nh->nh_type == NH_ENCAP && !(nh->nh_flags & NH_FLAG_MCAST))
+            vrouter_host->hos_del_mpls(router, req->mr_label);
+
+        vrouter_put_nexthop(nh);
+    }
 
     router->vr_ilm[req->mr_label] = NULL;
 
@@ -78,6 +85,10 @@ vr_mpls_add(vr_mpls_req *req)
     }
 
     router->vr_ilm[req->mr_label] = nh;
+
+    if (vrouter_host->hos_add_mpls
+        && nh->nh_type == NH_ENCAP && !(nh->nh_flags & NH_FLAG_MCAST))
+        vrouter_host->hos_add_mpls(router, req->mr_label);
 
 generate_resp:
     vr_send_response(ret);
@@ -219,7 +230,7 @@ vr_mpls_tunnel_type(unsigned int label, unsigned int control_data, unsigned
     case AF_UNSPEC:
         if (control_data == VR_L2_MCAST_CTRL_DATA)
             return PKT_MPLS_TUNNEL_L2_MCAST;
-        else 
+        else
             return PKT_MPLS_TUNNEL_L3;
     default:
         res = VP_DROP_INVALID_NH;
@@ -304,7 +315,7 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
      * Mark it for GRO. Diag, L2 and multicast nexthops unmark if
      * required
      */
-    if (vr_perfr) 
+    if (vr_perfr)
         pkt->vp_flags |= VP_FLAG_GRO;
 
     nh_output(vrf, pkt, nh, fmd);

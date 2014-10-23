@@ -60,7 +60,7 @@ vr_vrf_stats_req_process(void *s_req)
             stats->vsr_ecmp_composites, stats->vsr_l3_mcast_composites,
             stats->vsr_l2_mcast_composites, stats->vsr_fabric_composites,
             stats->vsr_multi_proto_composites);
-    printf("Udp Tunnels %" PRIu64 ", Udp Mpls Tunnels %" PRIu64 
+    printf("Udp Tunnels %" PRIu64 ", Udp Mpls Tunnels %" PRIu64
             ", Gre Mpls Tunnels %" PRIu64 "\n", stats->vsr_udp_tunnels,
             stats->vsr_udp_mpls_tunnels, stats->vsr_gre_mpls_tunnels);
     printf("L2 Encaps %" PRIu64 ", Encaps %" PRIu64 "\n",
@@ -143,7 +143,7 @@ vr_build_netlink_request(vr_vrf_stats_req *req)
         return ret;
 
     attr_len = nl_get_attr_hdr_size();
-    ret = sandesh_encode(req, "vr_vrf_stats_req", vr_find_sandesh_info, 
+    ret = sandesh_encode(req, "vr_vrf_stats_req", vr_find_sandesh_info,
                              (nl_get_buf_ptr(cl) + attr_len),
                              (nl_get_buf_len(cl) - attr_len), &error);
 
@@ -207,7 +207,7 @@ vr_do_stats_op(void)
     return;
 }
 
-static int 
+static int
 vr_stats_op(void)
 {
     int ret;

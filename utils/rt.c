@@ -163,7 +163,7 @@ vr_route_req_process(void *s_req)
             printf("%5d        ", rt->rtr_label);
         else
             printf("%5c        ", '-');
-        printf("%3d \n",rt->rtr_nh_id); 
+        printf("%3d \n",rt->rtr_nh_id);
     }
 
     response_pending = false;
@@ -196,7 +196,7 @@ vr_response_process(void *s)
 
 static vr_route_req *
 vr_build_route_request(unsigned int op, int family, unsigned int prefix, unsigned int p_len,
-        unsigned int nh_id, unsigned int vrf, int label, 
+        unsigned int nh_id, unsigned int vrf, int label,
         unsigned int rt_type, unsigned int src, char *eth, uint32_t replace_plen)
 {
     rt_req.rtr_family = family;
@@ -242,7 +242,7 @@ vr_build_route_request(unsigned int op, int family, unsigned int prefix, unsigne
         } else {
             rt_req.rtr_mac = calloc(1,6);
             rt_req.rtr_mac_size = 6;
-            memcpy(rt_req.rtr_mac, eth, 6); 
+            memcpy(rt_req.rtr_mac, eth, 6);
             if (label != -1) {
                 rt_req.rtr_label = label;
                 rt_req.rtr_label_flags |= VR_RT_LABEL_VALID_FLAG;
@@ -270,7 +270,7 @@ vr_build_netlink_request(vr_route_req *req)
         return ret;
 
     attr_len = nl_get_attr_hdr_size();
-    ret = sandesh_encode(req, "vr_route_req", vr_find_sandesh_info, 
+    ret = sandesh_encode(req, "vr_route_req", vr_find_sandesh_info,
                              (nl_get_buf_ptr(cl) + attr_len),
                              (nl_get_buf_len(cl) - attr_len), &error);
 
@@ -312,7 +312,7 @@ vr_route_dump(void)
 {
     while (vr_send_one_message() != 0) {
         vr_build_route_request(SANDESH_OP_DUMP, rt_req.rtr_family, rt_req.rtr_marker,
-                rt_req.rtr_marker_plen, 0, rt_req.rtr_vrf_id, 0, 
+                rt_req.rtr_marker_plen, 0, rt_req.rtr_vrf_id, 0,
                 rt_req.rtr_rt_type, rt_req.rtr_src, (char *)rt_req.rtr_mac, 0);
         vr_build_netlink_request(&rt_req);
     }
@@ -331,7 +331,7 @@ vr_do_route_op(int op)
     return;
 }
 
-static int 
+static int
 vr_route_op(void)
 {
     vr_route_req *req;
@@ -539,7 +539,7 @@ int main(int argc, char *argv[])
     cmd_family_id = AF_INET;
 
     while ((opt = getopt_long(argc, argv, "cdbmPn:p:l:v:t:s:e:f:r:",
-                    long_options, &option_index)) >= 0) { 
+                    long_options, &option_index)) >= 0) {
             switch (opt) {
             case 'c':
                 if (cmd_op >= 0) {
@@ -565,7 +565,7 @@ int main(int argc, char *argv[])
 
             case 'v':
                 cmd_vrf_id = atoi(optarg);
-                break;      
+                break;
 
             case 'n':
                 cmd_nh_id = atoi(optarg);

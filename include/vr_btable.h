@@ -1,5 +1,5 @@
 /*
- * vr_btable.h -- 
+ * vr_btable.h --
  *
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */

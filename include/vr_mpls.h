@@ -30,7 +30,7 @@ extern int vr_mpls_tunnel_type(unsigned int , unsigned int, unsigned short *);
 extern struct vr_nexthop *__vrouter_get_label(struct vrouter *, unsigned int);
 
 
-static inline bool 
+static inline bool
 vr_mpls_is_label_mcast(unsigned int lbl)
 {
     if (lbl < VR_MAX_UCAST_LABELS) {

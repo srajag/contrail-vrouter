@@ -38,30 +38,30 @@
 #define rolword(x,k) (((x)<<(k)) | ((x)>>(32-(k))))
 
 /* __vr_hash_mix -- mix 3 32-bit values reversibly. */
-#define __vr_hash_mix(a, b, c)			\
-{						\
-	a -= c;  a ^= rolword(c, 4);  c += b;	\
-	b -= a;  b ^= rolword(a, 6);  a += c;	\
-	c -= b;  c ^= rolword(b, 8);  b += a;	\
-	a -= c;  a ^= rolword(c, 16); c += b;	\
-	b -= a;  b ^= rolword(a, 19); a += c;	\
-	c -= b;  c ^= rolword(b, 4);  b += a;	\
+#define __vr_hash_mix(a, b, c)              \
+{                                           \
+    a -= c;  a ^= rolword(c, 4);  c += b;   \
+    b -= a;  b ^= rolword(a, 6);  a += c;   \
+    c -= b;  c ^= rolword(b, 8);  b += a;   \
+    a -= c;  a ^= rolword(c, 16); c += b;   \
+    b -= a;  b ^= rolword(a, 19); a += c;   \
+    c -= b;  c ^= rolword(b, 4);  b += a;   \
 }
 
 /* __vr_hash_final - final mixing of 3 32-bit values (a,b,c) into c */
-#define __vr_hash_final(a, b, c)			\
-{						\
-	c ^= b; c -= rolword(b, 14);		\
-	a ^= c; a -= rolword(c, 11);		\
-	b ^= a; b -= rolword(a, 25);		\
-	c ^= b; c -= rolword(b, 16);		\
-	a ^= c; a -= rolword(c, 4);		\
-	b ^= a; b -= rolword(a, 14);		\
-	c ^= b; c -= rolword(b, 24);		\
+#define __vr_hash_final(a, b, c)            \
+{                                           \
+    c ^= b; c -= rolword(b, 14);            \
+    a ^= c; a -= rolword(c, 11);            \
+    b ^= a; b -= rolword(a, 25);            \
+    c ^= b; c -= rolword(b, 16);            \
+    a ^= c; a -= rolword(c, 4);             \
+    b ^= a; b -= rolword(a, 14);            \
+    c ^= b; c -= rolword(b, 24);            \
 }
 
 /* An arbitrary initial parameter */
-#define VR_HASH_INITVAL		0xdeadbeef
+#define VR_HASH_INITVAL     0xdeadbeef
 
 struct __unaligned_u32 { __u32 x; } __attribute__((packed));
 static inline __u32 __get_unaligned_word(const void *p)
@@ -91,42 +91,42 @@ static inline __u32 __get_unaligned_word(const void *p)
  */
 static inline __u32 vr_hash(const void *key, __u32 length, __u32 initval)
 {
-	__u32 a, b, c;
-	const __u8 *k = key;
+    __u32 a, b, c;
+    const __u8 *k = key;
 
-	/* Set up the internal state */
-	a = b = c = VR_HASH_INITVAL + length + initval;
+    /* Set up the internal state */
+    a = b = c = VR_HASH_INITVAL + length + initval;
 
-	/* All but the last block: affect some 32 bits of (a,b,c) */
-	while (length > 12) {
-		a += __get_unaligned_word(k);
-		b += __get_unaligned_word(k + 4);
-		c += __get_unaligned_word(k + 8);
-		__vr_hash_mix(a, b, c);
-		length -= 12;
-		k += 12;
-	}
-	/* Last block: affect all 32 bits of (c) */
-	/* All the case statements fall through */
-	switch (length) {
-	case 12: c += (__u32)k[11]<<24;
-	case 11: c += (__u32)k[10]<<16;
-	case 10: c += (__u32)k[9]<<8;
-	case 9:  c += k[8];
-	case 8:  b += (__u32)k[7]<<24;
-	case 7:  b += (__u32)k[6]<<16;
-	case 6:  b += (__u32)k[5]<<8;
-	case 5:  b += k[4];
-	case 4:  a += (__u32)k[3]<<24;
-	case 3:  a += (__u32)k[2]<<16;
-	case 2:  a += (__u32)k[1]<<8;
-	case 1:  a += k[0];
-		 __vr_hash_final(a, b, c);
-	case 0: /* Nothing left to add */
-		break;
-	}
+    /* All but the last block: affect some 32 bits of (a,b,c) */
+    while (length > 12) {
+        a += __get_unaligned_word(k);
+        b += __get_unaligned_word(k + 4);
+        c += __get_unaligned_word(k + 8);
+        __vr_hash_mix(a, b, c);
+        length -= 12;
+        k += 12;
+    }
+    /* Last block: affect all 32 bits of (c) */
+    /* All the case statements fall through */
+    switch (length) {
+    case 12: c += (__u32)k[11]<<24;
+    case 11: c += (__u32)k[10]<<16;
+    case 10: c += (__u32)k[9]<<8;
+    case 9:  c += k[8];
+    case 8:  b += (__u32)k[7]<<24;
+    case 7:  b += (__u32)k[6]<<16;
+    case 6:  b += (__u32)k[5]<<8;
+    case 5:  b += k[4];
+    case 4:  a += (__u32)k[3]<<24;
+    case 3:  a += (__u32)k[2]<<16;
+    case 2:  a += (__u32)k[1]<<8;
+    case 1:  a += k[0];
+         __vr_hash_final(a, b, c);
+    case 0: /* Nothing left to add */
+        break;
+    }
 
-	return c;
+    return c;
 }
 
 /* vr_hash2 - hash an array of u32's
@@ -138,55 +138,55 @@ static inline __u32 vr_hash(const void *key, __u32 length, __u32 initval)
  */
 static inline __u32 vr_hash2(const __u32 *k, __u32 length, __u32 initval)
 {
-	__u32 a, b, c;
+    __u32 a, b, c;
 
-	/* Set up the internal state */
-	a = b = c = VR_HASH_INITVAL + (length<<2) + initval;
+    /* Set up the internal state */
+    a = b = c = VR_HASH_INITVAL + (length<<2) + initval;
 
-	/* Handle most of the key */
-	while (length > 3) {
-		a += k[0];
-		b += k[1];
-		c += k[2];
-		__vr_hash_mix(a, b, c);
-		length -= 3;
-		k += 3;
-	}
+    /* Handle most of the key */
+    while (length > 3) {
+        a += k[0];
+        b += k[1];
+        c += k[2];
+        __vr_hash_mix(a, b, c);
+        length -= 3;
+        k += 3;
+    }
 
-	/* Handle the last 3 u32's: all the case statements fall through */
-	switch (length) {
-	case 3: c += k[2];
-	case 2: b += k[1];
-	case 1: a += k[0];
-		__vr_hash_final(a, b, c);
-	case 0:	/* Nothing left to add */
-		break;
-	}
+    /* Handle the last 3 u32's: all the case statements fall through */
+    switch (length) {
+    case 3: c += k[2];
+    case 2: b += k[1];
+    case 1: a += k[0];
+        __vr_hash_final(a, b, c);
+    case 0:    /* Nothing left to add */
+        break;
+    }
 
-	return c;
+    return c;
 }
 
 
 /* vr_hash_3words - hash exactly 3, 2 or 1 word(s) */
 static inline __u32 vr_hash_3words(__u32 a, __u32 b, __u32 c, __u32 initval)
 {
-	a += VR_HASH_INITVAL;
-	b += VR_HASH_INITVAL;
-	c += initval;
+    a += VR_HASH_INITVAL;
+    b += VR_HASH_INITVAL;
+    c += initval;
 
-	__vr_hash_final(a, b, c);
+    __vr_hash_final(a, b, c);
 
-	return c;
+    return c;
 }
 
 static inline __u32 vr_hash_2words(__u32 a, __u32 b, __u32 initval)
 {
-	return vr_hash_3words(a, b, 0, initval);
+    return vr_hash_3words(a, b, 0, initval);
 }
 
 static inline __u32 vr_hash_1word(__u32 a, __u32 initval)
 {
-	return vr_hash_3words(a, 0, 0, initval);
+    return vr_hash_3words(a, 0, 0, initval);
 }
 
 #endif /* _VR_HASH_H */

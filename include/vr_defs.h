@@ -50,7 +50,7 @@ struct agent_hdr {
     unsigned int hdr_cmd_param;
     unsigned int hdr_cmd_param_1;
 } __attribute__((packed));
-    
+
 struct vr_list_node {
         struct vr_list_node *node_n;
 };

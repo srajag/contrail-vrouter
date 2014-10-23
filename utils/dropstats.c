@@ -149,7 +149,7 @@ vr_response_process(void *s)
     if (stats_resp->resp_code < 0) {
         printf("Error %s in kernel operation\n", strerror(stats_resp->resp_code));
         exit(-1);
-    } 
+    }
 
     return;
 }
@@ -180,7 +180,7 @@ vr_build_netlink_request(vr_drop_stats_req *req)
         return ret;
 
     attr_len = nl_get_attr_hdr_size();
-    ret = sandesh_encode(req, "vr_drop_stats_req", vr_find_sandesh_info, 
+    ret = sandesh_encode(req, "vr_drop_stats_req", vr_find_sandesh_info,
                              (nl_get_buf_ptr(cl) + attr_len),
                              (nl_get_buf_len(cl) - attr_len), &error);
 
@@ -221,7 +221,7 @@ vr_drop_stats_op(void)
     return;
 }
 
-static int 
+static int
 vr_get_drop_stats(void)
 {
     int ret;

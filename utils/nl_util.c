@@ -35,11 +35,11 @@ unsigned int nl_client_ids;
 extern struct nl_response *nl_parse_gen(struct nl_client *);
 
 extern void vr_ops_process (void *a) __attribute__((weak));
-extern void vr_flow_req_process(void *s_req) __attribute__((weak)); 
-extern void vr_route_req_process(void *s_req) __attribute__((weak)); 
-extern void vr_interface_req_process(void *s_req) __attribute__((weak)); 
+extern void vr_flow_req_process(void *s_req) __attribute__((weak));
+extern void vr_route_req_process(void *s_req) __attribute__((weak));
+extern void vr_interface_req_process(void *s_req) __attribute__((weak));
 extern void vr_mpls_req_process(void *s_req) __attribute__((weak));
-extern void vr_mirror_req_process(void *s_req) __attribute__((weak)); 
+extern void vr_mirror_req_process(void *s_req) __attribute__((weak));
 extern void vr_response_process(void *s_req) __attribute__((weak));
 extern void vr_nexthop_req_process(void *s_req) __attribute__((weak));
 extern void vr_vrf_assign_req_process(void *s_req) __attribute__((weak));
@@ -48,7 +48,7 @@ extern void vr_drop_stats_req_process(void *s_req) __attribute__((weak));
 extern void vr_vxlan_req_process(void *s_req) __attribute__((weak));
 
 void
-vrouter_ops_process(void *s_req) 
+vrouter_ops_process(void *s_req)
 {
     return;
 }
@@ -61,19 +61,19 @@ vr_nexthop_req_process(void *s_req)
 
 
 void
-vr_flow_req_process(void *s_req) 
+vr_flow_req_process(void *s_req)
 {
     return;
 }
 
 void
-vr_route_req_process(void *s_req) 
+vr_route_req_process(void *s_req)
 {
     return;
 }
 
 void
-vr_interface_req_process(void *s_req) 
+vr_interface_req_process(void *s_req)
 {
     return;
 }
@@ -85,38 +85,38 @@ vr_mpls_req_process(void *s_req)
 }
 
 void
-vr_mirror_req_process(void *s_req) 
+vr_mirror_req_process(void *s_req)
 {
     return;
 }
 
 void
-vr_response_process(void *s_req) 
+vr_response_process(void *s_req)
 {
     return;
 }
 
 
 void
-vr_vrf_assign_req_process(void *s_req) 
+vr_vrf_assign_req_process(void *s_req)
 {
     return;
 }
 
 void
-vr_vrf_stats_req_process(void *s_req) 
+vr_vrf_stats_req_process(void *s_req)
 {
     return;
 }
 
 void
-vr_drop_stats_req_process(void *s_req) 
+vr_drop_stats_req_process(void *s_req)
 {
     return;
 }
 
 void
-vr_vxlan_req_process(void *s_req) 
+vr_vxlan_req_process(void *s_req)
 {
     return;
 }
@@ -166,7 +166,7 @@ nl_parse_gen_ctrl(struct nl_client *cl)
 
 struct nl_response *
 nl_parse_gen(struct nl_client *cl)
-{   
+{
     char *buf = cl->cl_buf + cl->cl_buf_offset;
     struct genlmsghdr *ghdr;
     struct nl_response *resp = &cl->resp;
@@ -191,7 +191,7 @@ nl_parse_gen(struct nl_client *cl)
 }
 
 static int
-nl_build_sandesh_attr_without_attr_len(struct nl_client *cl) 
+nl_build_sandesh_attr_without_attr_len(struct nl_client *cl)
 {
     struct nlattr *nla = (struct nlattr *)
         ((char *)cl->cl_buf + cl->cl_buf_offset);
@@ -199,9 +199,9 @@ nl_build_sandesh_attr_without_attr_len(struct nl_client *cl)
     if (cl->cl_buf_offset + NLA_HDRLEN > cl->cl_buf_len)
         return -ENOMEM;
 
-	nla->nla_len = NLA_HDRLEN;
-	nla->nla_type = NL_ATTR_VR_MESSAGE_PROTOCOL;
-	cl->cl_buf_offset += NLA_HDRLEN;
+    nla->nla_len = NLA_HDRLEN;
+    nla->nla_type = NL_ATTR_VR_MESSAGE_PROTOCOL;
+    cl->cl_buf_offset += NLA_HDRLEN;
 
     return 0;
 }
@@ -231,7 +231,7 @@ nl_build_header(struct nl_client *cl, unsigned char **buf, __u32 *buf_len)
 
     *buf = (unsigned char *)(cl->cl_buf) + cl->cl_buf_offset;
     *buf_len = cl->cl_buf_len - cl->cl_buf_offset;
-    
+
     return 0;
 }
 
@@ -302,7 +302,7 @@ nl_build_get_family_id(struct nl_client *cl, char *family)
     nl_update_nlh(cl);
 
     return 0;
-}       
+}
 
 int
 nl_build_genlh(struct nl_client *cl, __u8 cmd, __u8 version)
@@ -344,7 +344,7 @@ nl_update_nlh(struct nl_client *cl)
     return;
 }
 
-int 
+int
 nl_get_attr_hdr_size()
 {
     return NLA_HDRLEN;
@@ -616,10 +616,10 @@ get_vrouter_pid(void)
 
     pid_file = fopen("/tmp/vrouter.pid", "r");
     if (!pid_file)
-	    return -1;
+        return -1;
 
     if (0 == fscanf(pid_file, "%u", &pid))
-	    pid = -1;
+        pid = -1;
     fclose(pid_file);
 
     return pid;
@@ -713,7 +713,7 @@ nl_parse_reply(struct nl_client *cl)
         resp = nl_parse_gen(cl);
     } else {
         return nl_set_resp_err(cl, NL_MSG_TYPE_ERROR);
-    }   
+    }
     return resp;
 }
 

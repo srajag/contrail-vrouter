@@ -111,7 +111,7 @@ struct vr_flow_table_info {
     uint32_t vfti_hold_count[0];
 };
 
-/* 
+/*
  * flow bytes and packets are of same width. this should be
  * ok since agent really has to take care of overflows. this
  * is also better probably because processor does not have to

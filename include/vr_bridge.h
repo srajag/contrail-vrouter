@@ -34,14 +34,14 @@
      (((uint16_t *)dst)[2] == 0xffff))  \
 
 #define IS_MAC_BMCAST(dst) \
-     (((uint8_t *)dst)[0]& 0x1) 
+     (((uint8_t *)dst)[0]& 0x1)
 
 #define VR_BE_FLAG_VALID                 0x01
 #define VR_BE_FLAG_LABEL_VALID           0x02
 
 
 unsigned int
-vr_bridge_input(struct vrouter *, unsigned short , struct vr_packet *, 
+vr_bridge_input(struct vrouter *, unsigned short , struct vr_packet *,
                             struct vr_forwarding_md *);
 
 #endif

@@ -208,7 +208,10 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
     uint8_t port_id = 0;
     unsigned vif_idx = vif->vif_idx;
-    struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
+    struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[0];
+
+    /* find empty RX queue */
+    while (rx_queue->rxq_queue_h) rx_queue++;
 
     if (vif->vif_type == VIF_TYPE_HOST) {
         port_id = (((struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os))->
