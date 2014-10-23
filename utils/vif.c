@@ -57,7 +57,6 @@ static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set;
 static int xconnect_set, vhost_phys_set;
-static int transport_type;
 
 static unsigned int vr_op, vr_if_type;
 static bool ignore_error = false, dump_pending = false;
@@ -198,22 +197,16 @@ vr_interface_req_process(void *s)
     for (; printed < 12; printed++)
         printf(" ");
 
-    if (req->vifr_flags & VIF_FLAG_PMD) {
-        if (req->vifr_type == VIF_TYPE_HOST)
-            printf("PMD: %s", req->vifr_os_idx ?
+    if (req->vifr_flags & VIF_FLAG_PMD)
+        printf("PMD: %d", req->vifr_os_idx);
+    else if ((platform == DPDK_PLATFORM) &&
+            (req->vifr_type == VIF_TYPE_PHYSICAL)) {
+        printf("PCI: %d:%d:%d.%d",
+                (req->vifr_os_idx >> 16), (req->vifr_os_idx >> 8) & 0xFF,
+                (req->vifr_os_idx >> 3) & 0x1F, (req->vifr_os_idx & 0x7));
+    } else {
+        printf("OS: %s", req->vifr_os_idx ?
                 if_indextoname(req->vifr_os_idx, name): "NULL");
-		else
-            printf("PMD: %d", req->vifr_os_idx);
-	} else {
-        if ((platform == DPDK_PLATFORM) &&
-                (req->vifr_type == VIF_TYPE_PHYSICAL)) {
-            printf("PCI: %d:%d:%d.%d",
-                    (req->vifr_os_idx >> 16), (req->vifr_os_idx >> 8) & 0xFF,
-                    (req->vifr_os_idx >> 3) & 0x1F, (req->vifr_os_idx & 0x7));
-        } else {
-            printf("OS: %s", req->vifr_os_idx ?
-                    if_indextoname(req->vifr_os_idx, name): "NULL");
-        }
     }
 
     if (req->vifr_type == VIF_TYPE_PHYSICAL) {
@@ -620,25 +613,8 @@ parse_long_opts(int option_index, char *opt_arg)
 
     case TYPE_OPT_INDEX:
         vr_if_type = vr_get_if_type(optarg);
-        switch (vr_if_type) {
-        case VIF_TYPE_HOST:
-            transport_type = VIF_TRANSPORT_ETH;
+        if (vr_if_type == VIF_TYPE_HOST)
             need_xconnect_if = true;
-            break;
-
-        case VIF_TYPE_PHYSICAL:
-            transport_type = VIF_TRANSPORT_ETH;
-            break;
-
-        case VIF_TYPE_VIRTUAL:
-            transport_type = VIF_TRANSPORT_VIRTUAL;
-            break;
-
-        default:
-            transport_type = VIF_TRANSPORT_VIRTUAL;
-            break;
-        }
-
         break;
 
     case SET_OPT_INDEX:
