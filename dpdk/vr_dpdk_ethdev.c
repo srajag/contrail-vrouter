@@ -111,7 +111,8 @@ int
 vr_dpdk_ethdev_filter_add(struct vr_interface *vif, unsigned queue_id,
     unsigned dst_ip, unsigned mpls_label)
 {
-    uint8_t port_id = vif->vif_os_idx;
+    struct vr_dpdk_ethdev *ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
+    uint8_t port_id = ethdev->ethdev_port_id;
     struct rte_fdir_filter filter;
 
     /* accept 2-byte labels only */
@@ -140,8 +141,7 @@ int
 vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif)
 {
     int i;
-    uint8_t port_id = vif->vif_os_idx;
-    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
+    struct vr_dpdk_ethdev *ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
 
     for (i = ethdev->ethdev_nb_rss_queues; i < ethdev->ethdev_nb_rx_queues; i++) {
         if (ethdev->ethdev_queue_states[i] == VR_DPDK_QUEUE_READY_STATE) {
@@ -320,8 +320,8 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
 }
 
 /* Init RSS */
-static int
-dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev)
+int
+vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev)
 {
     int ret, i, j;
     uint8_t port_id = ethdev->ethdev_port_id;
@@ -351,7 +351,6 @@ dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev)
     return ret;
 }
 
-#if VR_DPDK_USE_HW_FILTERING
 /* Init hardware filtering */
 static void
 dpdk_ethdev_mempools_free(struct vr_dpdk_ethdev *ethdev)
@@ -370,8 +369,8 @@ dpdk_ethdev_mempools_free(struct vr_dpdk_ethdev *ethdev)
 }
 
 /* Init hardware filtering */
-static int
-dpdk_ethdev_filtering_init(struct vr_interface *vif,
+int
+vr_dpdk_ethdev_filtering_init(struct vr_interface *vif,
         struct vr_dpdk_ethdev *ethdev)
 {
     int ret;
@@ -408,7 +407,6 @@ dpdk_ethdev_filtering_init(struct vr_interface *vif,
 
     return ret;
 }
-#endif
 
 /* Init ethernet device */
 int
@@ -431,10 +429,6 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
     }
 
     ret = dpdk_ethdev_queues_setup(ethdev);
-    if (ret < 0)
-        return ret;
-
-    ret = dpdk_ethdev_rss_init(ethdev);
     if (ret < 0)
         return ret;
 

@@ -878,6 +878,9 @@ dpdk_add_mpls(struct vrouter *router, unsigned mpls_label)
             mpls_label);
         return;
     }
+    if (!(router->vr_eth_if->vif_flags & VIF_FLAG_FILTERING_OFFLOAD))
+        return;
+
     RTE_LOG(INFO, VROUTER, "Enabling hardware acceleration on vif %u for MPLS %u\n",
         (unsigned)router->vr_eth_if->vif_idx, mpls_label);
     if (!router->vr_ip) {

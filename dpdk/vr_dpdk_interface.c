@@ -70,7 +70,7 @@ dpdk_virtual_if_del(struct vr_interface *vif)
     int ret;
 
     ret = vr_netlink_uvhost_vif_del(vif->vif_idx);
-       
+
     /*
      * TODO - forwarding lcores need to be informed and they need to ack the
      * vif removal. Also, user space vhost thread need to ack the deletion
@@ -90,6 +90,15 @@ dpdk_dbdf_to_pci(unsigned int dbdf,
     address->function = (dbdf & 0x7);
 
     return;
+}
+
+static inline unsigned
+dpdk_pci_to_dbdf(struct rte_pci_addr *address)
+{
+    return address->domain << 16
+        | address->bus << 8
+        | address->devid
+        | address->function;
 }
 
 /* mirrors the function used in bonding */
@@ -114,6 +123,11 @@ dpdk_find_port_by_pci_addr(struct rte_pci_addr *addr)
 
     return -1;
 }
+static inline void
+dpdk_find_pci_addr_by_port(struct rte_pci_addr *addr, unsigned port_id)
+{
+    rte_memcpy(addr, &rte_eth_devices[port_id].pci_dev->addr, sizeof(struct rte_pci_addr));
+}
 
 int
 dpdk_vif_attach_ethdev(struct vr_interface *vif,
@@ -130,13 +144,6 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
     } else {
         vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
     }
-
-#if VR_DPDK_USE_HW_FILTERING
-    /* init hardware filtering */
-    ret = dpdk_ethdev_filtering_init(vif, ethdev);
-    if (ret < 0)
-        return ret;
-#endif
 
     return ret;
 }
@@ -161,6 +168,10 @@ dpdk_fabric_if_add(struct vr_interface *vif)
         }
 
         port_id = vif->vif_os_idx;
+        /* TODO: does not work for host interfaces
+        dpdk_find_pci_addr_by_port(&pci_address, port_id);
+        vif->vif_os_idx = dpdk_pci_to_dbdf(&pci_address);
+        */
     } else {
         dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
         ret = dpdk_find_port_by_pci_addr(&pci_address);
@@ -173,7 +184,6 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 
         port_id = ret;
     }
-
 
     memset(&mac_addr, 0, sizeof(mac_addr));
     rte_eth_macaddr_get(port_id, &mac_addr);
@@ -196,13 +206,24 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     ret = dpdk_vif_attach_ethdev(vif, ethdev);
     if (ret)
         return ret;
-
     ret = rte_eth_dev_start(port_id);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "\terror starting eth device %" PRIu8
                 ": %s (%d)\n", port_id, rte_strerror(-ret), -ret);
         return ret;
     }
+
+    ret = vr_dpdk_ethdev_rss_init(ethdev);
+    if (ret < 0)
+        return ret;
+
+    /* we need to init Flow Director after the device has started */
+#if VR_DPDK_USE_HW_FILTERING
+    /* init hardware filtering */
+    ret = vr_dpdk_ethdev_filtering_init(vif, ethdev);
+    if (ret < 0)
+        return ret;
+#endif
 
     /* schedule RX/TX queues */
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
@@ -290,11 +311,13 @@ dpdk_if_add(struct vr_interface *vif)
     } else if (vif_is_vhost(vif)) {
         return dpdk_vhost_if_add(vif);
     } else if (vif->vif_type == VIF_TYPE_AGENT) {
+        /* TODO: remove xconnect */
+        vhost_remove_xconnect();
         if (vif->vif_transport == VIF_TRANSPORT_SOCKET)
             return dpdk_agent_if_add(vif);
     }
 
-    RTE_LOG(ERR, VROUTER, "Unsupported interface(type %d, index %d)",
+    RTE_LOG(ERR, VROUTER, "Unsupported interface type %d index %d\n",
             vif->vif_type, vif->vif_idx);
 
     return -EFAULT;

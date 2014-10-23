@@ -344,6 +344,10 @@ int vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif);
 /* Add hardware filter */
 int vr_dpdk_ethdev_filter_add(struct vr_interface *vif, unsigned queue_id,
     unsigned dst_ip, unsigned mpls_label);
+/* Init hardware filtering */
+int vr_dpdk_ethdev_filtering_init(struct vr_interface *vif, struct vr_dpdk_ethdev *ethdev);
+/* Init RSS */
+int vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev);
 
 /*
  * vr_dpdk_flow_mem.c
