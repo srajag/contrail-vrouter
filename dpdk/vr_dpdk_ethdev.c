@@ -164,7 +164,7 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[0];
 
-    /* find empty RX queue */
+    /* find an empty RX queue */
     while (rx_queue->rxq_queue_h) rx_queue++;
 
     ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;

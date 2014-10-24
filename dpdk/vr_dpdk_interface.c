@@ -38,6 +38,9 @@ dpdk_virtual_if_add(struct vr_interface *vif)
     int ret;
     unsigned int nrxqs, ntxqs;
 
+    RTE_LOG(INFO, VROUTER, "Adding vif %u virtual device %s\n",
+                vif->vif_idx, vif->vif_name);
+
     nrxqs = vr_dpdk_virtio_nrxqs(vif);
     ntxqs = vr_dpdk_virtio_ntxqs(vif);
 
