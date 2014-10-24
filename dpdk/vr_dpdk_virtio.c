@@ -69,7 +69,10 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     unsigned int vif_idx = vif->vif_idx;
-    struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
+    struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[0];
+
+    /* find an empty RX queue */
+    while (rx_queue->rxq_queue_h) rx_queue++;
 
     if (q_id >= vr_dpdk_virtio_nrxqs(vif)) {
         return NULL;
@@ -240,8 +243,9 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     }
 
     /* 
-     * TODO - need a memory barrier here. Also, might need to kick guest.
+     * TODO - might need to kick guest.
      */
+    rte_wmb();
     vq->vdv_soft_avail_idx += num_pkts;
     vq->vdv_used->idx += num_pkts;
 
