@@ -1394,13 +1394,16 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     vif->vif_rid = req->vifr_rid;
     vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
 
-    if ((req->vifr_mac_size != sizeof(vif->vif_mac)) || !req->vifr_mac) {
-        ret = -EINVAL;
-        goto generate_resp;
+    if (req->vifr_mac) {
+        if (req->vifr_mac_size != sizeof(vif->vif_mac)) {
+            ret = -EINVAL;
+            goto generate_resp;
+        }
+
+        memcpy(vif->vif_mac, req->vifr_mac, sizeof(vif->vif_mac));
+        memcpy(vif->vif_rewrite, req->vifr_mac, sizeof(vif->vif_mac));
     }
 
-    memcpy(vif->vif_mac, req->vifr_mac, sizeof(vif->vif_mac));
-    memcpy(vif->vif_rewrite, req->vifr_mac, sizeof(vif->vif_mac));
     vif->vif_ip = req->vifr_ip;
 
     if (req->vifr_name) {

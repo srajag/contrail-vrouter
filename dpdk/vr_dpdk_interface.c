@@ -137,6 +137,7 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
         struct vr_dpdk_ethdev *ethdev)
 {
     int ret = 0;
+    struct ether_addr mac_addr;
     struct rte_eth_dev_info dev_info;
 
     vif->vif_os = (void *)ethdev;
@@ -146,6 +147,16 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
         vif->vif_flags |= VIF_FLAG_TX_CSUM_OFFLOAD;
     } else {
         vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
+    }
+
+    memset(&mac_addr, 0, sizeof(mac_addr));
+    /*
+     * do not want to overwrite what agent had sent. set only if
+     * the address has null
+     */
+    if (!memcmp(vif->vif_mac, mac_addr.addr_bytes, ETHER_ADDR_LEN)) {
+        rte_eth_macaddr_get(ethdev->ethdev_port_id, &mac_addr);
+        memcpy(vif->vif_mac, mac_addr.addr_bytes, ETHER_ADDR_LEN);
     }
 
     return ret;
@@ -158,7 +169,6 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 {
     int ret;
     uint8_t port_id;
-    struct ether_addr mac_addr;
     struct rte_pci_addr pci_address;
     struct vr_dpdk_ethdev *ethdev;
 
@@ -188,11 +198,6 @@ dpdk_fabric_if_add(struct vr_interface *vif)
         port_id = ret;
     }
 
-    memset(&mac_addr, 0, sizeof(mac_addr));
-    rte_eth_macaddr_get(port_id, &mac_addr);
-    RTE_LOG(INFO, VROUTER, "Adding vif %u eth device %" PRIu8 " MAC " MAC_FORMAT "\n",
-                vif->vif_idx, port_id, MAC_VALUE(mac_addr.addr_bytes));
-
     ethdev = &vr_dpdk.ethdevs[port_id];
     if (ethdev->ethdev_ptr != NULL) {
         RTE_LOG(ERR, VROUTER, "\terror adding eth dev %s: already added\n",
@@ -209,6 +214,7 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     ret = dpdk_vif_attach_ethdev(vif, ethdev);
     if (ret)
         return ret;
+
     ret = rte_eth_dev_start(port_id);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "\terror starting eth device %" PRIu8
