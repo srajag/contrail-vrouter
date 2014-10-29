@@ -148,9 +148,9 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     queue_id = 0;
     /* for all lcores */
     do {
-        /* never use service lcores */
+        /* never use netlink lcore */
         lcore = vr_dpdk.lcores[lcore_id];
-        if (lcore->lcore_nb_rx_queues >= VR_MAX_INTERFACES) {
+        if (lcore->lcore_nb_rx_queues > VR_MAX_INTERFACES) {
             /* do not skip master lcore but wrap */
             lcore_id = rte_get_next_lcore(lcore_id, 0, 1);
             continue;
@@ -445,11 +445,15 @@ dpdk_lcore_service_loop(struct vr_dpdk_lcore *lcore, unsigned netlink_lcore_id,
 
     RTE_LOG(DEBUG, VROUTER, "Hello from service lcore %u\n", rte_lcore_id());
 
-    /* never schedule interfaces on the service lcore */
-    lcore->lcore_nb_rx_queues = VR_MAX_INTERFACES;
-
-    if (lcore_id == packet_lcore_id)
+    if (lcore_id == packet_lcore_id) {
         vr_dpdk.packet_lcore_id = packet_lcore_id;
+        /* never schedule RX queues on the packet lcore */
+        lcore->lcore_nb_rx_queues = VR_MAX_INTERFACES;
+    } else {
+        /* never schedule RX/TX queues on the netlink lcore */
+        lcore->lcore_nb_rx_queues = VR_MAX_INTERFACES + 1;
+    }
+
 
     while (1) {
         rte_prefetch0(lcore);
