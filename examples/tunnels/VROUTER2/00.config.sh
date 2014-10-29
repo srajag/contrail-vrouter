@@ -70,7 +70,7 @@ MPLS="${CONTRAIL_DIR}/build/${OPTIMIZATION}/vrouter/utils/mpls"
 NH="${CONTRAIL_DIR}/build/${OPTIMIZATION}/vrouter/utils/nh"
 RT="${CONTRAIL_DIR}/build/${OPTIMIZATION}/vrouter/utils/rt"
 VIF="${CONTRAIL_DIR}/build/${OPTIMIZATION}/vrouter/utils/vif"
-VROUTER="${CONTRAIL_DIR}/build/${OPTIMIZATION}/vrouter/dpdk/dpdk_vrouter"
+VROUTER="${CONTRAIL_DIR}/build/${OPTIMIZATION}/vrouter/dpdk/contrail-vrouter-dpdk"
 
 # Pktgen Vars
 PKTGEN_SDK="${PKTGEN_DIR}/dpdk"
