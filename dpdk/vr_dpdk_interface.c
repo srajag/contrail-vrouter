@@ -171,7 +171,9 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     uint8_t port_id;
     struct rte_pci_addr pci_address;
     struct vr_dpdk_ethdev *ethdev;
+    struct ether_addr mac_addr;
 
+    memset(&pci_address, 0, sizeof(pci_address));
     if (vif->vif_flags & VIF_FLAG_PMD) {
         if (vif->vif_os_idx >= rte_eth_dev_count()) {
             RTE_LOG(ERR, VROUTER, "Invalid PMD device index %u"
@@ -197,6 +199,14 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 
         port_id = ret;
     }
+
+    /* Please don't remove since we need it to debug. Thanks! */
+    memset(&mac_addr, 0, sizeof(mac_addr));
+    rte_eth_macaddr_get(port_id, &mac_addr);
+    RTE_LOG(INFO, VROUTER, "Adding vif %u eth device %" PRIu8 " PCI %d:%d.%d"
+        " MAC " MAC_FORMAT "\n",
+        vif->vif_idx, port_id, pci_address.bus, pci_address.devid, pci_address.function,
+        MAC_VALUE(mac_addr.addr_bytes));
 
     ethdev = &vr_dpdk.ethdevs[port_id];
     if (ethdev->ethdev_ptr != NULL) {
