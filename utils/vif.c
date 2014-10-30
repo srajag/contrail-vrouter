@@ -179,6 +179,32 @@ vr_interface_print_header(void)
     return;
 }
 
+unsigned char *
+vr_if_transport_string(vr_interface_req *req)
+{
+    switch (req->vifr_transport) {
+    case VIF_TRANSPORT_VIRTUAL:
+        return "Virtual";
+        break;
+
+    case VIF_TRANSPORT_ETH:
+        return "Ethernet";
+        break;
+
+    case VIF_TRANSPORT_PMD:
+        return "PMD";
+        break;
+
+    case VIF_TRANSPORT_SOCKET:
+        return "Socket";
+        break;
+
+    default:
+        break;
+    }
+
+    return "Unknown";
+}
 void
 vr_interface_req_process(void *s)
 {
@@ -197,13 +223,23 @@ vr_interface_req_process(void *s)
     for (; printed < 12; printed++)
         printf(" ");
 
-    if (req->vifr_flags & VIF_FLAG_PMD)
+    if (req->vifr_flags & VIF_FLAG_PMD) {
         printf("PMD: %d", req->vifr_os_idx);
-    else if ((platform == DPDK_PLATFORM) &&
-            (req->vifr_type == VIF_TYPE_PHYSICAL)) {
-        printf("PCI: %d:%d:%d.%d",
-                (req->vifr_os_idx >> 16), (req->vifr_os_idx >> 8) & 0xFF,
-                (req->vifr_os_idx >> 3) & 0x1F, (req->vifr_os_idx & 0x7));
+    } else if (platform == DPDK_PLATFORM) {
+        switch (req->vifr_type) {
+        case VIF_TYPE_PHYSICAL:
+            printf("PCI: %d:%d:%d.%d",
+                    (req->vifr_os_idx >> 16), (req->vifr_os_idx >> 8) & 0xFF,
+                    (req->vifr_os_idx >> 3) & 0x1F, (req->vifr_os_idx & 0x7));
+            break;
+
+        default:
+            if (req->vifr_name)
+                printf("%s:%s", vr_if_transport_string(req),
+                        req->vifr_name);
+            break;
+        }
+
     } else {
         printf("OS: %s", req->vifr_os_idx ?
                 if_indextoname(req->vifr_os_idx, name): "NULL");
