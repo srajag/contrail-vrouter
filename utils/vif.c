@@ -55,7 +55,7 @@ static int vr_ifflags;
 
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
-static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set;
+static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
 static int xconnect_set, vhost_phys_set;
 
 static unsigned int vr_op, vr_if_type;
@@ -527,7 +527,7 @@ Usage()
     printf("\t   [--add <intf_name> --mac <mac> --vrf <vrf>\n");
     printf("\t   \t--type [vhost|agent|physical|virtual]\n");
     printf("\t   \t--xconnect <physical interface name>\n");
-    printf( "[--id <intf_id> --pmd --policy, --vhost-phys, --dhcp-enable]]\n");
+    printf( "[--id <intf_id> --pmd --pci --policy, --vhost-phys, --dhcp-enable]]\n");
     printf("\t   [--delete <intf_id>]\n");
     printf("\t   [--get <intf_id>][--kernel]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
@@ -548,6 +548,7 @@ enum if_opt_index {
     DELETE_OPT_INDEX,
     POLICY_OPT_INDEX,
     PMD_OPT_INDEX,
+    PCI_OPT_INDEX,
     KINDEX_OPT_INDEX,
     TYPE_OPT_INDEX,
     SET_OPT_INDEX,
@@ -570,6 +571,7 @@ static struct option long_options[] = {
     [DELETE_OPT_INDEX]      =   {"delete",      required_argument,  &delete_set,        1},
     [POLICY_OPT_INDEX]      =   {"policy",      no_argument,        &policy_set,        1},
     [PMD_OPT_INDEX]         =   {"pmd",         no_argument,        &pmd_set,           1},
+    [PCI_OPT_INDEX]         =   {"pci",         no_argument,        &pci_set,           1},
     [KINDEX_OPT_INDEX]      =   {"kernel",      no_argument,        &kindex_set,        1},
     [TYPE_OPT_INDEX]        =   {"type",        required_argument,  &type_set,          1},
     [SET_OPT_INDEX]         =   {"set",         required_argument,  &set_set,           1},
@@ -670,7 +672,7 @@ parse_long_opts(int option_index, char *opt_arg)
     case XCONNECT_OPT_INDEX:
         if_xconnect_kindex = if_nametoindex(opt_arg);
         if (isdigit(opt_arg[0])) {
-            if_pmdindex = strtol(opt_arg, NULL, 10);
+            if_pmdindex = strtol(opt_arg, NULL, 0);
         } else if (!if_xconnect_kindex) {
             printf("%s does not seem to be a  valid physical interface name\n",
                     opt_arg);
@@ -708,7 +710,7 @@ validate_options(void)
     if (!sum_opt || help_set)
         Usage();
 
-    if (pmd_set) {
+    if (pmd_set || pci_set) {
         if_kindex = if_pmdindex;
         if_xconnect_kindex = if_pmdindex;
     }
@@ -762,7 +764,7 @@ main(int argc, char *argv[])
      */
     unsigned int sock_proto = NETLINK_GENERIC;
 
-    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:D:i:",
+    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:DPi:",
                     long_options, &option_index)) >= 0) {
             switch (opt) {
             case 'a':
@@ -814,6 +816,11 @@ main(int argc, char *argv[])
             case 'D':
                 pmd_set = 1;
                 parse_long_opts(PMD_OPT_INDEX, NULL);
+                break;
+
+            case 'P':
+                pci_set = 1;
+                parse_long_opts(PCI_OPT_INDEX, NULL);
                 break;
 
             case 't':
