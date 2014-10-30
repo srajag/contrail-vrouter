@@ -6,6 +6,8 @@
  */
 #include <sys/select.h>
 #include <sys/un.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/socket.h>
@@ -621,15 +623,24 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
     sun.sun_family = AF_UNIX;
 
     unlink(sun.sun_path);
-            
+
+    /*
+     * Ensure RW permissions for the socket files such that QEMU process is
+     * able to connect.
+     */
+    umask_mode = umask(~(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH |
+            S_IWOTH));
+
     ret = bind(s, (struct sockaddr *) &sun, sizeof(sun));
     if (ret < 0) {
-        vr_uvhost_log("Error %d binding vhost server socket %s\n", 
+        vr_uvhost_log("Error %d binding vhost server socket %s\n",
                       errno, sun.sun_path);
         goto error;
     }
 
-    /* 
+    umask(umask_mode);
+
+    /*
      * Set the socket to non-blocking
      */
     flags = fcntl(s, F_GETFL, 0);
