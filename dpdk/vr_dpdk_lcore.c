@@ -17,9 +17,40 @@
 #include <sched.h>
 #include <rte_malloc.h>
 #include <urcu-qsbr.h>
+#include <linux/vhost.h>
 
 #include "vr_dpdk.h"
 #include "vr_dpdk_usocket.h"
+#include "vr_dpdk_virtio.h"
+
+/* 
+ * vr_dpdk_phys_lcore_least_used_get - returns the least used lcore among the 
+ * ones that handle TX for physical interfaces.
+ */
+unsigned int
+vr_dpdk_phys_lcore_least_used_get(void)
+{
+    unsigned lcore_id;
+    struct vr_dpdk_lcore *lcore;
+    unsigned least_used_id = RTE_MAX_LCORE;
+    uint16_t least_used_nb_queues = 2 * VR_MAX_INTERFACES;
+    unsigned int num_queues;
+
+    RTE_LCORE_FOREACH(lcore_id) {
+        lcore = vr_dpdk.lcores[lcore_id];
+        if (lcore->lcore_is_phys_tx_lcore == 0) {
+            continue;
+        }
+
+        num_queues = lcore->lcore_nb_rx_queues + lcore->lcore_nb_rings_to_push;
+        if (num_queues < least_used_nb_queues) {
+            least_used_nb_queues = num_queues;
+            least_used_id = lcore_id;
+        }
+    }
+
+    return least_used_id;
+}
 
 /* Returns the least used lcore or RTE_MAX_LCORE */
 unsigned
@@ -28,12 +59,15 @@ vr_dpdk_lcore_least_used_get(void)
     unsigned lcore_id;
     struct vr_dpdk_lcore *lcore;
     unsigned least_used_id = RTE_MAX_LCORE;
-    uint16_t least_used_nb_queues = VR_MAX_INTERFACES;
+    uint16_t least_used_nb_queues = 2 * VR_MAX_INTERFACES;
+    unsigned int num_queues;
 
     RTE_LCORE_FOREACH(lcore_id) {
         lcore = vr_dpdk.lcores[lcore_id];
-        if (lcore->lcore_nb_rx_queues < least_used_nb_queues) {
-            least_used_nb_queues = lcore->lcore_nb_rx_queues;
+         num_queues = lcore->lcore_nb_rx_queues +
+                      lcore->lcore_nb_rings_to_push;
+        if (num_queues < least_used_nb_queues) {
+            least_used_nb_queues = num_queues;
             least_used_id = lcore_id;
         }
     }
@@ -164,6 +198,9 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
             tx_queue = (*tx_queue_init_op)(lcore_id, vif, queue_id);
             if (tx_queue == NULL)
                 return -EFAULT;
+            if (vif_is_fabric(vif)) {
+                lcore->lcore_is_phys_tx_lcore = 1;
+            }
         } else {
             /* no more hardware queues left, so we use rings instead */
             RTE_LOG(INFO, VROUTER, "\tlcore %u TX to SW ring\n", lcore_id);
@@ -268,6 +305,8 @@ dpdk_lcore_fwd_rx(struct vr_dpdk_lcore *lcore, struct rte_mbuf **pkts,
     uint64_t cur_queues_mask = *rx_queues_mask;
     uint64_t cur_queue = 1;
     uint32_t nb_pkts = 0;
+    struct vr_packet *pkt_arr[VR_DPDK_MAX_BURST_SZ];
+    int pkti;
 
     /* for all RX queues */
     while (cur_queues_mask) {
@@ -279,7 +318,16 @@ dpdk_lcore_fwd_rx(struct vr_dpdk_lcore *lcore, struct rte_mbuf **pkts,
             cur_queues_mask &= ~cur_queue;
             if (likely(nb_pkts > 0)) {
                 /* transmit packets to vrouter */
-                dpdk_vroute(rx_queue->rxq_vif, pkts, nb_pkts);
+                if (vif_is_virtual(rx_queue->rxq_vif)) {
+                    for (pkti = 0; pkti < nb_pkts; pkti++) {
+                        pkt_arr[pkti] = vr_dpdk_packet_get(pkts[pkti],
+                                                           rx_queue->rxq_vif);
+                    }
+                    vr_dpdk_virtio_enq_pkts_to_phys_lcore(rx_queue,
+                                                          pkt_arr, nb_pkts);
+                } else {
+                    dpdk_vroute(rx_queue->rxq_vif, pkts, nb_pkts);
+                }
             } else {
                 /* mark the queue as empty */
                 *rx_queues_mask &= ~cur_queue;
@@ -301,30 +349,54 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
     uint32_t nb_pkts;
     int i;
     struct vr_dpdk_ring_to_push *rtp;
+    struct vr_packet *pkt;
+    int pkti;
+    uint16_t num_tx_rings, max_tx_rings;
 
     total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
     total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
     total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
     total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
     total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
-
-    rcu_quiescent_state();
 
     /* for all TX rings to push */
     rtp = &lcore->lcore_rings_to_push[0];
-    while (unlikely(rtp->rtp_tx_queue != NULL)) {
+    max_tx_rings = lcore->lcore_nb_rings_to_push;
+    num_tx_rings = 0;
+    while ((num_tx_rings < max_tx_rings) &&
+              ((rtp - &lcore->lcore_rings_to_push[0]) < VR_DPDK_MAX_RINGS)) {
+        if (rtp->rtp_tx_ring == NULL) {
+            /*
+             * TODO - need ot handle decrementing lcore_nb_rings_to_push
+             * when vif is deleted.
+             */
+            rtp++;
+            continue;
+        }
+
         nb_pkts = rte_ring_sc_dequeue_burst(rtp->rtp_tx_ring, (void **)pkts,
             VR_DPDK_MAX_BURST_SZ-1);
         if (likely(nb_pkts != 0)) {
             total_pkts += nb_pkts;
 
-            /* push packets to the TX queue */
-            for (i = 0; i < nb_pkts; i++) {
-                rtp->rtp_tx_queue->txq_ops.f_tx(rtp->rtp_tx_queue->txq_queue_h, pkts[i]);
+            if (rtp->rtp_tx_queue) {
+                /* push packets to the TX queue */
+                for (i = 0; i < nb_pkts; i++) {
+                    rtp->rtp_tx_queue->txq_ops.f_tx(
+                        rtp->rtp_tx_queue->txq_queue_h, pkts[i]);
+                }
+            } else {
+                for (pkti = 0; pkti < nb_pkts; pkti++) {
+                    pkt = (struct vr_packet *) pkts[pkti];
+                    pkt->vp_if->vif_rx(pkt->vp_if, pkt, VLAN_ID_INVALID);
+                }
             }
         }
         rtp++;
+        num_tx_rings++;
     }
+
+    rcu_quiescent_state();
 
 #if VR_DPDK_SLEEP_NO_PACKETS_US > 0
     /* sleep if no single packet received */

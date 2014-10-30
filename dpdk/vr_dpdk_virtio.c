@@ -70,6 +70,7 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     unsigned int vif_idx = vif->vif_idx;
     struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[0];
+    char ring_name[64];
 
     /* find an empty RX queue */
     while (rx_queue->rxq_queue_h) rx_queue++;
@@ -77,6 +78,26 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     if (q_id >= vr_dpdk_virtio_nrxqs(vif)) {
         return NULL;
     }
+
+    sprintf(ring_name, "vif_%d_%d_ring", vif_idx, q_id);
+
+    vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring =
+        rte_ring_create(ring_name, VR_DPDK_VIRTIO_TX_RING_SZ, rte_socket_id(),
+                        RING_F_SP_ENQ | RING_F_SC_DEQ);
+    if (vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring == NULL) {
+        return NULL;
+    }
+    vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring_dst_lcore_id =
+         vr_dpdk_phys_lcore_least_used_get();
+    if (vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring_dst_lcore_id ==
+                RTE_MAX_LCORE) {
+        vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring_dst_lcore_id =
+            vr_dpdk_lcore_least_used_get();
+    }
+
+    dpdk_ring_to_push_add(
+        vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring_dst_lcore_id,
+        vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring, NULL);
 
     rx_queue->rxq_ops = dpdk_virtio_reader_ops;
     vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_ready_state = VQ_NOT_READY;
@@ -175,7 +196,7 @@ static int
 dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
 {
     vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
-    uint16_t vq_hard_avail_idx, i;
+    uint16_t vq_hard_avail_idx, vq_hard_used_idx, i;
     uint16_t num_pkts, next_desc_idx, next_avail_idx, pkts_sent = 0;
     struct vring_desc *desc;
     char *pkt_addr;
@@ -247,7 +268,8 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
      */
     rte_wmb();
     vq->vdv_soft_avail_idx += num_pkts;
-    vq->vdv_used->idx += num_pkts;
+    vq_hard_used_idx = (*((volatile uint16_t *)&vq->vdv_used->idx));
+    *((volatile uint16_t *) &vq->vdv_used->idx) = vq_hard_used_idx + num_pkts;
 
     return pkts_sent;
 }
@@ -288,7 +310,7 @@ dpdk_virtio_to_vm_flush(void *arg)
 {
     vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
     uint16_t i;
-    uint16_t num_buf_posted, vq_hard_avail_idx, num_pkts;
+    uint16_t num_buf_posted, vq_hard_avail_idx, vq_hard_used_idx, num_pkts;
     uint16_t next_desc_idx, next_avail_idx, size;
     struct vring_desc *desc;
     char *buf_addr;
@@ -395,7 +417,8 @@ dpdk_virtio_to_vm_flush(void *arg)
      * TODO - need memory barrier + VM kick here.
      */
     vq->vdv_soft_avail_idx += num_pkts;
-    vq->vdv_used->idx += num_pkts;
+    vq_hard_used_idx = (*((volatile uint16_t *)&vq->vdv_used->idx));
+    *((volatile uint16_t *) &vq->vdv_used->idx) = vq_hard_used_idx + num_pkts;
 
     return 0;
 }
@@ -459,6 +482,14 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
     }
 
     *vring_basep =  vq->vdv_base_idx;
+
+    /*
+     * This is usually called when qemu shuts down a virtio queue. Set the
+     * state to indicate that this queue should not be used any more.
+     *
+     * TODO: need memory barrier and rcu_synchronize here.
+     */
+    vq->vdv_ready_state = VQ_NOT_READY;
 
     return 0;
 }
@@ -594,5 +625,29 @@ vr_dpdk_virtio_get_vif_client(unsigned int idx)
     }
 
     return vr_dpdk_vif_clients[idx];
+}
+
+/*
+ * vr_dpdk_virtio_enq_pkts_to_phys_lcore - enqueue packets received on a 
+ * virtio interface queue onto a ring that will be handled by the lcore
+ * assigned to that queue. This lcore will then transmit the packet out the
+ * wire if required.
+ *
+ * Returns nothing.
+ */
+void
+vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_rx_queue *rx_queue,
+                                      struct vr_packet **pkt_arr,
+                                      uint32_t npkts)
+{
+    vr_dpdk_virtioq_t *vq;
+    struct rte_ring *vq_pring;
+
+    vq = (vr_dpdk_virtioq_t *) rx_queue->rxq_queue_h;
+    vq_pring = vq->vdv_pring;
+
+    rte_ring_sp_enqueue_bulk(vq_pring, (void **) pkt_arr, npkts);
+
+    return;
 }
 

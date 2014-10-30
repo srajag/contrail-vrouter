@@ -43,7 +43,7 @@
  */
 
 /* lcore mask */
-#define VR_DPDK_LCORE_MASK          "0xf"
+#define VR_DPDK_LCORE_MASK          "0x3f"
 /* Number of service lcores */
 #define VR_DPDK_NB_SERVICE_LCORES   2
 /* Minimum number of lcores */
@@ -188,6 +188,8 @@ struct vr_dpdk_lcore {
     rte_atomic16_t lcore_stop_flag;
     /* Number of RX queues assigned to the lcore (for the scheduler) */
     uint16_t lcore_nb_rx_queues;
+    /* Does this lcore do physical interface TX? */
+    int lcore_is_phys_tx_lcore;
 };
 
 /* Hardware RX queue state */
@@ -393,6 +395,8 @@ int vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
     unsigned mpls_label);
 /* Returns the least used lcore or RTE_MAX_LCORE */
 unsigned vr_dpdk_lcore_least_used_get(void);
+/* Returns the least used lcore among the ones that handle physical intf TX */
+unsigned int vr_dpdk_phys_lcore_least_used_get(void);
 
 /*
  * vr_dpdk_netlink.c
@@ -421,5 +425,7 @@ vr_dpdk_ring_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 struct vr_dpdk_tx_queue *
 vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id);
+void dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
+    struct vr_dpdk_tx_queue *tx_queue);
 
 #endif /*_VR_DPDK_H_ */

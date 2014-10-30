@@ -17,13 +17,18 @@
  */
 #define VR_DPDK_VIRTIO_TX_BURST_SZ VR_DPDK_MAX_BURST_SZ 
 
+/*
+ * Size of ring to send packets from virtio RX queue to lcore for forwarding 
+ */
+#define VR_DPDK_VIRTIO_TX_RING_SZ (64 * VR_DPDK_TX_RING_SZ)
+
 typedef enum vq_ready_state {
     VQ_NOT_READY = 1,
     VQ_READY,
 } vq_ready_state_t;
 
 typedef struct vr_dpdk_virtioq {
-    vq_ready_state_t vdv_ready_state;
+    volatile vq_ready_state_t vdv_ready_state;
     int vdv_enabled_state;
     unsigned int vdv_vif_idx;
     int vdv_zero_copy;
@@ -36,6 +41,8 @@ typedef struct vr_dpdk_virtioq {
     uint16_t vdv_soft_used_idx;
     struct rte_mbuf *vdv_tx_mbuf[2 * VR_DPDK_VIRTIO_TX_BURST_SZ];
     uint32_t vdv_tx_mbuf_count;
+    struct rte_ring *vdv_pring;
+    uint32_t vdv_pring_dst_lcore_id;
 } vr_dpdk_virtioq_t;
 
 uint16_t vr_dpdk_virtio_nrxqs(struct vr_interface *vif);
@@ -60,4 +67,7 @@ int vr_dpdk_set_virtq_ready(unsigned int vif_idx, unsigned int vring_idx,
                             vq_ready_state_t ready);
 void vr_dpdk_virtio_set_vif_client(unsigned int idx, void *client);
 void *vr_dpdk_virtio_get_vif_client(unsigned int idx);
+void vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_rx_queue *rx_queue,
+                                           struct vr_packet **pkt_arr,
+                                           uint32_t npkts);
 #endif /* __VR_DPDK_VIRTIO_H__ */
