@@ -221,6 +221,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         num_pkts = max_pkts;
     }
 
+    RTE_LOG(DEBUG, VROUTER, "%s: num_pkts=%u\n", __func__, num_pkts);
     for (i = 0; i < num_pkts; i++) {
         next_avail_idx = (vq->vdv_soft_avail_idx + i) &
                              (vq->vdv_vvs.num - 1);
@@ -490,6 +491,8 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
      * TODO: need memory barrier and rcu_synchronize here.
      */
     vq->vdv_ready_state = VQ_NOT_READY;
+    vq->vdv_soft_avail_idx = 0;
+    vq->vdv_soft_used_idx = 0;
 
     return 0;
 }
