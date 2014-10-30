@@ -871,28 +871,27 @@ dpdk_pgso_size(struct vr_packet *pkt)
 static void
 dpdk_add_mpls(struct vrouter *router, unsigned mpls_label)
 {
-    int ret;
+    int ret, i;
+    struct vr_interface *eth_vif;
 
-    if (!router->vr_eth_if) {
-        RTE_LOG(ERR, VROUTER, "Error accelerating MPLS %u: no physical interface added\n",
-            mpls_label);
-        return;
+    for (i = 0; i < router->vr_max_interfaces; i++) {
+        eth_vif = __vrouter_get_interface(router, i);
+        if (eth_vif && (eth_vif->vif_type == VIF_TYPE_PHYSICAL)
+            && (eth_vif->vif_flags & VIF_FLAG_FILTERING_OFFLOAD)) {
+            RTE_LOG(INFO, VROUTER, "Enabling hardware acceleration on vif %u for MPLS %u\n",
+                (unsigned)eth_vif->vif_idx, mpls_label);
+            if (!router->vr_ip) {
+                RTE_LOG(ERR, VROUTER, "\terror accelerating MPLS %u: no IP address set\n",
+                    mpls_label);
+                continue;
+            }
+            ret = vr_dpdk_lcore_mpls_schedule(eth_vif, router->vr_ip, mpls_label);
+            if (ret != 0)
+                RTE_LOG(INFO, VROUTER, "\terror accelerating MPLS %u: %s (%d)\n",
+                    mpls_label, rte_strerror(-ret), -ret);
+        }
     }
-    if (!(router->vr_eth_if->vif_flags & VIF_FLAG_FILTERING_OFFLOAD))
-        return;
 
-    RTE_LOG(INFO, VROUTER, "Enabling hardware acceleration on vif %u for MPLS %u\n",
-        (unsigned)router->vr_eth_if->vif_idx, mpls_label);
-    if (!router->vr_ip) {
-        RTE_LOG(ERR, VROUTER, "\terror accelerating MPLS %u: no IP address set\n",
-            mpls_label);
-        return;
-    }
-
-    ret = vr_dpdk_lcore_mpls_schedule(router->vr_eth_if, router->vr_ip, mpls_label);
-    if (ret != 0)
-        RTE_LOG(INFO, VROUTER, "\terror accelerating MPLS %u: %s (%d)\n", mpls_label,
-            rte_strerror(-ret), -ret);
 }
 
 static void
