@@ -16,6 +16,7 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 
+
 #include "vr_uvhost_util.h"
 #include "vr_uvhost_msg.h"
 #include "qemu_uvhost.h"
@@ -34,7 +35,7 @@ static int vr_uvhm_set_ring_num_desc(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_base(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl);
- 
+
 static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
     NULL,
     vr_uvmh_get_features,
@@ -87,19 +88,19 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
     for (i = 0; i < vum_msg->nregions; i++) {
         if (vru_cl->vruc_fds_sent[i]) {
             region = &vru_cl->vruc_mem_regions[i];
-            
+
             region->vrucmr_phys_addr = vum_msg->regions[i].guest_phys_addr;
             region->vrucmr_size = vum_msg->regions[i].memory_size;
             region->vrucmr_user_space_addr = vum_msg->regions[i].userspace_addr;
 
-            size = vum_msg->regions[i].mmap_offset + 
+            size = vum_msg->regions[i].mmap_offset +
                        vum_msg->regions[i].memory_size;
-            region->vrucmr_mmap_addr = (uint64_t) 
-                                            mmap(0, size, 
+            region->vrucmr_mmap_addr = (uint64_t)
+                                            mmap(0, size,
                                             PROT_READ | PROT_WRITE,
                                             MAP_SHARED,
                                             vru_cl->vruc_fds_sent[i], 0);
-            
+
             if (region->vrucmr_mmap_addr == ((uint64_t)MAP_FAILED)) {
                 vr_uvhost_log("mmap failed for fd %d on vhost client %s\n",
                               vru_cl->vruc_fds_sent[i],
@@ -108,7 +109,7 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
             }
 
             region->vrucmr_mmap_addr += vum_msg->regions[i].mmap_offset;
-        }           
+        }
     }
 
     vru_cl->vruc_num_mem_regions = vum_msg->nregions;
@@ -116,13 +117,13 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
     return 0;
 }
 
-/* 
+/*
  * vr_uvhm_set_ring_num_desc - handles VHOST_USER_SET_VRING_NUM message from
  * the user space vhost client to set the number of descriptors in the virtio
  * ring.
  *
  * Returns 0 on success, -1 otherwise.
- */ 
+ */
 static int
 vr_uvhm_set_ring_num_desc(vr_uvh_client_t *vru_cl)
 {
@@ -142,7 +143,7 @@ vr_uvhm_set_ring_num_desc(vr_uvh_client_t *vru_cl)
                                   vum_msg->state.num)) {
         vr_uvhost_log("Could set number of vring descriptors in vhost server"
                       " %d %d %d\n",
-                      vru_cl->vruc_idx, vring_idx, 
+                      vru_cl->vruc_idx, vring_idx,
                       vum_msg->state.num);
         return -1;
     }
@@ -256,7 +257,7 @@ vr_uvhm_set_vring_base(vr_uvh_client_t *vru_cl)
         vr_uvhost_log("Couldn't set vring base in vhost server %d %d %d\n",
                       vru_cl->vruc_idx, vring_idx, vum_msg->state.num);
         return -1;
-    } 
+    }
 
     return 0;
 }
@@ -282,7 +283,7 @@ vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl)
         return -1;
     }
 
-    if (vr_dpdk_virtio_get_vring_base(vru_cl->vruc_idx, vring_idx, 
+    if (vr_dpdk_virtio_get_vring_base(vru_cl->vruc_idx, vring_idx,
                                      &vum_msg->state.num)) {
         vr_uvhost_log("Couldn't get vring base in vhost server %d %d\n",
                       vru_cl->vruc_idx, vring_idx);
@@ -304,8 +305,8 @@ static int
 vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
 {
     VhostUserMsg *msg = &vru_cl->vruc_msg;
- 
-    if ((msg->request <= VHOST_USER_NONE) || 
+
+    if ((msg->request <= VHOST_USER_NONE) ||
             (msg->request >= VHOST_USER_MAX)) {
         return -1;
     }
@@ -342,7 +343,7 @@ vr_uvh_cl_send_reply(vr_uvh_client_t *vru_cl)
             msg->flags |= VHOST_USER_VERSION;
             msg->flags |= VHOST_USER_REPLY_MASK;
 
-            ret = send(vru_cl->vruc_fd, (void *) msg, 
+            ret = send(vru_cl->vruc_fd, (void *) msg,
                        VHOST_USER_HSIZE + msg->size, MSG_DONTWAIT);
             if ((ret < 0) || (ret != (VHOST_USER_HSIZE + msg->size))) {
                 /*
@@ -351,20 +352,20 @@ vr_uvh_cl_send_reply(vr_uvh_client_t *vru_cl)
                 vr_uvhost_log("Error sending vhost user reply to %s\n",
                               vru_cl->vruc_path);
                 return -1;
-             } 
+             }
 
             break;
 
         default:
-            /* 
+            /*
              * No reply needed.
              */
             break;
     }
-    
+
     return 0;
-}  
-              
+}
+
 /*
  * vr_uvh_cl_msg_handler - handler for messages from user space vhost
  * clients. Calls the appropriate handler based on the message type.
@@ -390,8 +391,8 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
         mhdr.msg_controllen = sizeof(vru_cl->vruc_cmsg);
 
         iov.iov_base = (void *) &vru_cl->vruc_msg;
-        iov.iov_len = VHOST_USER_HSIZE; 
-           
+        iov.iov_len = VHOST_USER_HSIZE;
+
         mhdr.msg_iov = &iov;
         mhdr.msg_iovlen = 1;
 
@@ -401,7 +402,7 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
                 return 0;
             }
 
-            vr_uvhost_log("Receive returned %d in vhost server for client %s\n", 
+            vr_uvhost_log("Receive returned %d in vhost server for client %s\n",
                           ret, vru_cl->vruc_path);
             return -1;
         } else if (ret > 0) {
@@ -414,7 +415,7 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
             cmsg = CMSG_FIRSTHDR(&mhdr);
             if (cmsg && (cmsg->cmsg_len > 0) &&
                    (cmsg->cmsg_level == SOL_SOCKET) &&
-                   (cmsg->cmsg_type == SCM_RIGHTS)) {  
+                   (cmsg->cmsg_type == SCM_RIGHTS)) {
                    vru_cl->vruc_num_fds_sent = (cmsg->cmsg_len - CMSG_LEN(0))/
                                                    sizeof(int);
                    if (vru_cl->vruc_num_fds_sent > VHOST_MEMORY_MAX_NREGIONS) {
@@ -430,23 +431,23 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
                 return 0;
             }
 
-            read_len = vru_cl->vruc_msg.size; 
-        } else { 
+            read_len = vru_cl->vruc_msg.size;
+        } else {
             /*
              * recvmsg returned 0, so return error.
              */
             vr_uvhost_log("Receive returned %d in vhost server for client %s\n",
                           ret, vru_cl->vruc_path);
             return -1;
-        }    
+        }
     } else if (vru_cl->vruc_msg_bytes_read < VHOST_USER_HSIZE) {
         read_len = VHOST_USER_HSIZE - vru_cl->vruc_msg_bytes_read;
     } else {
-        read_len = vru_cl->vruc_msg.size - 
+        read_len = vru_cl->vruc_msg.size -
                        (vru_cl->vruc_msg_bytes_read - VHOST_USER_HSIZE);
-    }        
-   
-    if (read_len) { 
+    }
+
+    if (read_len) {
         ret = read(fd, (((char *)&vru_cl->vruc_msg) + vru_cl->vruc_msg_bytes_read),
                    read_len);
         if (ret < 0) {
@@ -461,16 +462,16 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
             return -1;
         } else if (ret == 0) {
              vr_uvhost_log("Read returned %d in vhost server for client %s\n",
-                           ret, vru_cl->vruc_path); 
+                           ret, vru_cl->vruc_path);
             return -1;
-        }  
-      
-        vru_cl->vruc_msg_bytes_read += ret; 
+        }
+
+        vru_cl->vruc_msg_bytes_read += ret;
         if (vru_cl->vruc_msg_bytes_read < VHOST_USER_HSIZE) {
             return 0;
         }
 
-        if (vru_cl->vruc_msg_bytes_read < 
+        if (vru_cl->vruc_msg_bytes_read <
                 (vru_cl->vruc_msg.size + VHOST_USER_HSIZE)) {
             return 0;
         }
@@ -493,7 +494,7 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
     /*
      * Message received successully, so clear state for next message from
      * this client.
-     */        
+     */
     vru_cl->vruc_msg_bytes_read = 0;
     memset(&vru_cl->vruc_msg, 0, sizeof(vru_cl->vruc_msg));
     memset(vru_cl->vruc_cmsg, 0, sizeof(vru_cl->vruc_cmsg));
@@ -557,7 +558,7 @@ error:
 
 /*
  * vr_uvh_nl_vif_del_handler - handle a message from the netlink thread
- * to delete a vif. 
+ * to delete a vif.
  *
  * Returns 0 on success, -1 otherwise.
  */
@@ -592,7 +593,7 @@ vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
 }
 
 
-/* 
+/*
  * vr_uvh_nl_vif_add_handler - handle a vif add message from the netlink
  * thread. In response, the vhost server thread starts listening on the
  * UNIX domain socket corresponding to this vif.
@@ -606,6 +607,7 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
     struct sockaddr_un sun;
     int flags;
     vr_uvh_client_t *vru_cl = NULL;
+    mode_t umask_mode;
 
     if (msg == NULL) {
         return -1;
@@ -684,7 +686,7 @@ error:
     if (vru_cl) {
         vr_uvhost_del_client(vru_cl);
     }
- 
+
     return ret;
 }
 
@@ -706,8 +708,8 @@ vr_uvh_nl_msg_handler(int fd, void *arg)
     ret = recv(fd, (void *) &msg, sizeof(msg), MSG_DONTWAIT);
     if (ret < 0) {
         if ((errno != EAGAIN) && (errno != EWOULDBLOCK)) {
-            vr_uvhost_log("Error %d in netlink msg receive in vhost server\n", 
-                          errno); 
+            vr_uvhost_log("Error %d in netlink msg receive in vhost server\n",
+                          errno);
             return ret;
         } else {
             return 0;
@@ -718,7 +720,7 @@ vr_uvh_nl_msg_handler(int fd, void *arg)
         vr_uvhost_log("Received msg of length %d, expected %d in vhost server",
                       ret, sizeof(msg));
         return -1;
-    }    
+    }
 
     switch (msg.vrnum_type) {
         case VRNU_MSG_VIF_ADD:
@@ -735,8 +737,8 @@ vr_uvh_nl_msg_handler(int fd, void *arg)
             ret = -1;
             break;
     }
- 
-    return ret;    
+
+    return ret;
 }
 
 /*
@@ -762,6 +764,6 @@ vr_uvh_nl_listen_handler(int fd, void *arg)
         vr_uvhost_log("Error adding netlink socket fd in vhost server\n");
         return -1;
     }
- 
+
     return 0;
 }
