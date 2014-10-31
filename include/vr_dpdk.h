@@ -188,8 +188,6 @@ struct vr_dpdk_lcore {
     rte_atomic16_t lcore_stop_flag;
     /* Number of RX queues assigned to the lcore (for the scheduler) */
     uint16_t lcore_nb_rx_queues;
-    /* Does this lcore do physical interface TX? */
-    int lcore_is_phys_tx_lcore;
 };
 
 /* Hardware RX queue state */
