@@ -47,10 +47,8 @@
 
 #define TABLE_FLAG_VALID        0x1
 
-#ifndef __DPDK__
 #define MEM_DEV                 "/dev/flow"
 int mem_fd;
-#endif
 
 static int dvrf_set, mir_set, help_set;
 static unsigned short dvrf;
@@ -433,12 +431,10 @@ flow_table_map(vr_flow_req *req)
     struct flow_table *ft = &main_table;
     const char *flow_path;
 
-#ifdef __DPDK__
-    ft->ft_entries = (struct vr_flow_entry *)vr_shmem_alloc(
-        VR_FLOW_SHMEM_NAME, req->fr_ftable_size);
-#else
+#ifndef __DPDK__
     if (req->fr_ftable_dev < 0)
         exit(ENODEV);
+#endif
 
     const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
     if (platform && ((strcmp(platform, PLATFORM_DPDK) == 0) ||
@@ -462,7 +458,6 @@ flow_table_map(vr_flow_req *req)
 
     ft->ft_entries = (struct vr_flow_entry *)mmap(NULL, req->fr_ftable_size,
             PROT_READ, MAP_SHARED, mem_fd, 0);
-#endif /* __DPDK__ */
     if (ft->ft_entries == MAP_FAILED) {
         printf("flow table: %s\n", strerror(errno));
         exit(errno);
