@@ -532,6 +532,7 @@ dpdk_lcore_service_loop(struct vr_dpdk_lcore *lcore, unsigned netlink_lcore_id,
                 __func__, rte_lcore_id());
             dpdk_netlink_io();
         }
+
         if (lcore_id == packet_lcore_id) {
             RTE_LOG(DEBUG, VROUTER, "%s: packet IO on lcore %u\n",
                 __func__, rte_lcore_id());

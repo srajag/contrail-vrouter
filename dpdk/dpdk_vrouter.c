@@ -267,6 +267,7 @@ dpdk_signals_init(void)
         RTE_LOG(CRIT, VROUTER, "Fail to register SIGTERM handler\n");
         return -1;
     }
+
     if (sigaction(SIGINT, &act, NULL) != 0) {
         RTE_LOG(CRIT, VROUTER, "Fail to register SIGINT handler\n");
         return -1;

@@ -31,14 +31,20 @@ int
 dpdk_packet_io(void)
 {
     int ret;
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[rte_lcore_id()];
 
 wait_for_connection:
-    while (!vr_dpdk.packet_transport)
+    while (!vr_dpdk.packet_transport) {
+        if (unlikely(rte_atomic16_read(&lcore->lcore_stop_flag) != 0))
+            return -1;
         usleep(VR_DPDK_SLEEP_SERVICE_US);
+    }
 
     ret = vr_usocket_io(vr_dpdk.packet_transport);
     if (ret < 0) {
         vr_dpdk.packet_transport = NULL;
+        if (unlikely(rte_atomic16_read(&lcore->lcore_stop_flag) != 0))
+            return -1;
         usleep(VR_DPDK_SLEEP_SERVICE_US);
         goto wait_for_connection;
     }

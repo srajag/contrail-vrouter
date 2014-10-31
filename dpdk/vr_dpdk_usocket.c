@@ -233,7 +233,8 @@ usock_unbind(struct vr_usocket *child)
         return;
 
     parent->usock_children[child->usock_child_index] = NULL;
-    parent->usock_pfds[child->usock_child_index].fd = -1;
+    if (parent->usock_pfds)
+        parent->usock_pfds[child->usock_child_index].fd = -1;
 
     parent->usock_disconnects++;
     parent->usock_cfds--;
@@ -1008,6 +1009,7 @@ vr_usocket_io(void *transport)
     int timeout;
     struct pollfd *pfd;
     struct vr_usocket *usockp = (struct vr_usocket *)transport;
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[rte_lcore_id()];
 
     if (!usockp)
         return -1;
@@ -1030,12 +1032,17 @@ vr_usocket_io(void *transport)
         }
 
         rcu_thread_offline();
+
+        if (unlikely(rte_atomic16_read(&lcore->lcore_stop_flag) != 0))
+            break;
+
         ret = poll(usockp->usock_pfds, usockp->usock_max_cfds,
                 timeout);
         if (ret < 0) {
             usock_set_error(usockp, ret);
-            if (errno == EINTR)
+            if (errno == EINTR) {
                 continue;
+            }
 
             /* all other errors are fatal */
             goto return_from_io;
