@@ -118,17 +118,20 @@ dpdk_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
 static void
 dpdk_pfree(struct vr_packet *pkt, unsigned short reason)
 {
+    struct vrouter *router = vrouter_get(0);
     struct rte_mbuf *m;
 
     if (!pkt)
         rte_panic("Null packet");
 
+    if (router)
+        ((uint64_t *)(router->vr_pdrop_stats[pkt->vp_cpu]))[reason]++;
+
     /* Fetch original mbuf from packet structure */
     m = vr_dpdk_pkt_to_mbuf(pkt);
-
-    /* TODO: implement drop stats */
-
     rte_pktmbuf_free(m);
+
+    return;
 }
 
 static void
