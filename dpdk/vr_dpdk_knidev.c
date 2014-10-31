@@ -318,7 +318,12 @@ vr_dpdk_knidev_init(struct vr_interface *vif)
 
     if (vif->vif_type == VIF_TYPE_HOST) {
         ethdev = (struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os);
-        port_id = ethdev->ethdev_port_id;
+        /* TODO: in test scripts ethdev is null here */
+        if (ethdev)
+            port_id = ethdev->ethdev_port_id;
+        else
+            /* ...so we use os_idx instead */
+            port_id = vif->vif_os_idx;
     } else {
         RTE_LOG(ERR, VROUTER, "\tunknown KNI interface addition"
                 "type %d os index %d\n", vif->vif_type, vif->vif_os_idx);
