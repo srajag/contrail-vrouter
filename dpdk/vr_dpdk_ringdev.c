@@ -72,11 +72,17 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     struct vr_dpdk_lcore *host_lcore = vr_dpdk.lcores[host_lcore_id];
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
-    uint8_t port_id = vif->vif_os_idx;
+    uint8_t port_id;
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
     struct vr_dpdk_tx_queue *host_tx_queue = &host_lcore->lcore_tx_queues[vif_idx];
     struct rte_ring *tx_ring;
+
+    if (vif->vif_type == VIF_TYPE_PHYSICAL) {
+        port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id);
+    } else {
+        port_id = vif->vif_os_idx;
+    }
 
     /* init queue */
     tx_queue->txq_ops = rte_port_ring_writer_ops;

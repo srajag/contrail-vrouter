@@ -38,10 +38,6 @@ vr_dpdk_phys_lcore_least_used_get(void)
 
     RTE_LCORE_FOREACH(lcore_id) {
         lcore = vr_dpdk.lcores[lcore_id];
-        if (lcore->lcore_is_phys_tx_lcore == 0) {
-            continue;
-        }
-
         num_queues = lcore->lcore_nb_rx_queues + lcore->lcore_nb_rings_to_push;
         if (num_queues < least_used_nb_queues) {
             least_used_nb_queues = num_queues;
@@ -63,8 +59,11 @@ vr_dpdk_lcore_least_used_get(void)
     unsigned int num_queues;
 
     RTE_LCORE_FOREACH(lcore_id) {
+        if (lcore_id == vr_dpdk.packet_lcore_id)
+            continue;
         lcore = vr_dpdk.lcores[lcore_id];
-         num_queues = lcore->lcore_nb_rx_queues +
+
+        num_queues = lcore->lcore_nb_rx_queues +
                       lcore->lcore_nb_rings_to_push;
         if (num_queues < least_used_nb_queues) {
             least_used_nb_queues = num_queues;
@@ -184,23 +183,24 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     do {
         /* never use netlink lcore */
         lcore = vr_dpdk.lcores[lcore_id];
-        if (lcore->lcore_nb_rx_queues > VR_MAX_INTERFACES) {
+        if (lcore->lcore_nb_rx_queues >= VR_MAX_INTERFACES) {
             /* do not skip master lcore but wrap */
             lcore_id = rte_get_next_lcore(lcore_id, 0, 1);
             continue;
         }
 
         /* init hardware or ring queue */
-        if (queue_id < nb_tx_queues) {
+        if (((lcore_id != vr_dpdk.packet_lcore_id) ||
+                    (nb_tx_queues > vr_dpdk.nb_fwd_lcores)) &&
+                (queue_id < nb_tx_queues)) {
             /* there is a hardware queue available */
             RTE_LOG(INFO, VROUTER, "\tlcore %u TX to HW queue %" PRIu16 "\n",
                 lcore_id, queue_id);
             tx_queue = (*tx_queue_init_op)(lcore_id, vif, queue_id);
             if (tx_queue == NULL)
                 return -EFAULT;
-            if (vif_is_fabric(vif)) {
-                lcore->lcore_is_phys_tx_lcore = 1;
-            }
+            /* next queue */
+            queue_id++;
         } else {
             /* no more hardware queues left, so we use rings instead */
             RTE_LOG(INFO, VROUTER, "\tlcore %u TX to SW ring\n", lcore_id);
@@ -211,9 +211,6 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
 
         /* add the queue to the lcore */
         dpdk_lcore_tx_queue_add(lcore_id, tx_queue);
-
-        /* next queue */
-        queue_id++;
 
         /* do not skip master lcore but wrap */
         lcore_id = rte_get_next_lcore(lcore_id, 0, 1);
@@ -233,22 +230,25 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
         }
 
         /* init hardware or ring queue */
-        if (queue_id < nb_rx_queues) {
-            /* there is a hardware queue available */
-            RTE_LOG(INFO, VROUTER, "\tlcore %u RX from HW queue %" PRIu16 "\n",
-                lcore_id, queue_id);
-            rx_queue = (*rx_queue_init_op)(lcore_id, vif, queue_id);
-            if (rx_queue == NULL)
-                return -EFAULT;
-        } else {
-            /* break if no more hardware queues left */
-            break;
-        }
-        /* add the queue to the lcore */
-        dpdk_lcore_rx_queue_add(lcore_id, rx_queue);
+        if (lcore_id != vr_dpdk.packet_lcore_id) {
+            if (queue_id < nb_rx_queues) {
+                /* there is a hardware queue available */
+                RTE_LOG(INFO, VROUTER, "\tlcore %u RX from HW queue %" PRIu16
+                        "\n", lcore_id, queue_id);
+                rx_queue = (*rx_queue_init_op)(lcore_id, vif, queue_id);
+                if (rx_queue == NULL)
+                    return -EFAULT;
 
-        /* next queue */
-        queue_id++;
+                /* add the queue to the lcore */
+                dpdk_lcore_rx_queue_add(lcore_id, rx_queue);
+
+                /* next queue */
+                queue_id++;
+            } else {
+                /* break if no more hardware queues left */
+                break;
+            }
+        }
 
         /* do not skip master lcore but wrap */
         lcore_id = rte_get_next_lcore(lcore_id, 0, 1);
@@ -517,15 +517,12 @@ dpdk_lcore_service_loop(struct vr_dpdk_lcore *lcore, unsigned netlink_lcore_id,
 
     RTE_LOG(DEBUG, VROUTER, "Hello from service lcore %u\n", rte_lcore_id());
 
-    if (lcore_id == packet_lcore_id) {
-        vr_dpdk.packet_lcore_id = packet_lcore_id;
-        /* never schedule RX queues on the packet lcore */
+    /* never schedule interfaces on the service lcore */
+    if (lcore_id != packet_lcore_id) {
         lcore->lcore_nb_rx_queues = VR_MAX_INTERFACES;
     } else {
-        /* never schedule RX/TX queues on the netlink lcore */
-        lcore->lcore_nb_rx_queues = VR_MAX_INTERFACES + 1;
+        vr_dpdk.packet_lcore_id = packet_lcore_id;
     }
-
 
     while (1) {
         rte_prefetch0(lcore);

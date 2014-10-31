@@ -238,18 +238,19 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
 
     ethdev->ethdev_nb_rx_queues = RTE_MIN(dev_info.max_rx_queues,
         VR_DPDK_MAX_NB_RX_QUEUES);
-    /* add an extra TX queue for packet lcore */
     ethdev->ethdev_nb_tx_queues = RTE_MIN(RTE_MIN(dev_info.max_tx_queues,
-        vr_dpdk.nb_fwd_lcores + 1), VR_DPDK_MAX_NB_TX_QUEUES);
+        vr_dpdk.nb_fwd_lcores), VR_DPDK_MAX_NB_TX_QUEUES);
     ethdev->ethdev_nb_rss_queues = RTE_MIN(RTE_MIN(ethdev->ethdev_nb_rx_queues,
         vr_dpdk.nb_fwd_lcores), VR_DPDK_MAX_NB_RSS_QUEUES);
 
-    RTE_LOG(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u max_rx_queues=%"PRIu16
-        " max_vfs=%"PRIu16" max_vmdq_pools=%"PRIu16
-        " rx_offload_capa=%"PRIx32" tx_offload_capa=%"PRIx32"\n",
-        dev_info.driver_name, dev_info.if_index, dev_info.max_rx_queues,
-        dev_info.max_vfs, dev_info.max_vmdq_pools, dev_info.rx_offload_capa,
-        dev_info.tx_offload_capa);
+    RTE_LOG(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u "
+            "max_rx_queues=%"PRIu16 "max_tx_queues=%"PRIu16
+            " max_vfs=%"PRIu16" max_vmdq_pools=%"PRIu16
+            " rx_offload_capa=%"PRIx32" tx_offload_capa=%"PRIx32"\n",
+            dev_info.driver_name, dev_info.if_index,
+            dev_info.max_rx_queues, dev_info.max_tx_queues,
+            dev_info.max_vfs, dev_info.max_vmdq_pools,
+            dev_info.rx_offload_capa, dev_info.tx_offload_capa);
 
 #if !VR_DPDK_USE_HW_FILTERING
     /* use RSS queues only */
@@ -424,7 +425,8 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
     ret = rte_eth_dev_configure(port_id, ethdev->ethdev_nb_rx_queues,
         ethdev->ethdev_nb_tx_queues, &ethdev_conf);
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "\terror configuring eth dev %" PRIu8 ": %s (%d)\n",
+        RTE_LOG(ERR, VROUTER, "\terror configuring eth dev %" PRIu8
+                ": %s (%d)\n",
             port_id, rte_strerror(-ret), -ret);
         return ret;
     }
