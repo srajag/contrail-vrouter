@@ -330,6 +330,7 @@ retry_write:
             parent->usock_pfds[usockp->usock_child_index].events = POLLOUT;
             return 0;
         }
+        usockp->usock_tx_buf = NULL;
     }
 
     return ret;
@@ -429,10 +430,6 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
 {
     int ret;
     void *objp;
-    struct vr_interface *vif = usockp->usock_vif;
-
-    if (!vif)
-        return NULL;
 
     ret = rte_ring_dequeue(vr_dpdk.packet_ring, &objp);
     if (ret)

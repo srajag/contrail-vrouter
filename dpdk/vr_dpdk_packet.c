@@ -18,7 +18,7 @@ unsigned int packet0_port_id = RTE_MAX_ETHPORTS - 1;
 int
 vr_dpdk_packet_tx(void)
 {
-    int event = 1;
+    uint64_t event = 1;
 
     if (vr_dpdk.event_sock) {
         vr_usocket_write(vr_dpdk.event_sock, (unsigned char*)&event, sizeof(event));

@@ -493,6 +493,11 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     /* TODO: use pkt_len instead? */
     m->pkt.pkt_len = pkt_head_len(pkt);
 
+    if (vif->vif_type == VIF_TYPE_AGENT) {
+        rte_ring_enqueue_burst(vr_dpdk.packet_ring, (void *)&m, 1);
+        return 0;
+    }
+
     /* TODO: Checksums
      * With DPDK pktmbufs we don't know if the checksum is incomplete,
      * i.e. there is no direct equivalent of skb->ip_summed field.
