@@ -403,6 +403,8 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
 {
     struct rte_pktmbuf *pmbuf;
     struct vr_packet *pkt;
+    const unsigned lcore_id = rte_lcore_id();
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
 
     if (usockp->usock_vif) {
         pmbuf = &usockp->usock_mbuf->pkt;
@@ -413,6 +415,9 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
         pkt = vr_dpdk_packet_get(usockp->usock_mbuf, usockp->usock_vif);
         /* send the packet to vRouter */
         usockp->usock_vif->vif_rx(usockp->usock_vif, pkt, VLAN_ID_INVALID);
+        /* flush pkt0 TX queues immediately */
+        vr_dpdk_lcore_flush(lcore);
+
         rcu_quiescent_state();
     } else {
         rte_pktmbuf_free(usockp->usock_mbuf);

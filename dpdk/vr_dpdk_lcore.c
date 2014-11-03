@@ -257,19 +257,6 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     return 0;
 }
 
-/* Flush TX queues */
-static inline void
-dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
-{
-    struct vr_dpdk_tx_queue *tx_queue;
-
-    SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, txq_next) {
-        tx_queue->txq_ops.f_flush(tx_queue->txq_queue_h);
-    }
-    /* TODO: find a better place to call the function */
-    vr_dpdk_packet_tx();
-}
-
 /* Send a burst of packets to vRouter */
 static inline void
 dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ],
@@ -490,7 +477,7 @@ dpdk_lcore_fwd_loop(struct vr_dpdk_lcore *lcore)
             last_tx_cycles = cur_cycles;
 
             /* flush all TX queues */
-            dpdk_lcore_flush(lcore);
+            vr_dpdk_lcore_flush(lcore);
 
             if (unlikely(lcore->lcore_nb_rx_queues == 0)) {
                 /* no queues to poll -> sleep a bit */

@@ -380,6 +380,14 @@ vr_dpdk_kni_tx_queue_init( unsigned lcore_id, struct vr_interface *vif,
 void vr_dpdk_knidev_all_handle(void);
 
 /*
+ * vr_dpdk_packet.c
+ */
+int vr_dpdk_packet_tx(void);
+int dpdk_packet_socket_init(void);
+void dpdk_packet_socket_close(void);
+int dpdk_packet_io(void);
+
+/*
  * vr_dpdk_lcore.c
  */
 /* Launch lcore main loop */
@@ -395,6 +403,17 @@ int vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
 unsigned vr_dpdk_lcore_least_used_get(void);
 /* Returns the least used lcore among the ones that handle physical intf TX */
 unsigned int vr_dpdk_phys_lcore_least_used_get(void);
+/* Flush TX queues */
+static inline void
+vr_dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
+{
+    struct vr_dpdk_tx_queue *tx_queue;
+    SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, txq_next) {
+        tx_queue->txq_ops.f_flush(tx_queue->txq_queue_h);
+    }
+    vr_dpdk_packet_tx();
+}
+
 
 /*
  * vr_dpdk_netlink.c
@@ -403,14 +422,6 @@ void dpdk_netlink_exit(void);
 int dpdk_netlink_init(void);
 int dpdk_netlink_receive(void *usockp, char *nl_buf, unsigned int nl_len);
 int dpdk_netlink_io(void);
-
-/*
- * vr_dpdk_packet.c
- */
-int vr_dpdk_packet_tx(void);
-int dpdk_packet_socket_init(void);
-void dpdk_packet_socket_close(void);
-int dpdk_packet_io(void);
 
 /*
  * vr_dpdk_ringdev.c
