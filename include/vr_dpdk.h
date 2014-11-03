@@ -184,6 +184,8 @@ struct vr_dpdk_lcore {
     struct vr_dpdk_ring_to_push lcore_rings_to_push[VR_DPDK_MAX_RINGS];
     /* List of free rings */
     struct rte_ring *lcore_free_rings[VR_DPDK_MAX_RINGS];
+    /* Event socket */
+    void *lcore_event_sock;
     /* Global stop flag */
     rte_atomic16_t lcore_stop_flag;
     /* Number of RX queues assigned to the lcore (for the scheduler) */
@@ -241,8 +243,6 @@ struct vr_dpdk_global {
     struct rte_ring *packet_ring;
     void *packet_transport;
     unsigned packet_lcore_id;
-    /* Event socket */
-    void *event_sock;
     /* KNI thread ID */
     pthread_t kni_thread;
     /* Timer thread ID */
