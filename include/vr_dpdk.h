@@ -53,9 +53,9 @@
 /* Number of memory channels to use */
 #define VR_DPDK_MAX_MEMCHANNELS     "4"
 /* Use UDP source port hashing */
-#define VR_DPDK_USE_MPLS_UDP_ECMP   false
+#define VR_DPDK_USE_MPLS_UDP_ECMP   true 
 /* Use hardware filtering (Flow Director) */
-#define VR_DPDK_USE_HW_FILTERING    true
+#define VR_DPDK_USE_HW_FILTERING    false 
 /* KNI generates random MACs for e1000e NICs, so we need this
  * option enabled for the development on servers with those NICs */
 #define VR_DPDK_ENABLE_PROMISC      false

@@ -42,7 +42,7 @@ static struct rte_eth_conf ethdev_conf = {
         .rss_conf = { /* Port RSS configuration */
             .rss_key            = NULL, /* If not NULL, 40-byte hash key */
             .rss_key_len        = 0,    /* Hash key length in bytes */
-            .rss_hf             = ETH_RSS_IP, /* Hash functions to apply */
+            .rss_hf             = ETH_RSS_UDP, /* Hash functions to apply */
         },
     },
     .txmode = { /* Port TX configuration. */

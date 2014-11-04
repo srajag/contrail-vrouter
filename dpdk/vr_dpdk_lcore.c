@@ -39,7 +39,15 @@ vr_dpdk_phys_lcore_least_used_get(void)
     RTE_LCORE_FOREACH(lcore_id) {
         lcore = vr_dpdk.lcores[lcore_id];
         num_queues = lcore->lcore_nb_rx_queues + lcore->lcore_nb_rings_to_push;
-        if (num_queues < least_used_nb_queues) {
+       
+        /*
+         * Use <= instead of < below so that this function  returns lcores
+         * from the last lcore while vr_dpdk_lcore_least_used_get returns
+         * lcores from the first. This will ensure that the lcores which 
+         * process TX from VMs are different from the one which send packets
+         * out the wire (subject to number of cores).
+         */
+        if (num_queues <= least_used_nb_queues) {
             least_used_nb_queues = num_queues;
             least_used_id = lcore_id;
         }
