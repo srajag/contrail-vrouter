@@ -883,12 +883,12 @@ dpdk_add_mpls(struct vrouter *router, unsigned mpls_label)
             && (eth_vif->vif_flags & VIF_FLAG_FILTERING_OFFLOAD)) {
             RTE_LOG(INFO, VROUTER, "Enabling hardware acceleration on vif %u for MPLS %u\n",
                 (unsigned)eth_vif->vif_idx, mpls_label);
-            if (!router->vr_ip) {
+            if (!eth_vif->vif_ip) {
                 RTE_LOG(ERR, VROUTER, "\terror accelerating MPLS %u: no IP address set\n",
                     mpls_label);
                 continue;
             }
-            ret = vr_dpdk_lcore_mpls_schedule(eth_vif, router->vr_ip, mpls_label);
+            ret = vr_dpdk_lcore_mpls_schedule(eth_vif, eth_vif->vif_ip, mpls_label);
             if (ret != 0)
                 RTE_LOG(INFO, VROUTER, "\terror accelerating MPLS %u: %s (%d)\n",
                     mpls_label, rte_strerror(-ret), -ret);
