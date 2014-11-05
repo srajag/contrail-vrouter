@@ -114,6 +114,7 @@ vr_dpdk_ethdev_filter_add(struct vr_interface *vif, unsigned queue_id,
     struct vr_dpdk_ethdev *ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
     uint8_t port_id = ethdev->ethdev_port_id;
     struct rte_fdir_filter filter;
+    int ret;
 
     /* accept 2-byte labels only */
     if (mpls_label > 0xffff)
@@ -132,8 +133,12 @@ vr_dpdk_ethdev_filter_add(struct vr_interface *vif, unsigned queue_id,
     RTE_LOG(DEBUG, VROUTER, "%s: ip_dst=0x%x port_dst=%d flex_bytes=%d\n", __func__,
         (unsigned)dst_ip, (unsigned)VR_MPLS_OVER_UDP_DST_PORT, (unsigned)mpls_label);
 
-    return rte_eth_dev_fdir_add_perfect_filter(port_id, &filter, (uint16_t)mpls_label,
+    ret = rte_eth_dev_fdir_add_perfect_filter(port_id, &filter, (uint16_t)mpls_label,
         (uint8_t)queue_id, 0);
+    if (ret == 0)
+        ethdev->ethdev_queue_states[queue_id] = VR_DPDK_QUEUE_FILTERING_STATE;
+
+    return ret;
 }
 
 /* Get a ready queue ID */
