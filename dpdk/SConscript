@@ -58,7 +58,7 @@ dpdk_vrouter_src = [ 'dpdk_vrouter.c',
                    ]
 
 dpdk_vrouter = env.Program('contrail-vrouter-dpdk', dpdk_vrouter_src)
-env.Depends(dpdk_vrouter, dpdk_lib)
+env.Requires(dpdk_vrouter, dpdk_lib)
 
 if GetOption('clean'):
     os.system('cd ' + make_dir + ';' + make_cmd + ' clean')
