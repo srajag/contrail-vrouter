@@ -18,13 +18,18 @@ unsigned int packet0_port_id = RTE_MAX_ETHPORTS - 1;
 int
 vr_dpdk_packet_tx(void)
 {
+    int ret;
     uint64_t event = 1;
     unsigned int lcore_id = rte_lcore_id();
     struct vr_dpdk_lcore *lcorep = vr_dpdk.lcores[lcore_id];
 
     if (lcorep->lcore_event_sock) {
-        vr_usocket_write(lcorep->lcore_event_sock, (unsigned char *)&event,
+        ret = vr_usocket_write(lcorep->lcore_event_sock, (unsigned char *)&event,
                 sizeof(event));
+        if (ret < 0) {
+            vr_usocket_close(lcorep->lcore_event_sock);
+            lcorep->lcore_event_sock = NULL;
+        }
     }
 
     return 0;

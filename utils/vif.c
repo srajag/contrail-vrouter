@@ -211,6 +211,7 @@ vr_interface_req_process(void *s)
     char name[50];
     vr_interface_req *req = (vr_interface_req *)s;
     unsigned int printed = 0;
+    struct in_addr ina;
     int platform = get_platform();
 
     if (add_set)
@@ -235,7 +236,7 @@ vr_interface_req_process(void *s)
 
         default:
             if (req->vifr_name)
-                printf("%s:%s", vr_if_transport_string(req),
+                printf("%s: %s", vr_if_transport_string(req),
                         req->vifr_name);
             break;
         }
@@ -262,9 +263,15 @@ vr_interface_req_process(void *s)
     printf("\n");
 
     vr_interface_print_header();
-    printf("Type:%s HWaddr:"MAC_FORMAT" IPaddr:%x\n",
+    printf("Type:%s HWaddr:"MAC_FORMAT" ",
             vr_get_if_type_string(req->vifr_type),
-            MAC_VALUE((uint8_t *)req->vifr_mac), req->vifr_ip);
+            MAC_VALUE((uint8_t *)req->vifr_mac));
+    if (req->vifr_ip) {
+        ina.s_addr = (uint32_t)htonl(req->vifr_ip);
+        printf("IPaddr:%s", inet_ntoa(ina));
+    }
+    printf("\n");
+
     vr_interface_print_header();
     printf("Vrf:%d Flags:%s MTU:%d Ref:%d\n", req->vifr_vrf,
             req->vifr_flags ? vr_if_flags(req->vifr_flags) : "NULL" ,

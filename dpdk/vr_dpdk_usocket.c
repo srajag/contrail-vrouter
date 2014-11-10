@@ -133,9 +133,20 @@ usock_bind_usockets(struct vr_usocket *parent, struct vr_usocket *child)
 {
     unsigned int i;
     int ret;
+    struct vr_usocket *child_pair;
 
     if (parent->usock_state == LIMITED)
         return -ENOSPC;
+
+    if (child->usock_proto == EVENT) {
+        child_pair = vr_usocket(EVENT, RAW);
+        if (!child_pair)
+            return -ENOMEM;
+
+        close(child->usock_fd);
+        child->usock_fd = child_pair->usock_fd;
+        child = child_pair;
+    }
 
     ret = usock_init_poll(parent);
     if (ret)
@@ -256,6 +267,13 @@ usock_close(struct vr_usocket *usockp)
         return;
 
     usock_unbind(usockp);
+    usock_deinit_poll(usockp);
+
+    for (i = 0; i < usockp->usock_cfds; i++) {
+        usock_close(usockp->usock_children[i]);
+    }
+
+    close(usockp->usock_fd);
 
     if (!usockp->usock_mbuf_pool && usockp->usock_rx_buf) {
         vr_free(usockp->usock_rx_buf);
@@ -269,13 +287,6 @@ usock_close(struct vr_usocket *usockp)
 
     if (usockp->usock_mbuf_pool) {
         /* no api to destroy a pool */
-    }
-
-    usock_deinit_poll(usockp);
-    close(usockp->usock_fd);
-
-    for (i = 0; i < usockp->usock_cfds; i++) {
-        usock_close(usockp->usock_children[i]);
     }
 
     if (usockp->usock_proto == PACKET)
