@@ -133,11 +133,11 @@ usock_bind_usockets(struct vr_usocket *parent, struct vr_usocket *child)
 {
     unsigned int i;
     int ret;
-    struct vr_usocket *child_pair;
+//    struct vr_usocket *child_pair;
 
     if (parent->usock_state == LIMITED)
         return -ENOSPC;
-
+/*
     if (child->usock_proto == EVENT) {
         child_pair = vr_usocket(EVENT, RAW);
         if (!child_pair)
@@ -147,7 +147,7 @@ usock_bind_usockets(struct vr_usocket *parent, struct vr_usocket *child)
         child->usock_fd = child_pair->usock_fd;
         child = child_pair;
     }
-
+*/
     ret = usock_init_poll(parent);
     if (ret)
         return ret;
