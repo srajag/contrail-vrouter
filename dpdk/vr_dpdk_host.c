@@ -164,8 +164,6 @@ dpdk_preset(struct vr_packet *pkt)
 static inline void
 dpdk_pktmbuf_copy_data(struct rte_mbuf *dst, struct rte_mbuf *src)
 {
-    dst->buf_physaddr = src->buf_physaddr;
-    dst->buf_len = src->buf_len;
     dst->ol_flags = src->ol_flags;
 
     dst->pkt.next = NULL;
