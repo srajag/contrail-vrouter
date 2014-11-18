@@ -6,6 +6,10 @@
 #ifndef __VR_IP4_MTRIE_H__
 #define __VR_IP4_MTRIE_H__
 
+#ifdef __SSE4_2__
+#include <nmmintrin.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -49,8 +53,21 @@ struct ip4_bucket {
  * Ip4Mtrie ensures that an IP lookup can be performed in 3 data fetches. It
  * organizes the lookup buckets in a (16 + 8 + 8) structure.
  */
+#define MTRIE_CACHE_SIZE            (1 << 16)
+#define MTRIE_SHIFT16_HASH(ip)      (((ip) >> 16) ^ (ip))
+#define MTRIE_CRC_HASH(ip)          (_mm_crc32_u32(1, (ip)))
+
+#ifdef __SSE4_2__
+#define MTRIE_HASH(ip)              MTRIE_CRC_HASH(ip)
+#else
+#define MTRIE_HASH(ip)              MTRIE_SHIFT16_HASH(ip)
+#endif
 struct ip4_mtrie {
     struct ip4_bucket_entry root;
+    struct {
+        uint32_t prefix;
+        struct vr_nexthop *nexthop_p;
+    } cache[MTRIE_CACHE_SIZE];
 };
 
 #define IP4_PREFIX_LEN              32

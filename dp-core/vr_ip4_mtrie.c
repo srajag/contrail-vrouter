@@ -593,6 +593,12 @@ generate_response:
     return 0;
 }
 
+static inline void
+mtrie_cache_clear(struct ip4_mtrie *rtable)
+{
+    memset(rtable->cache, 0, sizeof(rtable->cache));
+}
+
 /*
  * Delete a route from the table.
  * prefix is in network byte order.
@@ -614,6 +620,7 @@ mtrie_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     rtable = vrfid_to_mtrie(vrf_id);
     if (!rtable)
         return -ENOENT;
+    mtrie_cache_clear(rtable);
 
     rt->rtr_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
     if (!rt->rtr_nh)
@@ -741,6 +748,8 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt,
     struct ip4_mtrie   *table;
     struct ip4_bucket  *bkt;
     struct ip4_bucket_entry *ent;
+    struct vr_nexthop  *nh;
+    int idx;
 
     /* we do not support any thing other than /32 route lookup */
     if (rt->rtr_req.rtr_prefix_len != IP4_PREFIX_LEN)
@@ -749,6 +758,11 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt,
     table = vrfid_to_mtrie(vrf_id);
     if (!table)
         return ip4_default_nh;
+
+    /* check for mtrie cache */
+    idx = MTRIE_HASH(rt->rtr_req.rtr_prefix) % MTRIE_CACHE_SIZE;
+    if (rt->rtr_req.rtr_prefix == table->cache[idx].prefix)
+        return table->cache[idx].nexthop_p;
 
     ent = &table->root;
     ptr = ent->entry_long_i;
@@ -774,6 +788,11 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt,
             rt->rtr_req.rtr_label_flags = ent->entry_label_flags;
             rt->rtr_req.rtr_label = ent->entry_label;
             rt->rtr_req.rtr_prefix_len = ent->entry_prefix_len;
+
+            /* set cache entry */
+            table->cache[idx].nexthop_p = PTR_TO_NEXTHOP(ptr);
+            table->cache[idx].prefix = rt->rtr_req.rtr_prefix;
+
             return PTR_TO_NEXTHOP(ptr);
         }
 
@@ -801,6 +820,7 @@ mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     mtrie = (mtrie ? : mtrie_alloc_vrf(vrf_id));
     if (!mtrie)
         return -ENOMEM;
+    mtrie_cache_clear(mtrie);
 
     rt->rtr_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
     if (!rt->rtr_nh)
