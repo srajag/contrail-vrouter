@@ -34,7 +34,7 @@ struct rte_port_out_ops dpdk_virtio_writer_ops = {
     .f_create = NULL,
     .f_free = NULL,
     .f_tx = dpdk_virtio_to_vm_tx, 
-    .f_tx_bulk = NULL,
+    .f_tx_bulk = NULL, /* TODO: not implemented */
     .f_flush = dpdk_virtio_to_vm_flush,
 };
 

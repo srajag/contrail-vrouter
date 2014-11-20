@@ -376,6 +376,7 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
 
             if (rtp->rtp_tx_queue) {
                 /* push packets to the TX queue */
+                /* TODO: use f_tx_bulk instead */
                 for (i = 0; i < nb_pkts; i++) {
                     rtp->rtp_tx_queue->txq_ops.f_tx(
                         rtp->rtp_tx_queue->txq_queue_h, pkts[i]);
