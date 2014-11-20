@@ -215,7 +215,7 @@ vr_uvh_wfdset_p(void)
  * vr_uvh_call_fd_handlers_internal - internal function to call the handler
  * for all fds that are set in the fd_set.
  *
- * Returns 0 on success, -1 otherwise.
+ * Returns 0 on success, error fd otherwise.
  */
 static int
 vr_uvh_call_fd_handlers_internal(uvh_fd_t *fd_arr, fd_set *fdset_ptr)
@@ -229,9 +229,8 @@ vr_uvh_call_fd_handlers_internal(uvh_fd_t *fd_arr, fd_set *fdset_ptr)
 
         if (FD_ISSET(fd_arr[i].uvh_fd, fdset_ptr)) {
             ret = fd_arr[i].uvh_fd_fn(fd_arr[i].uvh_fd, fd_arr[i].uvh_fd_arg);
-            if (ret) {
-                return ret;
-            }
+            if (ret)
+                return fd_arr[i].uvh_fd;
         }
     }
 
@@ -240,7 +239,7 @@ vr_uvh_call_fd_handlers_internal(uvh_fd_t *fd_arr, fd_set *fdset_ptr)
 
 /*
  * vr_uvh_call_fd_handlers - call the handler for each fd that is set upon
- * return from select(). 
+ * return from select().
  *
  * Returns 0 on success, -1 otherwise.
  */
@@ -250,9 +249,12 @@ vr_uvh_call_fd_handlers(void)
     int ret;
 
     ret = vr_uvh_call_fd_handlers_internal(uvh_rfds, &uvh_rfdset);
-    if (ret) {
-        return ret;
-    }
+    if (ret)
+        vr_uvhost_del_fd(ret, UVH_FD_READ);
 
-    return vr_uvh_call_fd_handlers_internal(uvh_wfds, &uvh_wfdset);
-}    
+    ret = vr_uvh_call_fd_handlers_internal(uvh_wfds, &uvh_wfdset);
+    if (ret)
+        vr_uvhost_del_fd(ret, UVH_FD_WRITE);
+
+    return 0;
+}
