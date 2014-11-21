@@ -9,9 +9,6 @@
 #include "vr_mcast.h"
 #include "vr_btable.h"
 #include "vr_fragment.h"
-#ifdef __DPDK__
-#include "vr_shmem.h"
-#endif
 
 #define VR_NUM_FLOW_TABLES          1
 #define VR_DEF_FLOW_ENTRIES         (512 * 1024)

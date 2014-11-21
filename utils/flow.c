@@ -40,9 +40,6 @@
 #include "vr_mirror.h"
 #include "vr_genetlink.h"
 #include "nl_util.h"
-#ifdef __DPDK__
-#include "vr_shmem.h"
-#endif
 #include "ini_parser.h"
 
 #define TABLE_FLAG_VALID        0x1
