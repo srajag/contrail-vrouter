@@ -322,7 +322,7 @@ flow_stats(void)
             }
         }
 
-        system("clear");
+        if (system("clear"));
         struct tm *tm;
         char fmt[64], buf[64];
         if((tm = localtime(&now.tv_sec)) != NULL)
