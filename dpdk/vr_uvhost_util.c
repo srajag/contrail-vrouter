@@ -13,14 +13,14 @@
 #include "vr_uvhost.h"
 #include "vr_uvhost_util.h"
 
-#define MAX_UVHOST_FDS 1024 
+#define MAX_UVHOST_FDS 1024
 
 typedef struct uvh_fd_s {
     int uvh_fd;
     void *uvh_fd_arg;
     uvh_fd_handler_t uvh_fd_fn;
 } uvh_fd_t;
-   
+
 /* Global variables */
 static uvh_fd_t uvh_rfds[MAX_UVHOST_FDS];
 static uvh_fd_t uvh_wfds[MAX_UVHOST_FDS];
@@ -48,7 +48,7 @@ vr_uvhost_log(const char *format, ...)
  * user space vhost server is listening on. fd_type indicates if it
  * is a read/write socket. The fd passed in is closed.
  *
- * Returns 0 on success, -1 otherwise. 
+ * Returns 0 on success, -1 otherwise.
  */
 int
 vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type)
@@ -75,20 +75,20 @@ vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type)
             "Cannot find fd %d for deletion inuser space vhost fds\n", fd);
         return -1;
     }
-    
+
     fds[i].uvh_fd = 0;  /* TODO - -1 instead of 0 */
     close(fd);
 
     return 0;
 }
- 
+
 /*
  * vr_uvhost_add_fd - adds the specified fd into the read/write list that
  * the user space vhost server is waiting on. The type indicates if it
  * is a read/write socket and the handler is the function that is called when
  * there is an event on the socket.
  *
- * Returns 0 on success, -1 otherwise. 
+ * Returns 0 on success, -1 otherwise.
  */
 int
 vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
@@ -140,7 +140,7 @@ vr_uvhost_fdset_init(void)
     return;
 }
 
-/* 
+/*
  * vr_uvh_max_fd - returns the max fd for select.
  */
 int
@@ -148,7 +148,7 @@ vr_uvh_max_fd(void)
 {
     return uvh_max_fd;
 }
- 
+
 /*
  * vr_uvh_reset_max_fd - sets the max fd to -1.
  */
@@ -159,22 +159,22 @@ vr_uvh_reset_max_fd(void)
 
     return;
 }
-   
+
 /*
  * vr_uvh_rfdset_p - returns a pointer to the fdset corresponding to the
- * read fds. 
+ * read fds.
  */
 fd_set *
 vr_uvh_rfdset_p(void)
 {
     int i;
- 
+
     FD_ZERO(&uvh_rfdset);
- 
+
     for (i = 0; i < MAX_UVHOST_FDS; i++) {
         if (uvh_rfds[i].uvh_fd == 0) {
             continue;
-        }        
+        }
 
         if (uvh_rfds[i].uvh_fd > uvh_max_fd) {
             uvh_max_fd = uvh_rfds[i].uvh_fd;

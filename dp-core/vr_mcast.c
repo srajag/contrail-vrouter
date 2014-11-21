@@ -198,7 +198,7 @@ mcast_make_req(struct vr_route_req *resp, struct vr_mcast_entry *ent)
     resp->rtr_req.rtr_vrf_id = ent->key.vrf_id;
     if (ent->nh)
         resp->rtr_req.rtr_nh_id = ent->nh->nh_id;
-    resp->rtr_req.rtr_rt_type =  RT_MCAST;
+    resp->rtr_req.rtr_rt_type = RT_MCAST;
     resp->rtr_req.rtr_family = AF_INET;
     return;
 }
@@ -267,7 +267,7 @@ mcast_algo_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs, bool soft_r
         return;
 
     vr_htable_trav(vn_rtable, 0, mcast_entry_free, NULL);
- 
+
     if (!soft_reset) {
         vr_htable_delete(vn_rtable);
         rtable->algo_data = NULL;

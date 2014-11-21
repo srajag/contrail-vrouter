@@ -659,9 +659,9 @@ mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
             response->vsr_fabric_composites += stats->vrf_fabric_composites;
             response->vsr_multi_proto_composites +=
                 stats->vrf_multi_proto_composites;
-            response->vsr_udp_tunnels  += stats->vrf_udp_tunnels;
-            response->vsr_udp_mpls_tunnels  += stats->vrf_udp_mpls_tunnels;
-            response->vsr_gre_mpls_tunnels  += stats->vrf_gre_mpls_tunnels;
+            response->vsr_udp_tunnels += stats->vrf_udp_tunnels;
+            response->vsr_udp_mpls_tunnels += stats->vrf_udp_mpls_tunnels;
+            response->vsr_gre_mpls_tunnels += stats->vrf_gre_mpls_tunnels;
             response->vsr_l2_encaps += stats->vrf_l2_encaps;
             response->vsr_encaps += stats->vrf_encaps;
             response->vsr_gros += stats->vrf_gros;

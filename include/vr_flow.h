@@ -73,7 +73,7 @@ struct vr_flow_key {
     unsigned char key_zero;
 } __attribute__((packed));
 
-/* 
+/*
  * Limit the number of outstanding flows in hold state. The flow rate can
  * be much more than what agent can handle. In such cases, to make sure that
  *
@@ -194,7 +194,7 @@ struct vrouter;
 
 extern int vr_flow_init(struct vrouter *);
 extern void vr_flow_exit(struct vrouter *, bool);
-extern unsigned int vr_flow_inet_input(struct vrouter *, unsigned short, 
+extern unsigned int vr_flow_inet_input(struct vrouter *, unsigned short,
         struct vr_packet *, unsigned short, struct vr_forwarding_md *);
 extern inline unsigned int
 vr_flow_bypass(struct vrouter *, struct vr_flow_key *, struct vr_packet *, unsigned int *);

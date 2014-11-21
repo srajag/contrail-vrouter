@@ -7,7 +7,7 @@
  *
  * This program is distributed "as is" WITHOUT ANY WARRANTY of any
  * kind, whether express or implied; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * vr_dpdk_host.c -- DPDK vrouter module
@@ -835,8 +835,8 @@ dpdk_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
 
 
     /*
-     *  Now we know exact ip header length,
-     *  check if whole tcp header is also in the packet
+     * Now we know exact ip header length,
+     * check if whole tcp header is also in the packet
      */
     offset = (iph->ip_hl * 4) + sizeof(struct tcphdr);
 

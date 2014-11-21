@@ -8,7 +8,7 @@
 #define __VR_UVHOST_MSG_H__
 
 /*
- * Definitions of messages from the netlink thread that are handled by the 
+ * Definitions of messages from the netlink thread that are handled by the
  * user space vhost thread
  */
 
@@ -16,7 +16,7 @@
 #define VR_UVH_VIF_PREFIX "/var/tmp/uvh_vif_"
 #define VR_UVH_VIF_PREFIX_SIZE (strlen(VR_UVH_VIF_PREFIX))
 #define VHOST_USER_VERSION 1
- 
+
 typedef enum vrnu_msg_type {
     VRNU_MSG_VIF_ADD = 1,
     VRNU_MSG_VIF_DEL,
@@ -44,4 +44,4 @@ typedef struct vrnu_msg {
 
 int vr_uvh_nl_listen_handler(int fd, void *arg);
 
-#endif /* __VR_UVHOST_MSG_H__ */ 
+#endif /* __VR_UVHOST_MSG_H__ */

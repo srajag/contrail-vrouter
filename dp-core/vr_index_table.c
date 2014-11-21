@@ -100,7 +100,7 @@ __vr_itable_del(struct vr_itbl *table, unsigned int index,
     return 0;
 }
 
-static int 
+static int
 __vr_itable_dump(struct vr_itbl *table, vr_itable_trav_cb_t func, void **ptr,
         unsigned int cnt, unsigned int index, unsigned int marker, void *udata)
 {
@@ -231,7 +231,7 @@ vr_itable_trav(vr_itable_t t, vr_itable_trav_cb_t func,
         func = print_ind;
     }
 
-    return  __vr_itable_dump(table, func, ptr, 0, 0, marker, udata);
+    return __vr_itable_dump(table, func, ptr, 0, 0, marker, udata);
 }
 
 void *

@@ -79,7 +79,7 @@ vr_mpls_add(vr_mpls_req *req)
     }
 
     nh = vrouter_get_nexthop(req->mr_rid, req->mr_nhid);
-    if (!nh)  {
+    if (!nh) {
         ret = -EINVAL;
         goto generate_resp;
     }

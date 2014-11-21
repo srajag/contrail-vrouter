@@ -33,7 +33,7 @@ vr_uvhost_client_init(void)
 }
 
 /*
- * vr_uvhost_new_client - initializes state for a new user space vhost client 
+ * vr_uvhost_new_client - initializes state for a new user space vhost client
  * fd is a file descriptor for the client socket. path is the UNIX domain
  * socket path. cidx is the index of the client.
  *
@@ -92,4 +92,4 @@ vr_uvhost_get_client(unsigned int cidx)
     }
 
     return &vr_uvh_clients[cidx];
-} 
+}

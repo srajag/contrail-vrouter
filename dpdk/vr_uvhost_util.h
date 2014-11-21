@@ -1,12 +1,12 @@
 /*
- * vr_uvhost_util.h - header for utils for user-space vhost server that peers 
+ * vr_uvhost_util.h - header for utils for user-space vhost server that peers
  * with the vhost client inside qemu (version 2.1 and later).
  *
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
 
 #ifndef __VR_UVHOST_UTIL_H__
-#define __VR_UVHOST_UTIL_H__    
+#define __VR_UVHOST_UTIL_H__
 
 typedef int (*uvh_fd_handler_t)(int fd, void *arg);
 

@@ -1,5 +1,5 @@
 /*
- * qemu_uvhost.h - header for structure and message definitions copied from 
+ * qemu_uvhost.h - header for structure and message definitions copied from
  * qemu 2.1.
  *
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.

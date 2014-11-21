@@ -330,7 +330,7 @@ nh_composite_ecmp_validate_src(unsigned short vrf, struct vr_packet *pkt,
 
             cnh = nh->nh_component_nh[i].cnh;
             /* If direct nexthop is not valid, dont process it */
-            if (!cnh || !(cnh->nh_flags & NH_FLAG_VALID) || 
+            if (!cnh || !(cnh->nh_flags & NH_FLAG_VALID) ||
                                             !cnh->nh_validate_src)
                 continue;
 
@@ -383,7 +383,7 @@ drop:
 }
 
 /*
- * This function validate the source  of the tunnel incase of L2 or L3
+ * This function validate the source of the tunnel incase of L2 or L3
  * multicast
  */
 
@@ -1265,7 +1265,7 @@ nh_encap_l3_mcast(unsigned short vrf, struct vr_packet *pkt,
 
     /*
      * The dmac of L2 rewrite information contains 0xFFFFFFFF. If L3 multicast
-     *  we need to compute L2 multicast and slap it. If not, keep the same
+     * we need to compute L2 multicast and slap it. If not, keep the same
      */
     ip = (struct vr_ip *)pkt_network_header(pkt);
     dip = ntohl(ip->ip_daddr);
@@ -1432,12 +1432,12 @@ nh_resolve_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 static int
 nh_rcv_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
-    struct vr_interface  *vif, *old_vif;
+    struct vr_interface *vif, *old_vif;
     vif = vrouter_get_interface(nh->nh_rid, req->nhr_encap_oif_id);
     if (!vif)
         return -ENODEV;
     /*
-     *  We need to delete the reference to old_vif only after new vif is
+     * We need to delete the reference to old_vif only after new vif is
      * added to NH
      */
     old_vif = nh->nh_dev;
@@ -1499,7 +1499,7 @@ nh_composite_mcast_validate(struct vr_nexthop *nh, vr_nexthop_req *req)
                 if (l3_seen)
                     return -1;
                 l3_seen = true;
-            } else  {
+            } else {
                 return -1;
             }
         }
@@ -1733,7 +1733,7 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         return -ENODEV;
 
     /*
-     *  We need to delete the reference to old_vif only after new vif is
+     * We need to delete the reference to old_vif only after new vif is
      * added to NH
      */
     old_vif = nh->nh_dev;

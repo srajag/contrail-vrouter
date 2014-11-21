@@ -7,7 +7,7 @@
  *
  * This program is distributed "as is" WITHOUT ANY WARRANTY of any
  * kind, whether express or implied; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * vr_dpdk_ethdev.c -- DPDK ethernet device
@@ -274,7 +274,7 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
     struct rte_mempool *mempool;
 
     /* configure RX queues */
-    RTE_LOG(DEBUG, VROUTER, "%s: nb_rx_queues=%u  nb_tx_queues=%u\n",
+    RTE_LOG(DEBUG, VROUTER, "%s: nb_rx_queues=%u nb_tx_queues=%u\n",
         __func__, (unsigned)ethdev->ethdev_nb_rx_queues,
             (unsigned)ethdev->ethdev_nb_tx_queues);
 

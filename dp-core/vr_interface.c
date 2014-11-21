@@ -16,7 +16,7 @@ static int eth_srx(struct vr_interface *, struct vr_packet *, unsigned short);
 static int eth_rx(struct vr_interface *, struct vr_packet *, unsigned short);
 
 extern struct vr_host_interface_ops *vr_host_interface_init(void);
-extern void  vr_host_interface_exit(void);
+extern void vr_host_interface_exit(void);
 extern void vr_host_vif_init(struct vrouter *);
 extern unsigned int vr_l3_input(unsigned short, struct vr_packet *,
                                               struct vr_forwarding_md *);
@@ -85,7 +85,7 @@ vr_interface_input(unsigned short vrf, struct vr_interface *vif,
     }
 
     /* If vlan tagged from VM, packet needs to be treated as L2 packet */
-    if ((vif->vif_type == VIF_TYPE_PHYSICAL) ||  (vlan_id == VLAN_ID_INVALID)) {
+    if ((vif->vif_type == VIF_TYPE_PHYSICAL) || (vlan_id == VLAN_ID_INVALID)) {
         if (vif->vif_flags & VIF_FLAG_L3_ENABLED) {
             ret = vr_l3_input(vrf, pkt, &fmd);
             if (ret != PKT_RET_FALLBACK_BRIDGING)

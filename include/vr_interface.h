@@ -9,7 +9,7 @@
 #include "vr_defs.h"
 #include "vr_types.h"
 
-/* 
+/*
  * 2 interfaces/VM + maximum vlan interfaces. VR_MAX_INTERFACES needs to
  * be the same as VR_UVH_MAX_CLIENTS.
  */

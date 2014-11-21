@@ -1,5 +1,5 @@
 /*
- * vr_dpdk_virtio.c - implements DPDK forwarding infrastructure for 
+ * vr_dpdk_virtio.c - implements DPDK forwarding infrastructure for
  * virtio interfaces. The virtio data structures are setup by the user
  * space vhost server.
  *
@@ -19,7 +19,7 @@ void *vr_dpdk_vif_clients[VR_MAX_INTERFACES];
 vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][RTE_MAX_LCORE];
 vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][RTE_MAX_LCORE];
 
-static int dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, 
+static int dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts,
                                   uint32_t max_pkts);
 static int dpdk_virtio_to_vm_tx(void *arg, struct rte_mbuf *pkt);
 static int dpdk_virtio_to_vm_flush(void *arg);
@@ -33,7 +33,7 @@ struct rte_port_in_ops dpdk_virtio_reader_ops = {
 struct rte_port_out_ops dpdk_virtio_writer_ops = {
     .f_create = NULL,
     .f_free = NULL,
-    .f_tx = dpdk_virtio_to_vm_tx, 
+    .f_tx = dpdk_virtio_to_vm_tx,
     .f_tx_bulk = NULL, /* TODO: not implemented */
     .f_flush = dpdk_virtio_to_vm_flush,
 };
@@ -101,7 +101,7 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
 
     rx_queue->rxq_ops = dpdk_virtio_reader_ops;
     vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_ready_state = VQ_NOT_READY;
-    vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_zero_copy =  0;
+    vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_zero_copy = 0;
     vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_soft_avail_idx = 0;
     vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_soft_used_idx = 0;
     vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_vif_idx = vif->vif_idx;
@@ -131,7 +131,7 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
 
     tx_queue->txq_ops = dpdk_virtio_writer_ops;
     vr_dpdk_virtio_txqs[vif_idx][q_id].vdv_ready_state = VQ_NOT_READY;
-    vr_dpdk_virtio_txqs[vif_idx][q_id].vdv_zero_copy =  0;
+    vr_dpdk_virtio_txqs[vif_idx][q_id].vdv_zero_copy = 0;
     vr_dpdk_virtio_txqs[vif_idx][q_id].vdv_soft_avail_idx = 0;
     vr_dpdk_virtio_txqs[vif_idx][q_id].vdv_soft_used_idx = 0;
     vr_dpdk_virtio_txqs[vif_idx][q_id].vdv_vif_idx = vif->vif_idx;
@@ -164,9 +164,9 @@ vr_dpdk_guest_phys_to_host_virt(vr_dpdk_virtioq_t *vq, uint64_t paddr)
     for (i = 0; i < vru_cl->vruc_num_mem_regions; i++) {
         reg = &vru_cl->vruc_mem_regions[i];
 
-        if ((paddr >= reg->vrucmr_phys_addr) && 
+        if ((paddr >= reg->vrucmr_phys_addr) &&
                 (paddr <= (reg->vrucmr_phys_addr + reg->vrucmr_size))) {
-            return ((char *) reg->vrucmr_mmap_addr) + 
+            return ((char *) reg->vrucmr_mmap_addr) +
                         (paddr - reg->vrucmr_phys_addr);
         }
     }
@@ -174,8 +174,8 @@ vr_dpdk_guest_phys_to_host_virt(vr_dpdk_virtioq_t *vq, uint64_t paddr)
     return NULL;
 }
 
-/* 
- * vr_dpdk_virtio_get_mempool - get the mempool to use for receiving 
+/*
+ * vr_dpdk_virtio_get_mempool - get the mempool to use for receiving
  * packets from VMs.
  */
 static struct rte_mempool *
@@ -183,9 +183,9 @@ vr_dpdk_virtio_get_mempool(void)
 {
     return vr_dpdk.virtio_mempool;
 }
-    
-/* 
- * dpdk_virtio_from_vm_rx - receive packets from a virtio client so that 
+
+/*
+ * dpdk_virtio_from_vm_rx - receive packets from a virtio client so that
  * the packets can be handed to vrouter for forwarding. the virtio client is
  * usually a VM.
  *
@@ -202,14 +202,14 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     char *pkt_addr;
     struct rte_mbuf *mbuf;
     uint32_t pkt_len;
- 
+
     if (vq->vdv_ready_state == VQ_NOT_READY) {
         return 0;
     }
 
     vq_hard_avail_idx = (*((volatile uint16_t *)&vq->vdv_avail->idx));
 
-    /*  
+    /*
      * Unsigned subtraction gives the right result even with wrap around.
      */
     num_pkts = vq_hard_avail_idx - vq->vdv_soft_avail_idx;
@@ -225,7 +225,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     for (i = 0; i < num_pkts; i++) {
         next_avail_idx = (vq->vdv_soft_avail_idx + i) &
                              (vq->vdv_vvs.num - 1);
-        next_desc_idx = vq->vdv_avail->ring[next_avail_idx]; 
+        next_desc_idx = vq->vdv_avail->ring[next_avail_idx];
         desc = &vq->vdv_desc[next_desc_idx];
 
         /*
@@ -235,7 +235,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
          * be updated at the end of the loop.
          */
         vq->vdv_used->ring[next_avail_idx].id = next_desc_idx;
-        vq->vdv_used->ring[next_avail_idx].len = 0; 
+        vq->vdv_used->ring[next_avail_idx].len = 0;
         if (desc->flags & VRING_DESC_F_NEXT) {
             /*
              * TODO - make sure desc->next is sane
@@ -264,7 +264,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         }
     }
 
-    /* 
+    /*
      * TODO - might need to kick guest.
      */
     rte_wmb();
@@ -295,8 +295,8 @@ dpdk_virtio_to_vm_tx(void *arg, struct rte_mbuf *pkt)
     vq->vdv_tx_mbuf[vq->vdv_tx_mbuf_count++] = pkt;
     if (vq->vdv_tx_mbuf_count >= VR_DPDK_VIRTIO_TX_BURST_SZ) {
         dpdk_virtio_to_vm_flush(vq);
-    }    
-    
+    }
+
     return 0;
 }
 
@@ -327,16 +327,16 @@ dpdk_virtio_to_vm_flush(void *arg)
 
     vq_hard_avail_idx = (*((volatile uint16_t *)&vq->vdv_avail->idx));
 
-    /*  
+    /*
      * Unsigned subtraction gives the right result even with wrap around.
      */
     num_buf_posted = vq_hard_avail_idx - vq->vdv_soft_avail_idx;
     if (num_buf_posted < vq->vdv_tx_mbuf_count) {
         num_pkts = num_buf_posted;
     } else {
-        num_pkts = vq->vdv_tx_mbuf_count;   
+        num_pkts = vq->vdv_tx_mbuf_count;
     }
-  
+
     for (i = 0; i < num_pkts; i++) {
         next_avail_idx = (vq->vdv_soft_avail_idx + i) &
                              (vq->vdv_vvs.num - 1);
@@ -354,13 +354,13 @@ dpdk_virtio_to_vm_flush(void *arg)
 
         desc = &vq->vdv_desc[next_desc_idx];
         buf_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
-        if (buf_addr == NULL) { 
+        if (buf_addr == NULL) {
             rte_pktmbuf_free(vq->vdv_tx_mbuf[i]);
             continue;
         }
 
         /*
-         * No support for checksum offload or GSO at the moment, so zero 
+         * No support for checksum offload or GSO at the moment, so zero
          * out the virtio header.
          */
         size = sizeof(vhdr);
@@ -370,7 +370,7 @@ dpdk_virtio_to_vm_flush(void *arg)
         /*
          * If the descriptor has VRING_DESC_F_NEXT set, the virtio_net header
          * and packet data use separate descriptors.
-         */ 
+         */
         if (desc->flags & VRING_DESC_F_NEXT) {
             desc->len = sizeof(struct virtio_net_hdr);
             /*
@@ -383,23 +383,23 @@ dpdk_virtio_to_vm_flush(void *arg)
                 rte_pktmbuf_free(vq->vdv_tx_mbuf[i]);
                 continue;
             }
-            
+
             desc->len = rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]);
         } else {
-            desc->len = sizeof(struct virtio_net_hdr) + 
+            desc->len = sizeof(struct virtio_net_hdr) +
                             rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]);
         }
 
         rte_memcpy(buf_addr, vq->vdv_tx_mbuf[i]->pkt.data,
                    rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]));
-            
+
         vq->vdv_used->ring[next_avail_idx].len =
             sizeof(struct virtio_net_hdr) +
             rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]);
 
         rte_pktmbuf_free(vq->vdv_tx_mbuf[i]);
     }
- 
+
     /*
      * Free any packets that could not be sent to the VM because it didn't
      * post receive buffers soon enough.
@@ -414,7 +414,7 @@ dpdk_virtio_to_vm_flush(void *arg)
     vq->vdv_tx_mbuf_count = 0;
 
     /*
-     * Now update the used index in the vring. 
+     * Now update the used index in the vring.
      * TODO - need memory barrier + VM kick here.
      */
     vq->vdv_soft_avail_idx += num_pkts;
@@ -456,7 +456,7 @@ vr_dpdk_virtio_set_vring_base(unsigned int vif_idx, unsigned int vring_idx,
 }
 
 /*
- * vr_dpdk_virtio_get_vring_base - gets the vring base for the specified vring 
+ * vr_dpdk_virtio_get_vring_base - gets the vring base for the specified vring
  * sent by the vhost client.
  *
  * Returns 0 on success, -1 otherwise.
@@ -482,7 +482,7 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
         vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
     }
 
-    *vring_basep =  vq->vdv_base_idx;
+    *vring_basep = vq->vdv_base_idx;
 
     /*
      * This is usually called when qemu shuts down a virtio queue. Set the
@@ -505,7 +505,7 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
  */
 int
 vr_dpdk_set_vring_addr(unsigned int vif_idx, unsigned int vring_idx,
-                       struct vring_desc *vrucv_desc, 
+                       struct vring_desc *vrucv_desc,
                        struct vring_avail *vrucv_avail,
                        struct vring_used *vrucv_used)
 {
@@ -612,9 +612,9 @@ vr_dpdk_virtio_set_vif_client(unsigned int idx, void *client)
     }
 
     vr_dpdk_vif_clients[idx] = client;
-    
+
     return;
-}     
+}
 
 /*
  * vr_dpdk_virtio_get_vif_client - returns a pointer to per vif state if it
@@ -631,7 +631,7 @@ vr_dpdk_virtio_get_vif_client(unsigned int idx)
 }
 
 /*
- * vr_dpdk_virtio_enq_pkts_to_phys_lcore - enqueue packets received on a 
+ * vr_dpdk_virtio_enq_pkts_to_phys_lcore - enqueue packets received on a
  * virtio interface queue onto a ring that will be handled by the lcore
  * assigned to that queue. This lcore will then transmit the packet out the
  * wire if required.

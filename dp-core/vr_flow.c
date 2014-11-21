@@ -810,7 +810,7 @@ vr_flow_inet_input(struct vrouter *router, unsigned short vrf,
     struct vr_ip *ip, *icmp_pl_ip = NULL;
     struct vr_fragment *frag;
     unsigned int flow_parse_res;
-    unsigned int trap_res  = 0;
+    unsigned int trap_res = 0;
     unsigned int sip, dip;
     unsigned short *t_hdr, sport, dport;
     unsigned char ip_proto;
@@ -1189,7 +1189,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
             ((req->fr_action != fe->fe_action) ||
              !(req->fr_flags & VR_FLOW_FLAG_ACTIVE)))
         __sync_fetch_and_add(&infop->vfti_action_count, 1);
-    /* 
+    /*
      * for delete, absence of the requested flow entry is caustic. so
      * handle that case first
      */

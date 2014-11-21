@@ -662,7 +662,7 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
         goto error;
     }
 
-    vru_cl->vruc_idx =  msg->vrnu_vif_idx;
+    vru_cl->vruc_idx = msg->vrnu_vif_idx;
     vru_cl->vruc_nrxqs = msg->vrnu_vif_nrxqs;
     vru_cl->vruc_ntxqs = msg->vrnu_vif_ntxqs;
 

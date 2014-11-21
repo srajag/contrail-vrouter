@@ -7,7 +7,7 @@
  *
  * This program is distributed "as is" WITHOUT ANY WARRANTY of any
  * kind, whether express or implied; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * vr_dpdk_lcore.c -- lcore support functions
@@ -23,8 +23,8 @@
 #include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
 
-/* 
- * vr_dpdk_phys_lcore_least_used_get - returns the least used lcore among the 
+/*
+ * vr_dpdk_phys_lcore_least_used_get - returns the least used lcore among the
  * ones that handle TX for physical interfaces.
  */
 unsigned int
@@ -39,11 +39,11 @@ vr_dpdk_phys_lcore_least_used_get(void)
     RTE_LCORE_FOREACH(lcore_id) {
         lcore = vr_dpdk.lcores[lcore_id];
         num_queues = lcore->lcore_nb_rx_queues + lcore->lcore_nb_rings_to_push;
-       
+
         /*
-         * Use <= instead of < below so that this function  returns lcores
+         * Use <= instead of < below so that this function returns lcores
          * from the last lcore while vr_dpdk_lcore_least_used_get returns
-         * lcores from the first. This will ensure that the lcores which 
+         * lcores from the first. This will ensure that the lcores which
          * process TX from VMs are different from the one which send packets
          * out the wire (subject to number of cores).
          */

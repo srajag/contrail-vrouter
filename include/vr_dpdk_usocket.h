@@ -17,7 +17,7 @@
  * A socket, when used for io, has to have a protocol to understand
  * the format of the data that enters and exits it. We have three
  * protocols: NETLINK, PACKET and EVENT.
- * 
+ *
  * A NETLINK socket carries netlink messages i.e.: each message in the
  * socket will be headed by a netlink header.
  *

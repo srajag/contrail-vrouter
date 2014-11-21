@@ -7,7 +7,7 @@
  *
  * This program is distributed "as is" WITHOUT ANY WARRANTY of any
  * kind, whether express or implied; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * vr_dpdk.h -- vRouter/DPDK definitions
@@ -53,9 +53,9 @@
 /* Number of memory channels to use */
 #define VR_DPDK_MAX_MEMCHANNELS     "4"
 /* Use UDP source port hashing */
-#define VR_DPDK_USE_MPLS_UDP_ECMP   true 
+#define VR_DPDK_USE_MPLS_UDP_ECMP   true
 /* Use hardware filtering (Flow Director) */
-#define VR_DPDK_USE_HW_FILTERING    false 
+#define VR_DPDK_USE_HW_FILTERING    false
 /* KNI generates random MACs for e1000e NICs, so we need this
  * option enabled for the development on servers with those NICs */
 #define VR_DPDK_ENABLE_PROMISC      false

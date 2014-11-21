@@ -154,7 +154,7 @@ vr_vxlan_add(vr_vxlan_req *req)
     }
 
     nh = vrouter_get_nexthop(req->vxlanr_rid, req->vxlanr_nhid);
-    if (!nh)  {
+    if (!nh) {
         ret = -EINVAL;
         goto generate_resp;
     }

@@ -440,7 +440,7 @@ vr_icmp_error(struct vr_icmp *icmph)
 struct vr_gre {
     unsigned short gre_flags;
     unsigned short gre_proto;
-}  __attribute__((packed));
+} __attribute__((packed));
 
 struct vr_pcap {
     /* timestamp seconds */

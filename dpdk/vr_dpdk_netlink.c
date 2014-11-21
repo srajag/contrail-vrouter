@@ -138,7 +138,7 @@ static struct vr_mtransport dpdk_nl_transport = {
 };
 
 /*
- * vr_netlink_uvhost_vif_del - sends a message to the user space vhost 
+ * vr_netlink_uvhost_vif_del - sends a message to the user space vhost
  * thread when a vif is deleted. vif_idx is the index of the vif.
  *
  * Returns 0 on success, -1 otherwise.
@@ -161,9 +161,9 @@ vr_netlink_uvhost_vif_del(int vif_idx)
 
     return 0;
 }
- 
+
 /*
- * vr_netlink_uvhost_vif_add - sends a message to the user space vhost 
+ * vr_netlink_uvhost_vif_add - sends a message to the user space vhost
  * thread when a new vif is created. The name os the vif is specified in
  * the vif_name argument.
  *

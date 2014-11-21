@@ -15,4 +15,4 @@ typedef void (*vr_uvh_exit_callback_t)(void);
 int vr_uvhost_init(pthread_t *th, vr_uvh_exit_callback_t exit_fn);
 
 #endif /* __VR_UVHOST_H__ */
-     
+

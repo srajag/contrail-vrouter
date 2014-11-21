@@ -1,6 +1,6 @@
 /*
  * vr_uvhost_client.h - header file for client state handling in user
- * space vhost server that peers with the vhost client inside qemu (version 
+ * space vhost server that peers with the vhost client inside qemu (version
  * 2.1 and later).
  *
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
@@ -12,7 +12,7 @@
 /*
  * VR_UVH_MAX_CLIENTS needs to be the same as VR_MAX_INTERFACES.
  */
-#define VR_UVH_MAX_CLIENTS (256 + 4096) 
+#define VR_UVH_MAX_CLIENTS (256 + 4096)
 #define VR_UNIX_PATH_MAX 108
 
 typedef struct vr_uvh_client_mem_region {
@@ -20,7 +20,7 @@ typedef struct vr_uvh_client_mem_region {
     uint64_t vrucmr_size;
     uint64_t vrucmr_user_space_addr;
     uint64_t vrucmr_mmap_addr;
-} vr_uvh_client_mem_region_t; 
+} vr_uvh_client_mem_region_t;
 
 typedef struct vr_uvh_client {
     int vruc_fd;

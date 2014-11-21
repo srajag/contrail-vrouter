@@ -289,7 +289,7 @@ vr_l3_input(unsigned short vrf, struct vr_packet *pkt,
 
     /* rest of the stuff is for slow path and we should be ok doing this */
     if (well_known_mac(dmac))
-        return vr_trap(pkt, vrf,  AGENT_TRAP_L2_PROTOCOLS, NULL);
+        return vr_trap(pkt, vrf, AGENT_TRAP_L2_PROTOCOLS, NULL);
 
     /* Get the L2 headers back */
     if (!pkt_push(pkt, pull_len)) {

@@ -835,7 +835,7 @@ main(int argc, char *argv[])
                 parse_long_opts(TYPE_OPT_INDEX, optarg);
                 break;
 
-            case 'i':  
+            case 'i':
                 vindex_set = 1;
                 parse_long_opts(VINDEX_OPT_INDEX, NULL);
                 break;

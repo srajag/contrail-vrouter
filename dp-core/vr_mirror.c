@@ -131,7 +131,7 @@ vr_mirror_add(vr_mirror_req *req)
     req->mirr_flags &= ~VR_MIRROR_FLAG_MARKED_DELETE;
 
     nh = vrouter_get_nexthop(req->mirr_rid, req->mirr_nhid);
-    if (!nh)  {
+    if (!nh) {
         ret = -EINVAL;
         goto generate_resp;
     }
@@ -258,7 +258,7 @@ vr_mirror_req_process(void *s_req)
     default:
         break;
     }
- 
+
     return;
 }
 
@@ -407,7 +407,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
             pkt_nh->nh_dev->vif_set_rewrite && pkt_nh->nh_encap_len) {
 
             reset = false;
-            if (vr_pcow(pkt,  VR_MIRROR_PKT_HEAD_SPACE + mirror_md_len +
+            if (vr_pcow(pkt, VR_MIRROR_PKT_HEAD_SPACE + mirror_md_len +
                     pkt_nh->nh_encap_len))
                 goto fail;
 
@@ -419,7 +419,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
 
     if (reset) {
         vr_preset(pkt);
-        if (vr_pcow(pkt,  VR_MIRROR_PKT_HEAD_SPACE + mirror_md_len))
+        if (vr_pcow(pkt, VR_MIRROR_PKT_HEAD_SPACE + mirror_md_len))
             goto fail;
     }
 

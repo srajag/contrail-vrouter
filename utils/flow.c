@@ -332,7 +332,7 @@ flow_stats(void)
         {
             strftime(fmt, sizeof fmt, "%Y-%m-%d %H:%M:%S %z", tm);
             snprintf(buf, sizeof buf, fmt, now.tv_usec);
-            printf("%s\n", buf); 
+            printf("%s\n", buf);
         }
 
         printf("Flow Statistics\n");

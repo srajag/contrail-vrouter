@@ -7,7 +7,7 @@
  *
  * This program is distributed "as is" WITHOUT ANY WARRANTY of any
  * kind, whether express or implied; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * vr_dpdk_interface.c -- vRouter interface callbacks
@@ -30,7 +30,7 @@
 
 /*
  * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
- * Returns 0 on success, < 0  otherwise.
+ * Returns 0 on success, < 0 otherwise.
  */
 static int
 dpdk_virtual_if_add(struct vr_interface *vif)
@@ -46,12 +46,12 @@ dpdk_virtual_if_add(struct vr_interface *vif)
 
     ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
                nrxqs, &vr_dpdk_virtio_rx_queue_init,
-               ntxqs, &vr_dpdk_virtio_tx_queue_init); 
+               ntxqs, &vr_dpdk_virtio_tx_queue_init);
     if (ret) {
         return ret;
     }
 
-    ret = vr_netlink_uvhost_vif_add(vif->vif_name, vif->vif_idx, 
+    ret = vr_netlink_uvhost_vif_add(vif->vif_name, vif->vif_idx,
                                     nrxqs, ntxqs);
     if (ret) {
         /*
@@ -284,7 +284,7 @@ dpdk_vhost_if_add(struct vr_interface *vif)
     /* add interface to the table of vHosts */
     vr_dpdk.vhosts[vif->vif_idx] = vrouter_get_interface(vif->vif_rid, vif->vif_idx);
 
-    /* 
+    /*
      * TODO: schedule KNI queues - set number of queues to 0 for now so that
      * vhost does not affect queue scheduling on lcores.
      */
