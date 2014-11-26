@@ -6,6 +6,8 @@ Import('VRouterEnv')
 env = VRouterEnv.Clone()
 
 env.Append(CCFLAGS = '-D__DPDK__')
+# Uncomment the following to enable SSE4.2 instruction set for CRC hash function
+#env.Append(CCFLAGS = '-march=corei7')
 
 env.Library('dp_core', Glob('*.c'))
 
