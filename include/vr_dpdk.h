@@ -117,8 +117,8 @@
 /* Sleep time in US if there are no queues to poll */
 #define VR_DPDK_SLEEP_NO_QUEUES_US  10000
 /* Sleep (in US) or yield if no packets received (use 0 to disable) */
-#define VR_DPDK_SLEEP_NO_PACKETS_US 10
-#define VR_DPDK_YIELD_NO_PACKETS    0
+#define VR_DPDK_SLEEP_NO_PACKETS_US 0
+#define VR_DPDK_YIELD_NO_PACKETS    1
 /* Timers handling periodicity in US */
 #define VR_DPDK_SLEEP_TIMER_US      100
 /* KNI handling periodicity in US */
