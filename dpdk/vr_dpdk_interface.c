@@ -289,8 +289,8 @@ dpdk_vhost_if_add(struct vr_interface *vif)
      * vhost does not affect queue scheduling on lcores.
      */
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
-            0, &vr_dpdk_kni_rx_queue_init,
-            0, &vr_dpdk_kni_tx_queue_init);
+            1, &vr_dpdk_kni_rx_queue_init,
+            1, &vr_dpdk_kni_tx_queue_init);
 }
 
 /* Add agent interface */
