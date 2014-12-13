@@ -43,6 +43,7 @@ typedef struct vr_dpdk_virtioq {
     uint32_t vdv_tx_mbuf_count;
     struct rte_ring *vdv_pring;
     uint32_t vdv_pring_dst_lcore_id;
+    int vdv_callfd;
 } vr_dpdk_virtioq_t;
 
 uint16_t vr_dpdk_virtio_nrxqs(struct vr_interface *vif);
@@ -63,6 +64,8 @@ int vr_dpdk_set_vring_addr(unsigned int vif_idx, unsigned int vring_idx,
                            struct vring_used *vrucv_used);
 int vr_dpdk_set_ring_num_desc(unsigned int vif_idx, unsigned int vring_idx,
                               unsigned int num_desc);
+int vr_dpdk_set_ring_callfd(unsigned int vif_idx, unsigned int vring_idx,
+                            int callfd);
 int vr_dpdk_set_virtq_ready(unsigned int vif_idx, unsigned int vring_idx,
                             vq_ready_state_t ready);
 void vr_dpdk_virtio_set_vif_client(unsigned int idx, void *client);

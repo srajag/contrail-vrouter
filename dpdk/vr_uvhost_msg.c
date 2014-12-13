@@ -35,6 +35,7 @@ static int vr_uvhm_set_ring_num_desc(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_base(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl);
+static int vr_uvhm_set_call_fd(vr_uvh_client_t *vru_cl);
 
 static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
     NULL,
@@ -50,7 +51,7 @@ static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
     vr_uvhm_set_vring_base,
     vr_uvhm_get_vring_base,
     NULL,
-    NULL,
+    vr_uvhm_set_call_fd,
     NULL
 };
 
@@ -219,7 +220,8 @@ vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl)
      * Now that the addresses have been set, the virtio queue is ready for
      * forwarding.
      *
-     * TODO - need a memory barrier here.
+     * TODO - need a memory barrier here. Also , queue may need to be set to
+     * READY after callfd is set.
      */
     if (vr_dpdk_set_virtq_ready(vru_cl->vruc_idx, vring_idx, VQ_READY)) {
         vr_uvhost_log("Couldn't set virtio queue ready in vhost server, "
@@ -291,6 +293,40 @@ vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl)
     }
 
     vum_msg->size = sizeof(struct vhost_vring_state);
+
+    return 0;
+}
+
+/*
+ * vr_uvhm_set_call_fd - handles a VHOST_USER_SET_VRING_CALL messsage
+ * from the vhost user client to set the eventfd to be used to interrupt the
+ * guest, if required.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+static int 
+vr_uvhm_set_call_fd(vr_uvh_client_t *vru_cl)
+{
+    VhostUserMsg *vum_msg;
+    unsigned int vring_idx;
+
+    vum_msg = &vru_cl->vruc_msg;
+    vring_idx = vum_msg->state.index;
+
+    if (vring_idx >= VHOST_CLIENT_MAX_VRINGS) {
+        vr_uvhost_log("Bad ring index %d received by vhost server in callfd\n",
+                      vring_idx);
+        return -1;
+    }
+
+    if (vr_dpdk_set_ring_callfd(vru_cl->vruc_idx, vring_idx,
+                                vru_cl->vruc_fds_sent[0])) {
+        vr_uvhost_log("Could not set callfd in vhost server"
+                      " %d %d %d\n",
+                      vru_cl->vruc_idx, vring_idx,
+                      vru_cl->vruc_fds_sent[0]);
+        return -1;
+    }
 
     return 0;
 }

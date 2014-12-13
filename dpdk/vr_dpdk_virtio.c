@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <linux/vhost.h>
 #include <linux/virtio_net.h>
+#include <sys/eventfd.h>
 
 #include "vr_dpdk.h"
 #include "vr_dpdk_virtio.h"
@@ -421,6 +422,17 @@ dpdk_virtio_to_vm_flush(void *arg)
     vq_hard_used_idx = (*((volatile uint16_t *)&vq->vdv_used->idx));
     *((volatile uint16_t *) &vq->vdv_used->idx) = vq_hard_used_idx + num_pkts;
 
+    /*
+     * If the VM did not want to be interrupted (i.e if it uses DPDK), do
+     * not raise an interrupt. Otherwise, use eventfd to raise an interrupt
+     * in the guest.
+     */
+    if (vq->vdv_avail->flags & VRING_AVAIL_F_NO_INTERRUPT) {
+        return 0;
+    }
+
+    eventfd_write(vq->vdv_callfd, 1);
+
     return 0;
 }
 
@@ -530,6 +542,12 @@ vr_dpdk_set_vring_addr(unsigned int vif_idx, unsigned int vring_idx,
     vq->vdv_avail = vrucv_avail;
     vq->vdv_used = vrucv_used;
 
+    /*
+     * Tell the guest that it need not interrupt vrouter when it updates the
+     * available ring (as vrouter is polling it).
+     */
+    vq->vdv_used->flags |= VRING_USED_F_NO_NOTIFY;
+
     return 0;
 }
 
@@ -562,6 +580,36 @@ vr_dpdk_set_ring_num_desc(unsigned int vif_idx, unsigned int vring_idx,
 
     vq->vdv_vvs.index = vring_idx;
     vq->vdv_vvs.num = num_desc;
+
+    return 0;
+}
+
+/*
+ * vr_dpdk_set_ring_callfd - set the eventd used to raise interrupts in
+ * the guest (if required). Returns 0 on success, -1 otherwise.
+ */
+int 
+vr_dpdk_set_ring_callfd(unsigned int vif_idx, unsigned int vring_idx,
+                        int callfd)
+{
+    vr_dpdk_virtioq_t *vq;
+
+    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * RTE_MAX_LCORE))) {
+        return -1;
+    }
+
+    /*
+     * RX rings are even numbered and TX rings are odd numbered from the
+     * VM's point of view. From vrouter's point of view, VM's TX ring is
+     * vrouter's RX ring and vice versa.
+     */
+    if (vring_idx & 1) {
+        vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
+    } else {
+        vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
+    }
+
+    vq->vdv_callfd = callfd;
 
     return 0;
 }
