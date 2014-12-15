@@ -498,6 +498,9 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     if (vif->vif_type == VIF_TYPE_AGENT) {
         rte_ring_enqueue_burst(vr_dpdk.packet_ring, (void *)&m, 1);
+#ifdef VR_DPDK_TX_PKT_DUMP
+        rte_pktmbuf_dump(stdout, m, 0x60);
+#endif
         return 0;
     }
 
