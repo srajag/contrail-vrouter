@@ -240,7 +240,10 @@ dpdk_pktmbuf_copy(struct rte_mbuf *md,
 static struct vr_packet *
 dpdk_pclone(struct vr_packet *pkt)
 {
-#ifdef RTE_MBUF_SCATTER_GATHER
+    /* TODO: pktmbuf_clone version should be faster, but at the moment
+     *       vr_dpdk_mbuf_to_pkt returns original vr_packet structure
+     */
+#if 0
     struct rte_mbuf *m, *m_clone;
     struct vr_packet *pkt_clone;
 
@@ -252,6 +255,7 @@ dpdk_pclone(struct vr_packet *pkt)
 
     /* clone vr_packet data */
     pkt_clone = vr_dpdk_mbuf_to_pkt(m_clone);
+    /* TODO: vr_dpdk_mbuf_to_pkt never returns pointer to the vr_packet copy */
     *pkt_clone = *pkt;
 
     return pkt_clone;
