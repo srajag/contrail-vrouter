@@ -284,10 +284,6 @@ dpdk_vhost_if_add(struct vr_interface *vif)
     /* add interface to the table of vHosts */
     vr_dpdk.vhosts[vif->vif_idx] = vrouter_get_interface(vif->vif_rid, vif->vif_idx);
 
-    /*
-     * TODO: schedule KNI queues - set number of queues to 0 for now so that
-     * vhost does not affect queue scheduling on lcores.
-     */
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
             1, &vr_dpdk_kni_rx_queue_init,
             1, &vr_dpdk_kni_tx_queue_init);
