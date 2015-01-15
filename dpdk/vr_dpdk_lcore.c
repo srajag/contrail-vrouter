@@ -273,9 +273,35 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
     unsigned i;
     struct rte_mbuf *mbuf;
     struct vr_packet *pkt;
+    unsigned lcore_id;
+    struct vr_dpdk_lcore * lcore;
+    struct vr_dpdk_tx_queue *monitoring_tx_queue;
+    struct vr_packet *p_clone;
 
     RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
+
+    if (vif->vif_flags & VIF_FLAG_MONITORED) {
+        lcore_id = rte_lcore_id();
+        lcore = vr_dpdk.lcores[lcore_id];
+        monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif->vif_idx]];
+        if (monitoring_tx_queue) {
+            for (i = 0; i < nb_pkts; i++) {
+                mbuf = pkts[i];
+
+                rte_prefetch0(vr_dpdk_mbuf_to_pkt(mbuf));
+                rte_prefetch0(rte_pktmbuf_mtod(mbuf, void *));
+
+                /* convert mbuf to vr_packet */
+                pkt = vr_dpdk_packet_get(mbuf, vif);
+                p_clone = vr_pclone(pkt);
+                if (p_clone)
+                    monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
+                        vr_dpdk_pkt_to_mbuf(p_clone));
+            }
+        }
+    }
+
     for (i = 0; i < nb_pkts; i++) {
         mbuf = pkts[i];
 #ifdef VR_DPDK_RX_PKT_DUMP
@@ -286,6 +312,49 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
 
         /* convert mbuf to vr_packet */
         pkt = vr_dpdk_packet_get(mbuf, vif);
+        /* send the packet to vRouter */
+        vif->vif_rx(vif, pkt, VLAN_ID_INVALID);
+    }
+}
+
+/* Send a burst of vr_packets to vRouter */
+void
+vr_dpdk_packets_vroute(struct vr_interface *vif, struct vr_packet *pkts[VR_DPDK_MAX_BURST_SZ], uint32_t nb_pkts)
+{
+    unsigned i;
+    struct vr_packet *pkt;
+    unsigned lcore_id;
+    struct vr_dpdk_lcore * lcore;
+    struct vr_dpdk_tx_queue *monitoring_tx_queue;
+    struct vr_packet *p_clone;
+
+    RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
+         __func__, nb_pkts, vif->vif_name);
+
+    if (vif->vif_flags & VIF_FLAG_MONITORED) {
+        lcore_id = rte_lcore_id();
+        lcore = vr_dpdk.lcores[lcore_id];
+        monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif->vif_idx]];
+        if (monitoring_tx_queue) {
+            for (i = 0; i < nb_pkts; i++) {
+                pkt = pkts[i];
+                rte_prefetch0(pkt);
+
+                p_clone = vr_pclone(pkt);
+                if (p_clone)
+                    monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
+                        vr_dpdk_pkt_to_mbuf(p_clone));
+            }
+        }
+    }
+
+    for (i = 0; i < nb_pkts; i++) {
+        pkt = pkts[i];
+#ifdef VR_DPDK_RX_PKT_DUMP
+        rte_pktmbuf_dump(stdout, vr_dpdk_pkt_to_mbuf(pkt), 0x60);
+#endif
+        rte_prefetch0(pkt);
+
         /* send the packet to vRouter */
         vif->vif_rx(vif, pkt, VLAN_ID_INVALID);
     }
@@ -344,8 +413,6 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
     uint32_t nb_pkts;
     int i;
     struct vr_dpdk_ring_to_push *rtp;
-    struct vr_packet *pkt;
-    int pkti;
     uint16_t num_tx_rings, max_tx_rings;
 
     total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
@@ -382,10 +449,8 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
                         rtp->rtp_tx_queue->txq_queue_h, pkts[i]);
                 }
             } else {
-                for (pkti = 0; pkti < nb_pkts; pkti++) {
-                    pkt = (struct vr_packet *) pkts[pkti];
-                    pkt->vp_if->vif_rx(pkt->vp_if, pkt, VLAN_ID_INVALID);
-                }
+                vr_dpdk_packets_vroute(((struct vr_packet*)pkts[0])->vp_if,
+                    (struct vr_packet**)pkts, nb_pkts);
             }
         }
         rtp++;

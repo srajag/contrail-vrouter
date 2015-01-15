@@ -542,6 +542,8 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_tx_queue *monitoring_tx_queue;
+    struct vr_packet *p_clone;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
@@ -551,6 +553,16 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     m->pkt.data_len = pkt_head_len(pkt);
     /* TODO: use pkt_len instead? */
     m->pkt.pkt_len = pkt_head_len(pkt);
+
+    if (vif->vif_flags & VIF_FLAG_MONITORED) {
+        monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
+        if (monitoring_tx_queue) {
+            p_clone = vr_pclone(pkt);
+            if (p_clone)
+                monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
+                    vr_dpdk_pkt_to_mbuf(p_clone));
+        }
+    }
 
     if (vif->vif_type == VIF_TYPE_AGENT) {
         rte_ring_enqueue_burst(vr_dpdk.packet_ring, (void *)&m, 1);
@@ -608,6 +620,8 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_tx_queue *monitoring_tx_queue;
+    struct vr_packet *p_clone;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
@@ -617,6 +631,16 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     m->pkt.data_len = pkt_head_len(pkt);
     /* TODO: use pkt_len instead? */
     m->pkt.pkt_len = pkt_head_len(pkt);
+
+    if (vif->vif_flags & VIF_FLAG_MONITORED) {
+        monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
+        if (monitoring_tx_queue) {
+            p_clone = vr_pclone(pkt);
+            if (p_clone)
+                monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
+                    vr_dpdk_pkt_to_mbuf(p_clone));
+        }
+    }
 
 #ifdef VR_DPDK_TX_PKT_DUMP
     rte_pktmbuf_dump(stdout, m, 0x60);
