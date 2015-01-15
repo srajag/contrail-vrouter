@@ -384,6 +384,9 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
             } else {
                 for (pkti = 0; pkti < nb_pkts; pkti++) {
                     pkt = (struct vr_packet *) pkts[pkti];
+                    /* TODO: This should be dependent on whether a guest requests
+                     * csums to be calculated or not */
+                    pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
                     pkt->vp_if->vif_rx(pkt->vp_if, pkt, VLAN_ID_INVALID);
                 }
             }

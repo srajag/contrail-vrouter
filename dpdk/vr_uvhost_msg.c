@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <linux/vhost.h>
+#include <linux/virtio_net.h>
 #include <stdint.h>
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -64,7 +65,7 @@ static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
 static int
 vr_uvmh_get_features(vr_uvh_client_t *vru_cl)
 {
-    vru_cl->vruc_msg.u64 = 0;
+    vru_cl->vruc_msg.u64 = VIRTIO_NET_F_CSUM | VIRTIO_NET_F_GUEST_CSUM;
     vru_cl->vruc_msg.size = sizeof(vru_cl->vruc_msg.u64);
 
     return 0;
