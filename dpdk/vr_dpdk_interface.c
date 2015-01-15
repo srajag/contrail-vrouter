@@ -322,8 +322,9 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
 
     /* check if KNI is already added */
     if (vr_dpdk.knis[vif->vif_idx] != NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror adding monitoring device %s: already exist\n",
-                vif->vif_name);
+        RTE_LOG(ERR, VROUTER, "\terror adding monitoring device %s: "
+                "vif %d already exist\n",
+                vif->vif_name, vif->vif_idx);
         return -EEXIST;
     }
 
