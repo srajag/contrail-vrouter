@@ -24,7 +24,8 @@
 #define VIF_TYPE_VIRTUAL_VLAN       6
 #define VIF_TYPE_STATS              7
 #define VIF_TYPE_VLAN               8
-#define VIF_TYPE_MAX                9
+#define VIF_TYPE_MONITORING         9
+#define VIF_TYPE_MAX               10
 
 #define vif_is_virtual(vif)         ((vif->vif_type == VIF_TYPE_VIRTUAL) ||\
                                         (vif->vif_type == VIF_TYPE_VIRTUAL_VLAN))
@@ -66,6 +67,11 @@
 #define VIF_FLAG_PMD                0x400
 /* The physical interface supports hardware filtering */
 #define VIF_FLAG_FILTERING_OFFLOAD  0x800
+/*
+ * The interface is being monitored,
+ * so we copy all the packets to another interface
+ */
+#define VIF_FLAG_MONITORED          0x1000
 
 #define VIF_TRANSPORT_VIRTUAL       0
 #define VIF_TRANSPORT_ETH           1

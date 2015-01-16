@@ -1,0 +1,66 @@
+#!/bin/bash
+##
+## vRouter/DPDK tcpdump
+##
+
+MON_IF_NAME="mon"
+VR_MAX_INTERFACES=63
+MON_TYPE="monitoring"
+
+usage () {
+    echo "vRouter/DPDK tcmpdump"
+    echo "Usage: ${0##*/} <vif index> [tcpdump arguments]"
+    echo "Example:"
+    echo "      ${0##*/} 1 -n"
+    exit 1
+}
+
+error () {
+    echo "${0##*/} error: $1"
+    exit 1
+}
+
+
+if [ $# -lt 1 ]; then
+    usage
+fi
+
+MONITORED_VIF_ID=${1}; shift
+
+## find free monitoring interface ID
+MON_IF_ID=0
+while true; do
+    if ! ifconfig ${MON_IF_NAME}${MON_IF_ID} &>/dev/null; then
+        break
+    fi
+    MON_IF_ID=$((${MON_IF_ID} + 1))
+done
+
+## find free monitoring vif index
+MON_VIF_ID=$((${VR_MAX_INTERFACES} - ${MON_IF_ID}))
+while true; do
+    if ! vif --list | grep "^vif0/${MON_VIF_ID}\b" &>/dev/null; then
+        break
+    fi
+    MON_VIF_ID=$((${MON_VIF_ID} - 1))
+done
+
+vif --add ${MON_IF_NAME}${MON_IF_ID} --type ${MON_TYPE} --vif ${MONITORED_VIF_ID} \
+    --id ${MON_VIF_ID}
+
+## wait for monitoring interface to appear
+WAIT=10
+while ! ifconfig ${MON_IF_NAME}${MON_IF_ID} &>/dev/null; do
+    WAIT=$((${WAIT} - 1))
+    if [ "${WAIT}" = "0" ]; then
+        error "no interface ${MON_IF_NAME}${MON_IF_ID}"
+    fi
+done
+
+ifconfig ${MON_IF_NAME}${MON_IF_ID} up
+
+## set signal handler
+trap "echo ${0##*/}: deleting vif ${MON_VIF_ID}... && vif --delete ${MON_VIF_ID}" SIGINT
+
+## run tcpdump with the rest of arguments
+tcpdump -i ${MON_IF_NAME}${MON_IF_ID} $*

@@ -284,12 +284,67 @@ dpdk_vhost_if_add(struct vr_interface *vif)
     /* add interface to the table of vHosts */
     vr_dpdk.vhosts[vif->vif_idx] = vrouter_get_interface(vif->vif_rid, vif->vif_idx);
 
-    /*
-     * TODO: schedule KNI queues - set number of queues to 0 for now so that
-     * vhost does not affect queue scheduling on lcores.
-     */
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
             1, &vr_dpdk_kni_rx_queue_init,
+            1, &vr_dpdk_kni_tx_queue_init);
+}
+
+/* Setup interface monitoring */
+static void
+dpdk_monitoring_setup(struct vr_interface *monitored_vif,
+    struct vr_interface *monitoring_vif)
+{
+    /* set vif flag */
+    monitored_vif->vif_flags |= VIF_FLAG_MONITORED;
+    /* set monitoring redirection */
+    vr_dpdk.monitorings[monitored_vif->vif_idx] = monitoring_vif->vif_idx;
+}
+
+/* Add monitoring interface */
+static int
+dpdk_monitoring_if_add(struct vr_interface *vif)
+{
+    int ret;
+    unsigned short monitored_vif_id = vif->vif_os_idx;
+    struct vr_interface *monitored_vif;
+
+    RTE_LOG(INFO, VROUTER, "Adding monitoring vif %u KNI device %s"
+                " to monitor vif %u\n",
+                vif->vif_idx, vif->vif_name, monitored_vif_id);
+
+    /* check if vif exist */
+    monitored_vif = vrouter_get_interface(vif->vif_rid, monitored_vif_id);
+    if (!monitored_vif) {
+        RTE_LOG(ERR, VROUTER, "\terror getting vif to monitor: vif %u does not exist\n",
+                monitored_vif_id);
+        return -EINVAL;
+    }
+
+    /* check if KNI is already added */
+    if (vr_dpdk.knis[vif->vif_idx] != NULL) {
+        RTE_LOG(ERR, VROUTER, "\terror adding monitoring device %s: "
+                "vif %d already exist\n",
+                vif->vif_name, vif->vif_idx);
+        return -EEXIST;
+    }
+
+    /* init KNI */
+    ret = vr_dpdk_knidev_init(vif);
+    if (ret != 0)
+        return ret;
+
+    /* add interface to the table of KNIs */
+    vr_dpdk.knis[vif->vif_idx] = vif->vif_os;
+
+    /* add interface to the table of vHosts */
+    vr_dpdk.vhosts[vif->vif_idx] = vrouter_get_interface(vif->vif_rid, vif->vif_idx);
+
+    /* setup monitoring */
+    dpdk_monitoring_setup(monitored_vif, vif);
+
+    /* write-only interface */
+    return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
+            0, &vr_dpdk_kni_rx_queue_init,
             1, &vr_dpdk_kni_tx_queue_init);
 }
 
@@ -337,6 +392,8 @@ dpdk_if_add(struct vr_interface *vif)
         vhost_remove_xconnect();
         if (vif->vif_transport == VIF_TRANSPORT_SOCKET)
             return dpdk_agent_if_add(vif);
+    } else if (vif->vif_type == VIF_TYPE_MONITORING) {
+        return dpdk_monitoring_if_add(vif);
     }
 
     RTE_LOG(ERR, VROUTER, "Unsupported interface type %d index %d\n",
@@ -486,6 +543,8 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_tx_queue *monitoring_tx_queue;
+    struct vr_packet *p_clone;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
@@ -495,6 +554,16 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     m->pkt.data_len = pkt_head_len(pkt);
     /* TODO: use pkt_len instead? */
     m->pkt.pkt_len = pkt_head_len(pkt);
+
+    if (vif->vif_flags & VIF_FLAG_MONITORED) {
+        monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
+        if (monitoring_tx_queue) {
+            p_clone = vr_pclone(pkt);
+            if (p_clone)
+                monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
+                    vr_dpdk_pkt_to_mbuf(p_clone));
+        }
+    }
 
     if (vif->vif_type == VIF_TYPE_AGENT) {
         rte_ring_enqueue_burst(vr_dpdk.packet_ring, (void *)&m, 1);
@@ -552,6 +621,8 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_tx_queue *monitoring_tx_queue;
+    struct vr_packet *p_clone;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
@@ -561,6 +632,16 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     m->pkt.data_len = pkt_head_len(pkt);
     /* TODO: use pkt_len instead? */
     m->pkt.pkt_len = pkt_head_len(pkt);
+
+    if (vif->vif_flags & VIF_FLAG_MONITORED) {
+        monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
+        if (monitoring_tx_queue) {
+            p_clone = vr_pclone(pkt);
+            if (p_clone)
+                monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
+                    vr_dpdk_pkt_to_mbuf(p_clone));
+        }
+    }
 
 #ifdef VR_DPDK_TX_PKT_DUMP
     rte_pktmbuf_dump(stdout, m, 0x60);

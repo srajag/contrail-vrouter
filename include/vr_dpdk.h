@@ -255,6 +255,8 @@ struct vr_dpdk_global {
     struct vr_interface *vhosts[VR_MAX_INTERFACES];
     /* Table of ethdevs */
     struct vr_dpdk_ethdev ethdevs[RTE_MAX_ETHPORTS];
+    /* Table of monitoring redirections (for tcpdump) */
+    uint8_t monitorings[VR_MAX_INTERFACES];
 };
 
 extern struct vr_dpdk_global vr_dpdk;
@@ -413,6 +415,10 @@ vr_dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
     }
     vr_dpdk_packet_tx();
 }
+/* Send a burst of vr_packets to vRouter */
+void
+vr_dpdk_packets_vroute(struct vr_interface *vif,
+    struct vr_packet *pkts[VR_DPDK_MAX_BURST_SZ], uint32_t nb_pkts);
 
 
 /*

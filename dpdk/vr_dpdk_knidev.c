@@ -324,6 +324,8 @@ vr_dpdk_knidev_init(struct vr_interface *vif)
         else
             /* ...so we use os_idx instead */
             port_id = vif->vif_os_idx;
+    } else if (vif->vif_type == VIF_TYPE_MONITORING) {
+            port_id = 0; /* we always use DPDK port 0 */
     } else {
         RTE_LOG(ERR, VROUTER, "\tunknown KNI interface addition"
                 "type %d os index %d\n", vif->vif_type, vif->vif_os_idx);
@@ -374,7 +376,8 @@ vr_dpdk_knidev_all_handle(void)
 
     for (i = 0; i < router->vr_max_interfaces; i++) {
         vif = __vrouter_get_interface(router, i);
-        if (vif && (vif->vif_type == VIF_TYPE_HOST))
+        if (vif && (vif->vif_type == VIF_TYPE_HOST
+                    || vif->vif_type == VIF_TYPE_MONITORING))
             rte_kni_handle_request((struct rte_kni *)vif->vif_os);
     }
 }

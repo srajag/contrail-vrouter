@@ -912,8 +912,12 @@ static struct vr_interface_driver vif_drivers[VIF_TYPE_MAX] = {
         .drv_delete                 =   vlan_drv_del,
     },
     [VIF_TYPE_STATS] = {
-        .drv_add        =   eth_drv_add,
-        .drv_delete     =   eth_drv_del,
+        .drv_add                    =   eth_drv_add,
+        .drv_delete                 =   eth_drv_del,
+    },
+    [VIF_TYPE_MONITORING] = {
+        .drv_add                    =   vhost_drv_add,
+        .drv_delete                 =   vhost_drv_del,
     },
 };
 

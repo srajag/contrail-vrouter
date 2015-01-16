@@ -370,7 +370,7 @@ main(int argc, char *argv[])
 
         case '?':
         default:
-            fprintf(stderr, "Invalid option %s\n", argv[optind]);
+            fprintf(stderr, "Invalid option %s\n", argv[optind - 1]);
             exit(-EINVAL);
             break;
         }
