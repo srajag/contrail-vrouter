@@ -56,6 +56,7 @@ struct vr_timer {
 };
 
 struct host_os {
+    int (*hos_printf)(const char *, ...);
     void *(*hos_malloc)(unsigned int);
     void *(*hos_zalloc)(unsigned int);
     void (*hos_free)(void *);
@@ -110,6 +111,7 @@ struct host_os {
     void (*hos_del_mpls)(struct vrouter *, unsigned);
 };
 
+#define vr_printf                       vrouter_host->hos_printf
 #define vr_malloc                       vrouter_host->hos_malloc
 #define vr_zalloc                       vrouter_host->hos_zalloc
 #define vr_free                         vrouter_host->hos_free

@@ -14,6 +14,7 @@
  *
  */
 
+#include <stdarg.h>
 #include <sys/user.h>
 #include <linux/if_ether.h>
 
@@ -57,6 +58,21 @@ static void
 dpdk_page_free(void *address, unsigned int size)
 {
     rte_free(address);
+}
+
+static int
+dpdk_printf(const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    if ((RTE_LOG_CRIT <= rte_logs.level) &&
+            (RTE_LOGTYPE_VROUTER & rte_logs.type)) {
+        rte_log(RTE_LOG_CRIT, RTE_LOGTYPE_VROUTER, format, args);
+    }
+    va_end(args);
+
+    return 0;
 }
 
 static void *
@@ -906,6 +922,7 @@ dpdk_del_mpls(struct vrouter *router, unsigned mpls_label)
 }
 
 struct host_os dpdk_host = {
+    .hos_printf                     =    dpdk_printf,
     .hos_malloc                     =    dpdk_malloc,
     .hos_zalloc                     =    dpdk_zalloc,
     .hos_free                       =    dpdk_free,

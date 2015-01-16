@@ -3,6 +3,8 @@
  *
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
+#include <stdarg.h>
+
 #include "vr_os.h"
 #include "vr_proto.h"
 #include "vrouter.h"
@@ -57,6 +59,19 @@ vr_lib_page_free(void *address, unsigned int size)
 {
 	if (address)
 		free(address);
+}
+
+static int
+vr_lib_printf(const char *format, ...)
+{
+    int printed;
+    va_list args;
+
+    va_start(args, format);
+    printed = printf(format, args);
+    va_end(args);
+
+    return printed;
 }
 
 static void *
@@ -216,6 +231,7 @@ vr_lib_delay_op(void)
 }
 
 struct host_os vr_lib_host = {
+    .hos_printf             =       vr_lib_printf,
     .hos_malloc             =       vr_lib_malloc,
     .hos_zalloc             =       vr_lib_zalloc,
     .hos_free               =       vr_lib_free,
