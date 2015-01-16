@@ -466,6 +466,7 @@ vr_intf_op(unsigned int op)
 {
     int ret;
     vr_interface_req intf_req;
+    int platform = get_platform();
 
     if (create_set)
         return vhost_create();
@@ -497,11 +498,18 @@ op_retry:
             intf_req.vifr_idx = vr_ifindex;
         intf_req.vifr_rid = 0;
         intf_req.vifr_type = vr_if_type;
-        if (vr_if_type == VIF_TYPE_HOST)
+        if (vr_if_type == VIF_TYPE_HOST) {
             intf_req.vifr_cross_connect_idx = if_xconnect_kindex;
-        if (vr_if_type == VIF_TYPE_MONITORING)
-            /* we carry vif index in OS index field */
-            intf_req.vifr_os_idx = if_vif_index;
+        } else if (vr_if_type == VIF_TYPE_MONITORING) {
+            if (platform == DPDK_PLATFORM) {
+                /* we carry vif index in OS index field */
+                intf_req.vifr_os_idx = if_vif_index;
+            } else {
+                printf("Error adding interface: " MONITORING_TYPE_STRING
+                    " type should be used for vRouter/DPDK only\n");
+                exit(-EINVAL);
+            }
+        }
         intf_req.vifr_flags = vr_ifflags;
         break;
 
