@@ -43,20 +43,23 @@
 #define GATEWAY_TYPE_STRING     "gateway"
 #define VIRTUAL_VLAN_TYPE_STRING    "virtual-vlan"
 #define STATS_TYPE_STRING       "stats"
+#define MONITORING_TYPE_STRING  "monitoring"
 
 static struct nl_client *cl;
 static char flag_string[32], if_name[IFNAMSIZ];
 static int if_kindex = -1, vrf_id, vr_ifindex = -1;
 static int if_pmdindex = -1, vif_index = -1;
 static bool need_xconnect_if = false;
+static bool need_vif_id = false;
 static int if_xconnect_kindex = -1;
+static int if_vif_index = -1;
 static short vlan_id = -1;
 static int vr_ifflags;
 
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
-static int xconnect_set, vhost_phys_set;
+static int xconnect_set, vif_set, vhost_phys_set;
 
 static unsigned int vr_op, vr_if_type;
 static bool ignore_error = false, dump_pending = false;
@@ -89,6 +92,8 @@ vr_get_if_type_string(int t)
         return "Stats";
     case VIF_TYPE_VIRTUAL_VLAN:
         return "Virtual(Vlan)";
+    case VIF_TYPE_MONITORING:
+        return "Monitoring";
     default:
         return "Invalid";
     }
@@ -123,6 +128,9 @@ vr_get_if_type(char *type_str)
     else if (!strncmp(type_str, VIRTUAL_VLAN_TYPE_STRING,
                 strlen(VIRTUAL_VLAN_TYPE_STRING)))
         return VIF_TYPE_VIRTUAL_VLAN;
+    else if (!strncmp(type_str, MONITORING_TYPE_STRING,
+                strlen(MONITORING_TYPE_STRING)))
+        return VIF_TYPE_MONITORING;
     else
         Usage();
 
@@ -153,6 +161,8 @@ vr_if_flags(int flags)
         strcat(flag_string, "L2");
     if (flags & VIF_FLAG_DHCP_ENABLED)
         strcat(flag_string, "D");
+    if (flags & VIF_FLAG_MONITORED)
+        strcat(flag_string, "Mon");
 
 
     return flag_string;
@@ -232,6 +242,11 @@ vr_interface_req_process(void *s)
             printf("PCI: %d:%d:%d.%d",
                     (req->vifr_os_idx >> 16), (req->vifr_os_idx >> 8) & 0xFF,
                     (req->vifr_os_idx >> 3) & 0x1F, (req->vifr_os_idx & 0x7));
+            break;
+
+        case VIF_TYPE_MONITORING:
+            printf("Monitoring: for vif%d/%d",
+                    req->vifr_rid, req->vifr_os_idx);
             break;
 
         default:
@@ -484,6 +499,9 @@ op_retry:
         intf_req.vifr_type = vr_if_type;
         if (vr_if_type == VIF_TYPE_HOST)
             intf_req.vifr_cross_connect_idx = if_xconnect_kindex;
+        if (vr_if_type == VIF_TYPE_MONITORING)
+            /* we carry vif index in OS index field */
+            intf_req.vifr_os_idx = if_vif_index;
         intf_req.vifr_flags = vr_ifflags;
         break;
 
@@ -532,8 +550,9 @@ Usage()
 {
     printf("Usage: vif [--create <intf_name> --mac <mac>]\n");
     printf("\t   [--add <intf_name> --mac <mac> --vrf <vrf>\n");
-    printf("\t   \t--type [vhost|agent|physical|virtual]\n");
+    printf("\t   \t--type [vhost|agent|physical|virtual|monitoring]\n");
     printf("\t   \t--xconnect <physical interface name>\n");
+    printf("\t   \t--vif <vif ID>\n");
     printf( "[--id <intf_id> --pmd --pci --policy, --vhost-phys, --dhcp-enable]]\n");
     printf("\t   [--delete <intf_id>]\n");
     printf("\t   [--get <intf_id>][--kernel]\n");
@@ -561,6 +580,7 @@ enum if_opt_index {
     SET_OPT_INDEX,
     VLAN_OPT_INDEX,
     XCONNECT_OPT_INDEX,
+    VIF_OPT_INDEX,
     DHCP_OPT_INDEX,
     VHOST_PHYS_OPT_INDEX,
     HELP_OPT_INDEX,
@@ -585,6 +605,7 @@ static struct option long_options[] = {
     [VLAN_OPT_INDEX]        =   {"vlan",        required_argument,  &vlan_set,          1},
     [VHOST_PHYS_OPT_INDEX]  =   {"vhost-phys",  no_argument,        &vhost_phys_set,    1},
     [XCONNECT_OPT_INDEX]    =   {"xconnect",    required_argument,  &xconnect_set,      1},
+    [VIF_OPT_INDEX]         =   {"vif",         required_argument,  &vif_set,           1},
     [DHCP_OPT_INDEX]        =   {"dhcp-enable", no_argument,        &dhcp_set,          1},
     [HELP_OPT_INDEX]        =   {"help",        no_argument,        &help_set,          1},
     [VINDEX_OPT_INDEX]      =   {"id",          required_argument,  &vindex_set,      1},
@@ -660,6 +681,14 @@ parse_long_opts(int option_index, char *opt_arg)
         vr_if_type = vr_get_if_type(optarg);
         if (vr_if_type == VIF_TYPE_HOST)
             need_xconnect_if = true;
+        if (vr_if_type == VIF_TYPE_MONITORING) {
+            need_vif_id = true;
+            /* set default values for mac and vrf */
+            vrf_id = 0;
+            vrf_set = 1;
+            vr_ifmac[0] = 0x2; /* locally administered */
+            mac_set = 1;
+        }
         break;
 
     case SET_OPT_INDEX:
@@ -686,6 +715,11 @@ parse_long_opts(int option_index, char *opt_arg)
             Usage();
         }
 
+        break;
+
+    case VIF_OPT_INDEX:
+        if_vif_index = strtol(opt_arg, NULL, 0);
+        vr_ifmac[sizeof(vr_ifmac) - 1] = if_vif_index & 0xFF;
         break;
 
     case DHCP_OPT_INDEX:
@@ -746,6 +780,8 @@ validate_options(void)
         if (!vrf_set || !mac_set || !type_set)
             Usage();
         if (need_xconnect_if && !xconnect_set)
+            Usage();
+        if (need_vif_id && !vif_set)
             Usage();
         return;
     }
