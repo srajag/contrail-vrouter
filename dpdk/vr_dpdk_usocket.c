@@ -425,7 +425,7 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
         /* convert mbuf to vr_packet */
         pkt = vr_dpdk_packet_get(usockp->usock_mbuf, usockp->usock_vif);
         /* send the packet to vRouter */
-        usockp->usock_vif->vif_rx(usockp->usock_vif, pkt, VLAN_ID_INVALID);
+        vr_dpdk_packets_vroute(usockp->usock_vif, &pkt, 1);
         /* flush pkt0 TX queues immediately */
         vr_dpdk_lcore_flush(lcore);
 
