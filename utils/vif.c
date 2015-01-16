@@ -245,7 +245,7 @@ vr_interface_req_process(void *s)
             break;
 
         case VIF_TYPE_MONITORING:
-            printf("Monitoring: for vif%d/%d",
+            printf("Monitoring: %s for vif%d/%d", req->vifr_name,
                     req->vifr_rid, req->vifr_os_idx);
             break;
 

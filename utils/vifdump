@@ -3,24 +3,29 @@
 ## vRouter/DPDK tcpdump
 ##
 
+## Constants
 MON_IF_NAME="mon"
-VR_MAX_INTERFACES=63
+VR_MAX_INTERFACES=$((256 + 4096))
 MON_TYPE="monitoring"
 
+## Functions
 usage () {
-    echo "vRouter/DPDK tcmpdump"
-    echo "Usage: ${0##*/} <vif index> [tcpdump arguments]"
+    echo "vRouter/DPDK vif tcmpdump script"
+    echo "Usage:"
+    echo "      ${0##*/} <vif index> [tcpdump arguments]"
+    echo "              - to run tcpdump on a specified vif"
     echo "Example:"
-    echo "      ${0##*/} 1 -n"
+    echo "      ${0##*/} 1 -nvv"
     exit 1
 }
 
 error () {
-    echo "${0##*/} error: $1"
+    echo -e "${0##*/} error: $1"
     exit 1
 }
 
 
+## parse the arguments
 if [ $# -lt 1 ]; then
     usage
 fi
