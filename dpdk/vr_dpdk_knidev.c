@@ -325,7 +325,12 @@ vr_dpdk_knidev_init(struct vr_interface *vif)
             /* ...so we use os_idx instead */
             port_id = vif->vif_os_idx;
     } else if (vif->vif_type == VIF_TYPE_MONITORING) {
-            port_id = 0; /* we always use DPDK port 0 */
+            /*
+             * DPDK numerates all the detected Ethernet devices starting from 0.
+             * So we might get into an issue if we have no eth devices at all
+             * or we have few eth ports and don't what to use the first one.
+             */
+            port_id = 0; /* TODO: we always use DPDK port 0 */
     } else {
         RTE_LOG(ERR, VROUTER, "\tunknown KNI interface addition"
                 "type %d os index %d\n", vif->vif_type, vif->vif_os_idx);
