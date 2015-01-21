@@ -376,11 +376,11 @@ struct vr_packet * vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *v
 int vr_dpdk_knidev_init(struct vr_interface *vif);
 /* Init KNI RX queue */
 struct vr_dpdk_rx_queue *
-vr_dpdk_kni_rx_queue_init( unsigned lcore_id, struct vr_interface *vif,
+vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id);
 /* Init KNI TX queue */
 struct vr_dpdk_tx_queue *
-vr_dpdk_kni_tx_queue_init( unsigned lcore_id, struct vr_interface *vif,
+vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id);
 /* Handle all KNIs attached */
 void vr_dpdk_knidev_all_handle(void);

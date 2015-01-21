@@ -230,8 +230,8 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     };
     rx_queue->rxq_queue_h = rx_queue->rxq_ops.f_create(&rx_queue_params, socket_id);
     if (rx_queue->rxq_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror creating KNI device %s RX queue at eth device %" PRIu8 "\n",
-            vif->vif_name, port_id);
+        RTE_LOG(ERR, VROUTER, "\terror creating KNI device %s RX queue at eth device %"
+            PRIu8 "\n", vif->vif_name, port_id);
         return NULL;
     }
 
@@ -266,8 +266,8 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     };
     tx_queue->txq_queue_h = tx_queue->txq_ops.f_create(&tx_queue_params, socket_id);
     if (tx_queue->txq_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror creating KNI device %s TX queue at eth device %" PRIu8 "\n",
-            vif->vif_name, port_id);
+        RTE_LOG(ERR, VROUTER, "\terror creating KNI device %s TX queue at eth device %"
+            PRIu8 "\n", vif->vif_name, port_id);
         return NULL;
     }
 
@@ -361,8 +361,8 @@ vr_dpdk_knidev_init(struct vr_interface *vif)
     /* allocate KNI device */
     kni = rte_kni_alloc(vr_dpdk.rss_mempool, &kni_conf, &kni_ops);
     if (kni == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror allocation KNI device %s at eth device %" PRIu8 "\n",
-                vif->vif_name, port_id);
+        RTE_LOG(ERR, VROUTER, "\terror allocation KNI device %s at eth device %"
+                PRIu8 "\n", vif->vif_name, port_id);
         return -ENOMEM;
     }
 
