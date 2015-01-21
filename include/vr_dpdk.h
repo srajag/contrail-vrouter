@@ -261,6 +261,8 @@ struct vr_dpdk_global {
     struct vr_dpdk_ethdev ethdevs[RTE_MAX_ETHPORTS];
     /* Table of monitoring redirections (for tcpdump) */
     uint16_t monitorings[VR_MAX_INTERFACES];
+    /* Interface configuration mutex */
+    pthread_mutex_t if_lock;
 };
 
 extern struct vr_dpdk_global vr_dpdk;
@@ -368,6 +370,16 @@ int vr_dpdk_host_init(void);
 void vr_dpdk_host_exit(void);
 /* Convert internal packet fields */
 struct vr_packet * vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *vif);
+
+/*
+ * vr_dpdk_interface.c
+ */
+/* Lock interface operations */
+static inline int vr_dpdk_if_lock()
+{ return pthread_mutex_lock(&vr_dpdk.if_lock); }
+/* Unlock interface operations */
+static inline int vr_dpdk_if_unlock()
+{ return pthread_mutex_unlock(&vr_dpdk.if_lock); }
 
 /*
  * vr_dpdk_knidev.c
