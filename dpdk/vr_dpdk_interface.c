@@ -424,7 +424,7 @@ dpdk_if_del(struct vr_interface *vif)
 static int
 dpdk_if_del_tap(struct vr_interface *vif)
 {
-    /* TODO: not implemented */
+    /* TODO: we untap interfaces at if_del */
     return 0;
 }
 
@@ -433,7 +433,7 @@ dpdk_if_del_tap(struct vr_interface *vif)
 static int
 dpdk_if_add_tap(struct vr_interface *vif)
 {
-    /* TODO: not implemented */
+    /* TODO: we tap interfaces at if_add */
     return 0;
 }
 
@@ -684,20 +684,18 @@ dpdk_if_get_mtu(struct vr_interface *vif)
 static void
 dpdk_if_unlock(void)
 {
-    /* TODO: not implemented */
-    return;
+    vr_dpdk_if_unlock();
 }
 
 static void
 dpdk_if_lock(void)
 {
-    /* TODO: not implemented */
-    return;
+    vr_dpdk_if_lock();
 }
 
 struct vr_host_interface_ops dpdk_interface_ops = {
-    .hif_lock           =    dpdk_if_lock,      /* not implemented */
-    .hif_unlock         =    dpdk_if_unlock,    /* not implemented */
+    .hif_lock           =    dpdk_if_lock,
+    .hif_unlock         =    dpdk_if_unlock,
     .hif_add            =    dpdk_if_add,
     .hif_del            =    dpdk_if_del,       /* not implemented */
     .hif_add_tap        =    dpdk_if_add_tap,   /* not implemented */
