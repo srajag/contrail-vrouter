@@ -50,10 +50,10 @@ uint16_t vr_dpdk_virtio_nrxqs(struct vr_interface *vif);
 uint16_t vr_dpdk_virtio_ntxqs(struct vr_interface *vif);
 struct vr_dpdk_rx_queue *
 vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
-                             unsigned int q_id);
+                             unsigned int queue_id);
 struct vr_dpdk_tx_queue *
 vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
-                             unsigned int q_id);
+                             unsigned int queue_id);
 int vr_dpdk_virtio_set_vring_base(unsigned int vif_idx, unsigned int vring_idx,
                                    unsigned int vring_base);
 int vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,

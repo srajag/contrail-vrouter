@@ -127,6 +127,8 @@
 #define VR_DPDK_SLEEP_SERVICE_US    100
 /* Invalid port ID */
 #define VR_DPDK_INVALID_PORT_ID     0xFF
+/* Invalid queue ID */
+#define VR_DPDK_INVALID_QUEUE_ID    0xFFFF
 
 /*
  * VRouter/DPDK Data Structures
@@ -344,9 +346,9 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 /* Init ethernet device */
 int vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *);
 /* Get free queue ID */
-int vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif);
+uint16_t vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif);
 /* Add hardware filter */
-int vr_dpdk_ethdev_filter_add(struct vr_interface *vif, unsigned queue_id,
+int vr_dpdk_ethdev_filter_add(struct vr_interface *vif, uint16_t queue_id,
     unsigned dst_ip, unsigned mpls_label);
 /* Init hardware filtering */
 int vr_dpdk_ethdev_filtering_init(struct vr_interface *vif, struct vr_dpdk_ethdev *ethdev);

@@ -136,7 +136,8 @@ int
 vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
     unsigned mpls_label)
 {
-    int queue_id, ret;
+    int ret;
+    uint16_t queue_id;
     struct vr_dpdk_rx_queue *rx_queue;
     unsigned least_used_id = vr_dpdk_lcore_least_used_get();
 
@@ -146,7 +147,7 @@ vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
     }
 
     queue_id = vr_dpdk_ethdev_ready_queue_id_get(vif);
-    if (queue_id < 0)
+    if (queue_id == VR_DPDK_INVALID_QUEUE_ID)
         return -ENOMEM;
 
     /* add hardware filter */
@@ -155,8 +156,8 @@ vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
         return ret;
 
     /* init RX queue */
-    RTE_LOG(INFO, VROUTER, "\tlcore %u RX from filtering queue %d MPLS %u\n",
-        least_used_id, queue_id, mpls_label);
+    RTE_LOG(INFO, VROUTER, "\tlcore %u RX from filtering queue %" PRIu16
+        " MPLS %u\n", least_used_id, queue_id, mpls_label);
     rx_queue = vr_dpdk_ethdev_rx_queue_init(least_used_id, vif, queue_id);
     if (rx_queue == NULL)
         return -EFAULT;

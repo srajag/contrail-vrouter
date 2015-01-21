@@ -66,8 +66,9 @@ vr_dpdk_virtio_ntxqs(struct vr_interface *vif)
  */
 struct vr_dpdk_rx_queue *
 vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
-                             unsigned int q_id)
+                             unsigned int queue_or_lcore_id)
 {
+    uint16_t queue_id = queue_or_lcore_id;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     unsigned int vif_idx = vif->vif_idx;
     struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[0];
@@ -76,37 +77,37 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     /* find an empty RX queue */
     while (rx_queue->rxq_queue_h) rx_queue++;
 
-    if (q_id >= vr_dpdk_virtio_nrxqs(vif)) {
+    if (queue_id >= vr_dpdk_virtio_nrxqs(vif)) {
         return NULL;
     }
 
-    sprintf(ring_name, "vif_%d_%d_ring", vif_idx, q_id);
+    sprintf(ring_name, "vif_%d_%" PRIu16 "_ring", vif_idx, queue_id);
 
-    vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring =
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring =
         rte_ring_create(ring_name, VR_DPDK_VIRTIO_TX_RING_SZ, rte_socket_id(),
                         RING_F_SP_ENQ | RING_F_SC_DEQ);
-    if (vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring == NULL) {
+    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring == NULL) {
         return NULL;
     }
-    vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring_dst_lcore_id =
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id =
          vr_dpdk_phys_lcore_least_used_get();
-    if (vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring_dst_lcore_id ==
+    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id ==
                 RTE_MAX_LCORE) {
-        vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring_dst_lcore_id =
+        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id =
             vr_dpdk_lcore_least_used_get();
     }
 
     dpdk_ring_to_push_add(
-        vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring_dst_lcore_id,
-        vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_pring, NULL);
+        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id,
+        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring, NULL);
 
     rx_queue->rxq_ops = dpdk_virtio_reader_ops;
-    vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_ready_state = VQ_NOT_READY;
-    vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_zero_copy = 0;
-    vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_soft_avail_idx = 0;
-    vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_soft_used_idx = 0;
-    vr_dpdk_virtio_rxqs[vif_idx][q_id].vdv_vif_idx = vif->vif_idx;
-    rx_queue->rxq_queue_h = (void *) &vr_dpdk_virtio_rxqs[vif_idx][q_id];
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_ready_state = VQ_NOT_READY;
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_zero_copy = 0;
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_soft_avail_idx = 0;
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_soft_used_idx = 0;
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
+    rx_queue->rxq_queue_h = (void *) &vr_dpdk_virtio_rxqs[vif_idx][queue_id];
     rx_queue->rxq_burst_size = VR_DPDK_VIRTIO_RX_BURST_SZ;
     rx_queue->rxq_vif = vif;
 
@@ -120,24 +121,25 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
  */
 struct vr_dpdk_tx_queue *
 vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
-                             unsigned int q_id)
+                             unsigned int queue_or_lcore_id)
 {
+    uint16_t queue_id = queue_or_lcore_id;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     unsigned int vif_idx = vif->vif_idx;
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
 
-    if (q_id >= vr_dpdk_virtio_ntxqs(vif)) {
+    if (queue_id >= vr_dpdk_virtio_ntxqs(vif)) {
         return NULL;
     }
 
     tx_queue->txq_ops = dpdk_virtio_writer_ops;
-    vr_dpdk_virtio_txqs[vif_idx][q_id].vdv_ready_state = VQ_NOT_READY;
-    vr_dpdk_virtio_txqs[vif_idx][q_id].vdv_zero_copy = 0;
-    vr_dpdk_virtio_txqs[vif_idx][q_id].vdv_soft_avail_idx = 0;
-    vr_dpdk_virtio_txqs[vif_idx][q_id].vdv_soft_used_idx = 0;
-    vr_dpdk_virtio_txqs[vif_idx][q_id].vdv_vif_idx = vif->vif_idx;
-    vr_dpdk_virtio_txqs[vif_idx][q_id].vdv_tx_mbuf_count = 0;
-    tx_queue->txq_queue_h = (void *) &vr_dpdk_virtio_txqs[vif_idx][q_id];
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_ready_state = VQ_NOT_READY;
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_zero_copy = 0;
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_soft_avail_idx = 0;
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_soft_used_idx = 0;
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_tx_mbuf_count = 0;
+    tx_queue->txq_queue_h = (void *) &vr_dpdk_virtio_txqs[vif_idx][queue_id];
     tx_queue->txq_vif = vif;
 
     return tx_queue;

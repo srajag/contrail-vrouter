@@ -108,7 +108,7 @@ static const struct rte_eth_txconf tx_queue_conf = {
 
 /* Add hardware filter */
 int
-vr_dpdk_ethdev_filter_add(struct vr_interface *vif, unsigned queue_id,
+vr_dpdk_ethdev_filter_add(struct vr_interface *vif, uint16_t queue_id,
     unsigned dst_ip, unsigned mpls_label)
 {
     struct vr_dpdk_ethdev *ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
@@ -133,6 +133,12 @@ vr_dpdk_ethdev_filter_add(struct vr_interface *vif, unsigned queue_id,
     RTE_LOG(DEBUG, VROUTER, "%s: ip_dst=0x%x port_dst=%d flex_bytes=%d\n", __func__,
         (unsigned)dst_ip, (unsigned)VR_MPLS_OVER_UDP_DST_PORT, (unsigned)mpls_label);
 
+    if (queue_id >= 0xFF) {
+        RTE_LOG(ERR, VROUTER, "\terror adding perfect filter for eth device %"
+                PRIu8 ": queue ID %" PRIu16 " is out of range\n",
+                 port_id, queue_id);
+        return -EINVAL;
+    }
     ret = rte_eth_dev_fdir_add_perfect_filter(port_id, &filter, (uint16_t)mpls_label,
         (uint8_t)queue_id, 0);
     if (ret == 0)
@@ -142,10 +148,10 @@ vr_dpdk_ethdev_filter_add(struct vr_interface *vif, unsigned queue_id,
 }
 
 /* Get a ready queue ID */
-int
+uint16_t
 vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif)
 {
-    int i;
+    uint16_t i;
     struct vr_dpdk_ethdev *ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
 
     for (i = ethdev->ethdev_nb_rss_queues; i < ethdev->ethdev_nb_rx_queues; i++) {
@@ -153,14 +159,15 @@ vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif)
             return i;
         }
     }
-    return -1;
+    return VR_DPDK_INVALID_QUEUE_ID;
 }
 
 /* Init eth RX queue */
 struct vr_dpdk_rx_queue *
 vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
-    unsigned rx_queue_id)
+    unsigned queue_or_lcore_id)
 {
+    uint16_t rx_queue_id = queue_or_lcore_id;
     uint8_t port_id;
     unsigned int vif_idx = vif->vif_idx;
     const unsigned int socket_id = rte_lcore_to_socket_id(lcore_id);
@@ -199,8 +206,9 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 /* Init eth TX queue */
 struct vr_dpdk_tx_queue *
 vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
-    unsigned tx_queue_id)
+    unsigned queue_or_lcore_id)
 {
+    uint16_t tx_queue_id = queue_or_lcore_id;
     uint8_t port_id;
     unsigned int vif_idx = vif->vif_idx;
     const unsigned int socket_id = rte_lcore_to_socket_id(lcore_id);
