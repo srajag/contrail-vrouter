@@ -42,7 +42,7 @@ typedef struct vr_dpdk_virtioq {
     struct rte_mbuf *vdv_tx_mbuf[2 * VR_DPDK_VIRTIO_TX_BURST_SZ];
     uint32_t vdv_tx_mbuf_count;
     struct rte_ring *vdv_pring;
-    uint32_t vdv_pring_dst_lcore_id;
+    unsigned vdv_pring_dst_lcore_id;
     int vdv_callfd;
 } vr_dpdk_virtioq_t;
 
