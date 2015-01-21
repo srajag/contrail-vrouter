@@ -125,6 +125,8 @@
 #define VR_DPDK_SLEEP_KNI_US        500
 /* Sleep time in US for service lcore */
 #define VR_DPDK_SLEEP_SERVICE_US    100
+/* Invalid port ID */
+#define VR_DPDK_INVALID_PORT_ID     0xFF
 
 /*
  * VRouter/DPDK Data Structures
@@ -214,7 +216,7 @@ struct vr_dpdk_ethdev {
     uint16_t ethdev_nb_tx_queues;
     /* Number of HW RX queues used for RSS (limited by the nb of lcores) */
     uint16_t ethdev_nb_rss_queues;
-    uint16_t ethdev_port_id;
+    uint8_t ethdev_port_id;
     /* Hardware RX queue states */
     enum vr_dpdk_queue_state ethdev_queue_states[VR_DPDK_MAX_NB_RX_QUEUES];
     /* Pointers to memory pools */

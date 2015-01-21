@@ -105,10 +105,10 @@ dpdk_pci_to_dbdf(struct rte_pci_addr *address)
 }
 
 /* mirrors the function used in bonding */
-static inline int
-dpdk_find_port_by_pci_addr(struct rte_pci_addr *addr)
+static inline uint8_t
+dpdk_find_port_id_by_pci_addr(struct rte_pci_addr *addr)
 {
-    unsigned int i;
+    uint8_t i;
     struct rte_pci_addr *eth_pci_addr;
 
     for (i = 0; i < rte_eth_dev_count(); i++) {
@@ -124,10 +124,10 @@ dpdk_find_port_by_pci_addr(struct rte_pci_addr *addr)
         }
     }
 
-    return -1;
+    return VR_DPDK_INVALID_PORT_ID;
 }
 static inline void
-dpdk_find_pci_addr_by_port(struct rte_pci_addr *addr, unsigned port_id)
+dpdk_find_pci_addr_by_port(struct rte_pci_addr *addr, uint8_t port_id)
 {
     rte_memcpy(addr, &rte_eth_devices[port_id].pci_dev->addr, sizeof(struct rte_pci_addr));
 }
@@ -189,15 +189,13 @@ dpdk_fabric_if_add(struct vr_interface *vif)
         */
     } else {
         dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
-        ret = dpdk_find_port_by_pci_addr(&pci_address);
-        if (ret < 0) {
+        port_id = dpdk_find_port_id_by_pci_addr(&pci_address);
+        if (port_id == VR_DPDK_INVALID_PORT_ID) {
             RTE_LOG(ERR, VROUTER, "Invalid PCI address %d:%d:%d:%d\n",
                     pci_address.domain, pci_address.bus,
                     pci_address.devid, pci_address.function);
             return -ENOENT;
         }
-
-        port_id = ret;
     }
 
     /* Please don't remove since we need it to debug. Thanks! */

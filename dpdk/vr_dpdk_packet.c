@@ -13,7 +13,6 @@
 #include "vr_dpdk_usocket.h"
 
 int dpdk_packet_core_id = -1;
-unsigned int packet0_port_id = RTE_MAX_ETHPORTS - 1;
 
 int
 vr_dpdk_packet_tx(void)

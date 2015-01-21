@@ -276,15 +276,16 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
 /* Change KNI MTU size callback */
 static int
-dpdk_knidev_change_mtu(uint8_t portid, unsigned new_mtu)
+dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
 {
     /* TODO: not implemented */
-    if (portid >= rte_eth_dev_count()) {
-        RTE_LOG(ERR, VROUTER, "Invalid eth device %d\n", portid);
+    if (port_id >= rte_eth_dev_count()) {
+        RTE_LOG(ERR, VROUTER, "Invalid eth device %" PRIu8 "\n", port_id);
         return -EINVAL;
     }
 
-    RTE_LOG(INFO, VROUTER, "Change MTU of eth device %d to %u\n", portid, new_mtu);
+    RTE_LOG(INFO, VROUTER, "Change MTU of eth device %" PRIu8 " to %u\n",
+        port_id, new_mtu);
 
     return 0;
 }
@@ -292,12 +293,12 @@ dpdk_knidev_change_mtu(uint8_t portid, unsigned new_mtu)
 
 /* Configure KNI state callback */
 static int
-dpdk_knidev_config_network_if(uint8_t portid, uint8_t if_up)
+dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
 {
-    RTE_LOG(INFO, VROUTER, "Configuring eth device %d %s\n",
-                    (int)portid, if_up ? "UP" : "DOWN");
-    if (portid >= rte_eth_dev_count() || portid >= RTE_MAX_ETHPORTS) {
-        RTE_LOG(ERR, VROUTER, "Invalid eth device %d\n", portid);
+    RTE_LOG(INFO, VROUTER, "Configuring eth device %" PRIu8 " %s\n",
+                    port_id, if_up ? "UP" : "DOWN");
+    if (port_id >= rte_eth_dev_count() || port_id >= RTE_MAX_ETHPORTS) {
+        RTE_LOG(ERR, VROUTER, "Invalid eth device %" PRIu8 "\n", port_id);
         return -EINVAL;
     }
 
