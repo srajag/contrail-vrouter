@@ -87,7 +87,7 @@ void
 dpdk_lcore_rx_queue_add(unsigned lcore_id, struct vr_dpdk_rx_queue *rx_queue)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    uint8_t queue_id = rx_queue - &lcore->lcore_rx_queues[0];
+    uint16_t queue_id = rx_queue - &lcore->lcore_rx_queues[0];
 
     rte_wmb();
 

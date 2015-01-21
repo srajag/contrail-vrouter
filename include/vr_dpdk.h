@@ -256,7 +256,7 @@ struct vr_dpdk_global {
     /* Table of ethdevs */
     struct vr_dpdk_ethdev ethdevs[RTE_MAX_ETHPORTS];
     /* Table of monitoring redirections (for tcpdump) */
-    uint8_t monitorings[VR_MAX_INTERFACES];
+    uint16_t monitorings[VR_MAX_INTERFACES];
 };
 
 extern struct vr_dpdk_global vr_dpdk;

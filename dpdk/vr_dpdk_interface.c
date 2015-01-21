@@ -294,10 +294,12 @@ static void
 dpdk_monitoring_setup(struct vr_interface *monitored_vif,
     struct vr_interface *monitoring_vif)
 {
-    /* set vif flag */
-    monitored_vif->vif_flags |= VIF_FLAG_MONITORED;
     /* set monitoring redirection */
     vr_dpdk.monitorings[monitored_vif->vif_idx] = monitoring_vif->vif_idx;
+
+    /* set vif flag */
+    rte_wmb();
+    monitored_vif->vif_flags |= VIF_FLAG_MONITORED;
 }
 
 /* Add monitoring interface */
@@ -339,13 +341,17 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
     /* add interface to the table of vHosts */
     vr_dpdk.vhosts[vif->vif_idx] = vrouter_get_interface(vif->vif_rid, vif->vif_idx);
 
+    /* write-only interface */
+    ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
+            0, NULL,
+            1, &vr_dpdk_kni_tx_queue_init);
+    if (ret != 0)
+        return ret;
+
     /* setup monitoring */
     dpdk_monitoring_setup(monitored_vif, vif);
 
-    /* write-only interface */
-    return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
-            0, &vr_dpdk_kni_rx_queue_init,
-            1, &vr_dpdk_kni_tx_queue_init);
+    return 0;
 }
 
 /* Add agent interface */
