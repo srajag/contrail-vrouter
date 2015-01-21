@@ -8,7 +8,7 @@
 
 #################################################################
 ## Shutdown Linux Interfaces
-sudo ifconfig ${VROUTER1_2_IF} down
+sudo ifconfig ${VROUTER1_1_IF} down
 
 #################################################################
 ## Load Kernel Modules

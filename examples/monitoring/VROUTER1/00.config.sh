@@ -64,7 +64,7 @@ VROUTER2_VHOST_IP="172.16.1.102"
 MPLS_LABEL=22
 
 # Number of HugePages
-NB_HUGEPAGES=2048
+NB_HUGEPAGES=4096
 
 # vRouter Utils
 MPLS="${CONTRAIL_DIR}/build/${OPTIMIZATION}/vrouter/utils/mpls"
