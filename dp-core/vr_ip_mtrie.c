@@ -11,7 +11,7 @@
 #include "vr_bridge.h"
 #include "vr_ip_mtrie.h"
 
-extern struct vr_nexthop *ip4_default_nh; 
+extern struct vr_nexthop *ip4_default_nh;
 
 static struct vr_vrf_stats **mtrie_vrf_stats;
 static struct vr_vrf_stats *invalid_vrf_stats;
@@ -264,7 +264,7 @@ mtrie_free_entry(struct ip_bucket_entry *entry, unsigned int level)
 
     return;
 }
-        
+
 static void
 mtrie_reset_entry(struct ip_bucket_entry *ent, int level,
                 struct vr_nexthop *nh)
@@ -286,8 +286,8 @@ mtrie_reset_entry(struct ip_bucket_entry *ent, int level,
 
     return;
 }
-       
-/* 
+
+/*
  * When adding a route:
  * - descend the tree to the bucket at which the route is significant.
  * (i.e. the bucket corresponding to a prefix >= to the route prefix).
@@ -339,7 +339,7 @@ __mtrie_add(struct ip_mtrie *mtrie, struct vr_route_req *rt)
             continue;
 
         } else {
-            /* 
+            /*
              * cover all the indices for which this route is the best
              * prefix match
              */
@@ -427,7 +427,7 @@ free_bucket(struct ip_bucket_entry *ent, int level, struct vr_route_req *rt)
     ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
     ent->entry_label = rt->rtr_req.rtr_label;
     ent->entry_bridge_index = rt->rtr_req.rtr_index;
-    
+
     ip_bucket_sched_for_free(bkt, level);
 }
 
@@ -471,7 +471,7 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
                 tmp_ent->entry_label = rt->rtr_req.rtr_label;
                 tmp_ent->entry_prefix_len = rt->rtr_req.rtr_replace_plen;
                 tmp_ent->entry_bridge_index = rt->rtr_req.rtr_index;
-            } else 
+            } else
                 __mtrie_delete(rt, tmp_ent, level + 1);
         }
     }
@@ -480,11 +480,11 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
     for (i = 1; i < ip_bkt_info[level].bi_size; i++) {
         if ((bkt->bkt_data[i].entry_long_i == bkt->bkt_data[0].entry_long_i) &&
                 (bkt->bkt_data[i].entry_label_flags ==
-                	bkt->bkt_data[0].entry_label_flags) &&
+                    bkt->bkt_data[0].entry_label_flags) &&
                 (bkt->bkt_data[i].entry_label ==
-                	bkt->bkt_data[0].entry_label) && 
-                (bkt->bkt_data[i].entry_prefix_len == 
-			bkt->bkt_data[0].entry_prefix_len)) {
+                    bkt->bkt_data[0].entry_label) &&
+                (bkt->bkt_data[i].entry_prefix_len ==
+                    bkt->bkt_data[0].entry_prefix_len)) {
             continue;
         } else
             return 0;
@@ -629,7 +629,7 @@ mtrie_walk(struct vr_message_dumper *dumper, unsigned int family)
     req = (vr_route_req *)dumper->dump_req;
     mtrie = vrfid_to_mtrie(req->rtr_vrf_id, family);
     if (!mtrie)
-        return -EINVAL; 
+        return -EINVAL;
 
     ent = &mtrie->root;
 
@@ -745,9 +745,9 @@ mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
             response->vsr_evpn_composites += stats->vrf_evpn_composites;
             response->vsr_l2_mcast_composites += stats->vrf_l2_mcast_composites;
             response->vsr_fabric_composites += stats->vrf_fabric_composites;
-            response->vsr_udp_tunnels  += stats->vrf_udp_tunnels;
-            response->vsr_udp_mpls_tunnels  += stats->vrf_udp_mpls_tunnels;
-            response->vsr_gre_mpls_tunnels  += stats->vrf_gre_mpls_tunnels;
+            response->vsr_udp_tunnels += stats->vrf_udp_tunnels;
+            response->vsr_udp_mpls_tunnels += stats->vrf_udp_mpls_tunnels;
+            response->vsr_gre_mpls_tunnels += stats->vrf_gre_mpls_tunnels;
             response->vsr_l2_encaps += stats->vrf_l2_encaps;
             response->vsr_encaps += stats->vrf_encaps;
             response->vsr_gros += stats->vrf_gros;
@@ -906,6 +906,7 @@ mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     struct ip_mtrie       *mtrie = vrfid_to_mtrie(vrf_id, rt->rtr_req.rtr_family);
     int ret;
     struct vr_route_req tmp_req;
+    struct vrouter *router;
 
     mtrie = (mtrie ? : mtrie_alloc_vrf(vrf_id, rt->rtr_req.rtr_family));
     if (!mtrie)
@@ -914,6 +915,11 @@ mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     rt->rtr_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
     if (!rt->rtr_nh)
         return -ENOENT;
+
+    if (rt->rtr_nh->nh_type == NH_RCV) {
+        router = vrouter_get(rt->rtr_req.rtr_rid);
+        router->vr_ip = rt->rtr_req.rtr_prefix;
+    }
 
     if ((!(rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG)) &&
                  (rt->rtr_nh->nh_type == NH_TUNNEL)) {
