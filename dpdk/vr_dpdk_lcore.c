@@ -403,7 +403,7 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
         lcore_id = rte_lcore_id();
         lcore = vr_dpdk.lcores[lcore_id];
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif->vif_idx]];
-        if (monitoring_tx_queue) {
+        if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             for (i = 0; i < nb_pkts; i++) {
                 mbuf = pkts[i];
 
@@ -453,7 +453,7 @@ vr_dpdk_packets_vroute(struct vr_interface *vif, struct vr_packet *pkts[VR_DPDK_
         lcore_id = rte_lcore_id();
         lcore = vr_dpdk.lcores[lcore_id];
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif->vif_idx]];
-        if (monitoring_tx_queue) {
+        if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             for (i = 0; i < nb_pkts; i++) {
                 pkt = pkts[i];
                 rte_prefetch0(pkt);
@@ -575,7 +575,7 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
         if (likely(nb_pkts != 0)) {
             total_pkts += nb_pkts;
 
-            if (rtp->rtp_tx_queue) {
+            if (likely(rtp->rtp_tx_queue && rtp->rtp_tx_queue->txq_ops.f_tx)) {
                 /* push packets to the TX queue */
                 /* TODO: use f_tx_bulk instead */
                 for (i = 0; i < nb_pkts; i++) {
