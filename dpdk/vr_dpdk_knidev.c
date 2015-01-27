@@ -377,6 +377,17 @@ vr_dpdk_knidev_init(struct vr_interface *vif)
     return 0;
 }
 
+/* Release KNI */
+int
+vr_dpdk_knidev_release(struct vr_interface *vif)
+{
+    struct rte_kni *kni = vif->vif_os;
+
+    vif->vif_os = NULL;
+    rte_wmb();
+    return rte_kni_release(kni);
+}
+
 /* Handle all KNIs attached */
 void
 vr_dpdk_knidev_all_handle(void)

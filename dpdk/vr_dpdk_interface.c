@@ -72,6 +72,9 @@ dpdk_virtual_if_del(struct vr_interface *vif)
 {
     int ret;
 
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u virtual device\n",
+                vif->vif_idx);
+
     ret = vr_netlink_uvhost_vif_del(vif->vif_idx);
 
     /*
@@ -248,6 +251,17 @@ dpdk_fabric_if_add(struct vr_interface *vif)
         ethdev->ethdev_nb_tx_queues, &vr_dpdk_ethdev_tx_queue_init);
 }
 
+/* Delete fabric interface */
+static int
+dpdk_fabric_if_del(struct vr_interface *vif)
+{
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u eth device\n",
+        vif->vif_idx);
+
+    /* TODO: not implemented */
+    return 0;
+}
+
 /* Add vhost interface */
 static int
 dpdk_vhost_if_add(struct vr_interface *vif)
@@ -287,6 +301,17 @@ dpdk_vhost_if_add(struct vr_interface *vif)
             1, &vr_dpdk_kni_tx_queue_init);
 }
 
+/* Delete vhost interface */
+static int
+dpdk_vhost_if_del(struct vr_interface *vif)
+{
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u KNI device\n",
+                vif->vif_idx);
+
+    /* TODO: not implemented */
+    return 0;
+}
+
 /* Setup interface monitoring */
 static void
 dpdk_monitoring_setup(struct vr_interface *monitored_vif,
@@ -298,6 +323,19 @@ dpdk_monitoring_setup(struct vr_interface *monitored_vif,
     /* set vif flag */
     rte_wmb();
     monitored_vif->vif_flags |= VIF_FLAG_MONITORED;
+}
+
+/* Stop interface monitoring */
+static void
+dpdk_monitoring_stop(struct vr_interface *monitored_vif,
+    struct vr_interface *monitoring_vif)
+{
+    /* clear vif flag */
+    monitored_vif->vif_flags &= ~((unsigned int)VIF_FLAG_MONITORED);
+    rte_wmb();
+
+    /* clear monitoring redirection */
+    vr_dpdk.monitorings[monitored_vif->vif_idx] = VR_MAX_INTERFACES;
 }
 
 /* Add monitoring interface */
@@ -352,6 +390,52 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
     return 0;
 }
 
+/* Delete monitoring interface */
+static int
+dpdk_monitoring_if_del(struct vr_interface *vif)
+{
+    unsigned short monitored_vif_id = vif->vif_os_idx;
+    struct vr_interface *monitored_vif;
+
+    RTE_LOG(INFO, VROUTER, "Deleting monitoring vif %u KNI device"
+                " to monitor vif %u\n",
+                vif->vif_idx, monitored_vif_id);
+
+    /* check if vif exist */
+    monitored_vif = vrouter_get_interface(vif->vif_rid, monitored_vif_id);
+    if (!monitored_vif) {
+        RTE_LOG(ERR, VROUTER, "\terror getting vif to monitor: vif %u does not exist\n",
+                monitored_vif_id);
+        return -EINVAL;
+    }
+
+    /* stop monitoring */
+    dpdk_monitoring_stop(monitored_vif, vif);
+    vrouter_put_interface(monitored_vif);
+
+    vr_dpdk_lcore_if_unschedule(vif);
+
+    /* check if KNI is added */
+    if (vr_dpdk.knis[vif->vif_idx] == NULL) {
+        RTE_LOG(ERR, VROUTER, "\terror deleting monitoring device: "
+                "vif %d KNI device does not exist\n",
+                vif->vif_idx);
+        return -EEXIST;
+    }
+
+    /* del the interface from the table of KNIs */
+    vr_dpdk.knis[vif->vif_idx] = NULL;
+
+    /* del the interface from the table of vHosts */
+    if (vr_dpdk.vhosts[vif->vif_idx]) {
+        vrouter_put_interface(vr_dpdk.vhosts[vif->vif_idx]);
+        vr_dpdk.vhosts[vif->vif_idx] = NULL;
+    }
+
+    /* release KNI */
+    return vr_dpdk_knidev_release(vif);
+}
+
 /* Add agent interface */
 static int
 dpdk_agent_if_add(struct vr_interface *vif)
@@ -377,6 +461,18 @@ dpdk_agent_if_add(struct vr_interface *vif)
 
     /* schedule packet device with no hardware queues */
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk.packet_lcore_id, 0, NULL, 0, NULL);
+}
+
+/* Delete agent interface */
+static int
+dpdk_agent_if_del(struct vr_interface *vif)
+{
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u packet device\n",
+                vif->vif_idx);
+
+    dpdk_packet_socket_close();
+
+    return 0;
 }
 
 extern void vhost_remove_xconnect(void);
@@ -409,15 +505,23 @@ dpdk_if_add(struct vr_interface *vif)
 static int
 dpdk_if_del(struct vr_interface *vif)
 {
-    if (vif_is_virtual(vif)) {
+    if (vif_is_fabric(vif)) {
+        return dpdk_fabric_if_del(vif);
+    } else if (vif_is_virtual(vif)) {
         return dpdk_virtual_if_del(vif);
+    } else if (vif_is_vhost(vif)) {
+        return dpdk_vhost_if_del(vif);
+    } else if (vif->vif_type == VIF_TYPE_AGENT) {
+        if (vif->vif_transport == VIF_TRANSPORT_SOCKET)
+            return dpdk_agent_if_del(vif);
+    } else if (vif->vif_type == VIF_TYPE_MONITORING) {
+        return dpdk_monitoring_if_del(vif);
     }
 
-    if ((vif->vif_type == VIF_TYPE_AGENT) &&
-            (vif->vif_transport == VIF_TRANSPORT_SOCKET))
-        dpdk_packet_socket_close();
+    RTE_LOG(ERR, VROUTER, "Unsupported interface type %d index %d\n",
+            vif->vif_type, vif->vif_idx);
 
-    return 0;
+    return -EFAULT;
 }
 
 /* vRouter callback */
@@ -697,7 +801,7 @@ struct vr_host_interface_ops dpdk_interface_ops = {
     .hif_lock           =    dpdk_if_lock,
     .hif_unlock         =    dpdk_if_unlock,
     .hif_add            =    dpdk_if_add,
-    .hif_del            =    dpdk_if_del,       /* not implemented */
+    .hif_del            =    dpdk_if_del,
     .hif_add_tap        =    dpdk_if_add_tap,   /* not implemented */
     .hif_del_tap        =    dpdk_if_del_tap,   /* not implemneted */
     .hif_tx             =    dpdk_if_tx,
