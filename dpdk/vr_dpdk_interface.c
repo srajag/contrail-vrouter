@@ -312,9 +312,9 @@ dpdk_vhost_if_del(struct vr_interface *vif)
     return 0;
 }
 
-/* Setup interface monitoring */
+/* Start interface monitoring */
 static void
-dpdk_monitoring_setup(struct vr_interface *monitored_vif,
+dpdk_monitoring_start(struct vr_interface *monitored_vif,
     struct vr_interface *monitoring_vif)
 {
     /* set monitoring redirection */
@@ -384,8 +384,10 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
     if (ret != 0)
         return ret;
 
-    /* setup monitoring */
-    dpdk_monitoring_setup(monitored_vif, vif);
+    /* start monitoring */
+    dpdk_monitoring_start(monitored_vif, vif);
+
+    vrouter_put_interface(monitored_vif);
 
     return 0;
 }
