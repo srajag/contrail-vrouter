@@ -141,6 +141,14 @@
  * TODO: update the description
  */
 
+/* Release RX queue operation */
+typedef void
+    (*vr_dpdk_rx_queue_release_op)(unsigned lcore_id, struct vr_interface *vif);
+/* Release TX queue operation */
+typedef void
+    (*vr_dpdk_tx_queue_release_op)(unsigned lcore_id, struct vr_interface *vif);
+
+
 struct vr_dpdk_rx_queue {
     /* RX queue operators */
     struct rte_port_in_ops rxq_ops;
@@ -152,6 +160,24 @@ struct vr_dpdk_rx_queue {
     struct vr_interface *rxq_vif;
 };
 
+/* We store the queue params in the separate structure to increase CPU
+ * cache hit rate
+ */
+struct vr_dpdk_rx_queue_params {
+    /* Pointer to release operator */
+    vr_dpdk_rx_queue_release_op rxqp_release_op;
+    /* For RX queues we use a list rather than table, so we need to store
+     * the RX queue index in the list */
+    unsigned rxqp_queue_idx;
+    /* Extra queue params */
+    union {
+        struct {
+            struct rte_ring *rx_ring;
+            unsigned host_lcore_id;
+        } rxqp_ring;
+    };
+};
+
 struct vr_dpdk_tx_queue {
     SLIST_ENTRY(vr_dpdk_tx_queue) txq_next;
     /* TX queue operators */
@@ -160,6 +186,21 @@ struct vr_dpdk_tx_queue {
     void *txq_queue_h;
     /* Pointer to vRouter interface */
     struct vr_interface *txq_vif;
+};
+
+/* We store the queue params in the separate structure to increase CPU
+ * cache hit rate
+ */
+struct vr_dpdk_tx_queue_params {
+    /* Pointer to release operator */
+    vr_dpdk_tx_queue_release_op txqp_release_op;
+    /* Extra queue params */
+    union {
+        struct {
+            struct rte_ring *tx_ring;
+            unsigned host_lcore_id;
+        } txqp_ring;
+    };
 };
 
 struct vr_dpdk_ring_to_push {
@@ -198,6 +239,10 @@ struct vr_dpdk_lcore {
     uint16_t lcore_nb_free_rings;
     /* List of rings to push */
     struct vr_dpdk_ring_to_push lcore_rings_to_push[VR_DPDK_MAX_RINGS];
+    /* Table of RX queue params */
+    struct vr_dpdk_rx_queue_params lcore_rx_queue_params[VR_MAX_INTERFACES];
+    /* Table of TX queue params */
+    struct vr_dpdk_tx_queue_params lcore_tx_queue_params[VR_MAX_INTERFACES];
     /* List of free rings */
     struct rte_ring *lcore_free_rings[VR_DPDK_MAX_RINGS];
     /* Event socket */
@@ -400,6 +445,8 @@ static inline int vr_dpdk_if_unlock()
  */
 /* Init KNI */
 int vr_dpdk_knidev_init(struct vr_interface *vif);
+/* Release KNI */
+int vr_dpdk_knidev_release(struct vr_interface *vif);
 /* Init KNI RX queue */
 struct vr_dpdk_rx_queue *
 vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
@@ -428,6 +475,8 @@ int vr_dpdk_lcore_launch(void *dummy);
 int vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     uint16_t nb_rx_queues, vr_dpdk_rx_queue_init_op rx_queue_init_op,
     uint16_t nb_tx_queues, vr_dpdk_tx_queue_init_op tx_queue_init_op);
+/* Unschedule an interface */
+void vr_dpdk_lcore_if_unschedule(struct vr_interface *vif);
 /* Schedule an MPLS label queue */
 int vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
     unsigned mpls_label);
