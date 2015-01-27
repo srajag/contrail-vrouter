@@ -295,6 +295,8 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
 static int
 dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
 {
+    int ret = 0;
+
     RTE_LOG(INFO, VROUTER, "Configuring eth device %" PRIu8 " %s\n",
                     port_id, if_up ? "UP" : "DOWN");
     if (port_id >= rte_eth_dev_count() || port_id >= RTE_MAX_ETHPORTS) {
@@ -302,9 +304,17 @@ dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
         return -EINVAL;
     }
 
-    /* TODO: not implemented */
+    if(if_up)
+        ret = rte_eth_dev_start(port_id);
+    else
+        rte_eth_dev_stop(port_id);
 
-    return 0;
+    if(ret < 0) {
+        RTE_LOG(ERR, VROUTER, "Configuring eth device %" PRIu8 " UP"
+                    "failed (%d)", port_id, ret);
+    }
+
+    return ret;
 }
 
 /* Init KNI */
