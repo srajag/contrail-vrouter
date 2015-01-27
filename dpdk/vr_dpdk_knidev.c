@@ -278,16 +278,32 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 static int
 dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
 {
-    /* TODO: not implemented */
+    struct vrouter *router = vrouter_get(0);
+    struct vr_interface *vif;
+    int ret = 0;
+
+    RTE_LOG(INFO, VROUTER, "Change MTU of eth device %" PRIu8 " to %u\n", 
+                    port_id, new_mtu);
     if (port_id >= rte_eth_dev_count()) {
         RTE_LOG(ERR, VROUTER, "Invalid eth device %" PRIu8 "\n", port_id);
         return -EINVAL;
     }
 
-    RTE_LOG(INFO, VROUTER, "Change MTU of eth device %" PRIu8 " to %u\n",
-        port_id, new_mtu);
+    ret =  rte_eth_dev_set_mtu(port_id, new_mtu);
 
-    return 0;
+    //on success, inform vrouter about new MTU
+    if(ret == 0) {
+        vif = __vrouter_get_interface_os(router, port_id);
+        vif->vif_mtu = new_mtu;
+        router->vr_host_if->vif_mtu = new_mtu;
+    }
+
+    if(ret < 0) {
+        RTE_LOG(ERR, VROUTER, "Change MTU of eth device %" PRIu8 " to %u"
+                        " failed (%d)\n", port_id, new_mtu, ret);
+    }
+
+    return ret;
 }
 
 
