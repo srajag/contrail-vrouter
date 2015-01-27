@@ -234,7 +234,7 @@ struct vr_dpdk_lcore {
     /* Table of TX queues */
     struct vr_dpdk_tx_queue lcore_tx_queues[VR_MAX_INTERFACES];
     /* Number of rings to push for the lcore */
-    uint16_t lcore_nb_rings_to_push;
+    volatile uint16_t lcore_nb_rings_to_push;
     /* Number of free rings available for the lcore */
     uint16_t lcore_nb_free_rings;
     /* List of rings to push */

@@ -552,7 +552,7 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
     uint32_t nb_pkts;
     int i;
     struct vr_dpdk_ring_to_push *rtp;
-    uint16_t num_tx_rings, max_tx_rings;
+    uint16_t nb_rtp;
 
     total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
     total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
@@ -562,15 +562,10 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
 
     /* for all TX rings to push */
     rtp = &lcore->lcore_rings_to_push[0];
-    max_tx_rings = lcore->lcore_nb_rings_to_push;
-    num_tx_rings = 0;
-    while ((num_tx_rings < max_tx_rings) &&
-              ((rtp - &lcore->lcore_rings_to_push[0]) < VR_DPDK_MAX_RINGS)) {
-        if (rtp->rtp_tx_ring == NULL) {
-            /*
-             * TODO - need ot handle decrementing lcore_nb_rings_to_push
-             * when vif is deleted.
-             */
+    nb_rtp = lcore->lcore_nb_rings_to_push;
+    while (nb_rtp > 0) {
+        nb_rtp--;
+        if (unlikely(rtp->rtp_tx_ring == NULL)) {
             rtp++;
             continue;
         }
@@ -593,7 +588,6 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
             }
         }
         rtp++;
-        num_tx_rings++;
     }
 
     rcu_quiescent_state();
