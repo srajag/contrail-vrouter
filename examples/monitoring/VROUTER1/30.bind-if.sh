@@ -13,7 +13,7 @@ sudo ifconfig ${VROUTER1_1_IF} down
 #################################################################
 ## Load Kernel Modules
 sudo modprobe uio
-sudo insmod ${DPDK_DIR}/build/kmod/rte_kni.ko
+sudo insmod ${DPDK_DIR}/build/kmod/rte_kni.ko kthread_mode=multiple
 sudo insmod ${DPDK_DIR}/build/kmod/igb_uio.ko
 
 #################################################################
