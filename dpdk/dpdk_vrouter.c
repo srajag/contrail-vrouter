@@ -248,7 +248,7 @@ dpdk_stop_flag_set(void) {
 
     RTE_LCORE_FOREACH(lcore_id) {
         lcore = vr_dpdk.lcores[lcore_id];
-        rte_atomic16_inc(&lcore->lcore_stop_flag);
+        vr_dpdk_lcore_cmd_post(lcore, VR_DPDK_LCORE_STOP_CMD, 0);
     }
 
     rte_atomic16_inc(&vr_dpdk.stop_flag);

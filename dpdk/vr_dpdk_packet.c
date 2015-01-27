@@ -42,7 +42,8 @@ dpdk_packet_io(void)
 
 wait_for_connection:
     while (!vr_dpdk.packet_transport) {
-        if (unlikely(rte_atomic16_read(&lcore->lcore_stop_flag) != 0))
+        /* handle an IPC command */
+        if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
             return -1;
         usleep(VR_DPDK_SLEEP_SERVICE_US);
     }
@@ -50,7 +51,8 @@ wait_for_connection:
     ret = vr_usocket_io(vr_dpdk.packet_transport);
     if (ret < 0) {
         vr_dpdk.packet_transport = NULL;
-        if (unlikely(rte_atomic16_read(&lcore->lcore_stop_flag) != 0))
+        /* handle an IPC command */
+        if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
             return -1;
         usleep(VR_DPDK_SLEEP_SERVICE_US);
         goto wait_for_connection;
