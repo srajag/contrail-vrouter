@@ -141,6 +141,14 @@
  * TODO: update the description
  */
 
+/* Init RX queue operation */
+typedef struct vr_dpdk_rx_queue *
+    (*vr_dpdk_rx_queue_init_op)(unsigned lcore_id, struct vr_interface *vif,
+        unsigned queue_or_lcore_id);
+/* Init TX queue operation */
+typedef struct vr_dpdk_tx_queue *
+    (*vr_dpdk_tx_queue_init_op)(unsigned lcore_id, struct vr_interface *vif,
+        unsigned queue_or_lcore_id);
 /* Release RX queue operation */
 typedef void
     (*vr_dpdk_rx_queue_release_op)(unsigned lcore_id, struct vr_interface *vif);
@@ -150,7 +158,7 @@ typedef void
 
 
 struct vr_dpdk_rx_queue {
-    /* RX queue operators */
+    /* DPDK RX queue operators */
     struct rte_port_in_ops rxq_ops;
     /* Queue handler */
     void *rxq_queue_h;
@@ -180,7 +188,7 @@ struct vr_dpdk_rx_queue_params {
 
 struct vr_dpdk_tx_queue {
     SLIST_ENTRY(vr_dpdk_tx_queue) txq_next;
-    /* TX queue operators */
+    /* DPDK TX queue operators */
     struct rte_port_out_ops txq_ops;
     /* Queue handler */
     void *txq_queue_h;
@@ -226,7 +234,7 @@ enum vr_dpdk_lcore_cmd {
 
 struct vr_dpdk_lcore {
     /* Mask of enabled RX queues */
-    uint64_t lcore_rx_queues_mask;
+    volatile uint64_t lcore_rx_queues_mask;
     /* List of RX queues */
     struct vr_dpdk_rx_queue lcore_rx_queues[VR_DPDK_MAX_LCORE_RX_QUEUES];
     /* TX queues head */
@@ -235,14 +243,14 @@ struct vr_dpdk_lcore {
     struct vr_dpdk_tx_queue lcore_tx_queues[VR_MAX_INTERFACES];
     /* Number of rings to push for the lcore */
     volatile uint16_t lcore_nb_rings_to_push;
-    /* Number of free rings available for the lcore */
-    uint16_t lcore_nb_free_rings;
     /* List of rings to push */
     struct vr_dpdk_ring_to_push lcore_rings_to_push[VR_DPDK_MAX_RINGS];
     /* Table of RX queue params */
     struct vr_dpdk_rx_queue_params lcore_rx_queue_params[VR_MAX_INTERFACES];
     /* Table of TX queue params */
     struct vr_dpdk_tx_queue_params lcore_tx_queue_params[VR_MAX_INTERFACES];
+    /* Number of free rings available for the lcore */
+    uint16_t lcore_nb_free_rings;
     /* List of free rings */
     struct rte_ring *lcore_free_rings[VR_DPDK_MAX_RINGS];
     /* Event socket */
@@ -279,7 +287,7 @@ struct vr_dpdk_ethdev {
     uint16_t ethdev_nb_rss_queues;
     uint8_t ethdev_port_id;
     /* Hardware RX queue states */
-    enum vr_dpdk_queue_state ethdev_queue_states[VR_DPDK_MAX_NB_RX_QUEUES];
+    uint8_t ethdev_queue_states[VR_DPDK_MAX_NB_RX_QUEUES];
     /* Pointers to memory pools */
     struct rte_mempool *ethdev_mempools[VR_DPDK_MAX_NB_RX_QUEUES];
 };
@@ -325,15 +333,6 @@ struct vr_dpdk_global {
 };
 
 extern struct vr_dpdk_global vr_dpdk;
-
-/* Init RX queue operation */
-typedef struct vr_dpdk_rx_queue *
-    (*vr_dpdk_rx_queue_init_op)(unsigned lcore_id, struct vr_interface *vif,
-        unsigned queue_or_lcore_id);
-/* Init TX queue operation */
-typedef struct vr_dpdk_tx_queue *
-    (*vr_dpdk_tx_queue_init_op)(unsigned lcore_id, struct vr_interface *vif,
-        unsigned queue_or_lcore_id);
 
 /*
  * rte_mbuf <=> vr_packet conversion

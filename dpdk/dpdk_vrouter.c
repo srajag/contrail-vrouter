@@ -136,6 +136,9 @@ dpdk_init(void)
         return ret;
     }
 
+    /* TODO: for DPDK 1.8+ */
+    /* rte_kni_init(max_kni_ifaces); */
+
     ret = dpdk_mempools_create();
     if (ret < 0)
         return ret;
