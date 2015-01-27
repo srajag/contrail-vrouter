@@ -371,7 +371,7 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
     /* check if KNI is already added */
     if (vr_dpdk.knis[vif->vif_idx] != NULL) {
         RTE_LOG(ERR, VROUTER, "\terror adding monitoring device %s: "
-                "vif %d already exist\n",
+                "vif %d KNI device already exist\n",
                 vif->vif_name, vif->vif_idx);
         return -EEXIST;
     }
@@ -808,7 +808,7 @@ struct vr_host_interface_ops dpdk_interface_ops = {
     .hif_add            =    dpdk_if_add,
     .hif_del            =    dpdk_if_del,
     .hif_add_tap        =    dpdk_if_add_tap,   /* not implemented */
-    .hif_del_tap        =    dpdk_if_del_tap,   /* not implemneted */
+    .hif_del_tap        =    dpdk_if_del_tap,   /* not implemented */
     .hif_tx             =    dpdk_if_tx,
     .hif_rx             =    dpdk_if_rx,
     .hif_get_settings   =    dpdk_if_get_settings, /* always returns speed 1000 duplex 1 */

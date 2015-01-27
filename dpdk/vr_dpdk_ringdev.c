@@ -22,7 +22,7 @@
 #include <rte_errno.h>
 
 /* Allocates a new ring */
-struct rte_ring *
+static struct rte_ring *
 dpdk_ring_allocate(unsigned host_lcore_id, unsigned vif_idx, unsigned for_lcore_id)
 {
     int ret;

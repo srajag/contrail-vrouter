@@ -96,6 +96,10 @@ dpdk_lcore_rx_queue_add(unsigned lcore_id, struct vr_dpdk_rx_queue *rx_queue)
 
     /* increase the number of RX queues */
     lcore->lcore_nb_rx_queues++;
+    RTE_VERIFY(lcore->lcore_nb_rx_queues < VR_DPDK_MAX_LCORE_RX_QUEUES
+            /* we use uint64_t to store RX queue masks */
+            && lcore->lcore_nb_rx_queues < 64);
+}
 
 /* Remove a RX queue from a lcore */
 static void
@@ -269,7 +273,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
             continue;
         }
 
-        /* init hardware or ring queue */
+        /* init hardware queue */
         if (lcore_id != vr_dpdk.packet_lcore_id) {
             if (queue_id < nb_rx_queues) {
                 /* there is a hardware queue available */
