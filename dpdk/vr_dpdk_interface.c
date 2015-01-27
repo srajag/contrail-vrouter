@@ -677,7 +677,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     if (vif->vif_flags & VIF_FLAG_MONITORED) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
-        if (monitoring_tx_queue) {
+        if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             p_clone = vr_pclone(pkt);
             if (p_clone)
                 monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
@@ -728,7 +728,8 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
-    tx_queue->txq_ops.f_tx(tx_queue->txq_queue_h, m);
+    if (likely(tx_queue->txq_ops.f_tx != NULL))
+        tx_queue->txq_ops.f_tx(tx_queue->txq_queue_h, m);
 
     return 0;
 }
@@ -755,7 +756,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
 
     if (vif->vif_flags & VIF_FLAG_MONITORED) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
-        if (monitoring_tx_queue) {
+        if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             p_clone = vr_pclone(pkt);
             if (p_clone)
                 monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
@@ -767,7 +768,8 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
-    tx_queue->txq_ops.f_tx(tx_queue->txq_queue_h, m);
+    if (likely(tx_queue->txq_ops.f_tx != NULL))
+        tx_queue->txq_ops.f_tx(tx_queue->txq_queue_h, m);
 
     return 0;
 }
