@@ -171,6 +171,18 @@ struct vr_dpdk_ring_to_push {
 
 SLIST_HEAD(vr_dpdk_tx_slist, vr_dpdk_tx_queue);
 
+/* Lcore commands */
+enum vr_dpdk_lcore_cmd {
+    /* No command */
+    VR_DPDK_LCORE_NO_CMD = 0,
+    /* Stop and exit the lcore loop */
+    VR_DPDK_LCORE_STOP_CMD,
+    /* Remove RX queue */
+    VR_DPDK_LCORE_RX_RM_CMD,
+    /* Remove TX queue */
+    VR_DPDK_LCORE_TX_RM_CMD,
+};
+
 struct vr_dpdk_lcore {
     /* Mask of enabled RX queues */
     uint64_t lcore_rx_queues_mask;
@@ -190,8 +202,10 @@ struct vr_dpdk_lcore {
     struct rte_ring *lcore_free_rings[VR_DPDK_MAX_RINGS];
     /* Event socket */
     void *lcore_event_sock;
-    /* Global stop flag */
-    rte_atomic16_t lcore_stop_flag;
+    /* Lcore command param */
+    rte_atomic32_t lcore_cmd_param;
+    /* Lcore command */
+    rte_atomic16_t lcore_cmd;
     /* Number of RX queues assigned to the lcore (for the scheduler) */
     uint16_t lcore_nb_rx_queues;
 };
@@ -435,6 +449,13 @@ vr_dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
 void
 vr_dpdk_packets_vroute(struct vr_interface *vif,
     struct vr_packet *pkts[VR_DPDK_MAX_BURST_SZ], uint32_t nb_pkts);
+/* Handle an IPC command */
+int
+vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore);
+/* Post an lcore command */
+void
+vr_dpdk_lcore_cmd_post(struct vr_dpdk_lcore *lcore, uint16_t cmd,
+    uint32_t cmd_param);
 
 
 /*

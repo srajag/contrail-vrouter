@@ -96,6 +96,25 @@ dpdk_lcore_rx_queue_add(unsigned lcore_id, struct vr_dpdk_rx_queue *rx_queue)
 
     /* increase the number of RX queues */
     lcore->lcore_nb_rx_queues++;
+
+/* Remove a RX queue from a lcore */
+static void
+dpdk_lcore_rx_queue_remove(struct vr_dpdk_lcore *lcore,
+                            struct vr_dpdk_rx_queue *rx_queue)
+{
+    uint16_t queue_id = rx_queue - &lcore->lcore_rx_queues[0];
+    uint64_t queue_mask = 1ULL << queue_id;
+
+    /* clear RX queue bit */
+    lcore->lcore_rx_queues_mask &= ~queue_mask;
+
+    /* decrease the number of RX queues */
+    lcore->lcore_nb_rx_queues--;
+    RTE_VERIFY(lcore->lcore_nb_rx_queues < VR_DPDK_MAX_LCORE_RX_QUEUES
+            /* we use uint64_t to store RX queue masks */
+            && lcore->lcore_nb_rx_queues < 64);
+
+    rte_wmb();
 }
 
 /* Add a TX queue to a lcore */
@@ -129,6 +148,18 @@ dpdk_lcore_tx_queue_add(unsigned lcore_id, struct vr_dpdk_tx_queue *tx_queue)
         else
             SLIST_INSERT_AFTER(prev_tx_queue, tx_queue, txq_next);
     }
+}
+
+/* Flush and remove TX queue from a lcore */
+static void
+dpdk_lcore_tx_queue_remove(struct vr_dpdk_lcore *lcore,
+                            struct vr_dpdk_tx_queue *tx_queue)
+{
+    tx_queue->txq_ops.f_tx = NULL;
+    SLIST_REMOVE(&lcore->lcore_tx_head, tx_queue, vr_dpdk_tx_queue,
+        txq_next);
+    rte_wmb();
+    tx_queue->txq_ops.f_flush(tx_queue->txq_queue_h);
 }
 
 /* Schedule an MPLS label queue */
@@ -264,6 +295,32 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     } while (lcore_id != least_used_id);
 
     return 0;
+}
+
+/* Post an lcore command */
+void
+vr_dpdk_lcore_cmd_post(struct vr_dpdk_lcore *lcore, uint16_t cmd,
+    uint32_t cmd_param)
+{
+    uint64_t event = 1;
+
+    rte_atomic32_set(&lcore->lcore_cmd_param, cmd_param);
+    rte_atomic16_set(&lcore->lcore_cmd, cmd);
+
+    /* TODO: wake up the pkt0 thread? */
+    if (lcore->lcore_event_sock) {
+        vr_usocket_write(lcore->lcore_event_sock, (unsigned char *)&event,
+                sizeof(event));
+    }
+}
+
+/* Wait for the command completion */
+static void
+dpdk_lcore_cmd_wait(struct vr_dpdk_lcore *lcore)
+{
+    while (rte_atomic16_read(&lcore->lcore_cmd) != VR_DPDK_LCORE_NO_CMD);
+}
+
 }
 
 /* Send a burst of packets to vRouter */
@@ -514,6 +571,48 @@ dpdk_lcore_exit()
     rte_free(lcore);
 }
 
+/* Handle an IPC command
+ * Returns -1 if if there is a stop command
+ */
+int
+vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
+{
+    uint16_t cmd = (uint16_t)rte_atomic16_read(&lcore->lcore_cmd);
+    uint32_t cmd_param = (uint32_t)rte_atomic32_read(&lcore->lcore_cmd_param);
+    int ret = 0;
+    unsigned vif_idx;
+    struct vr_dpdk_rx_queue *rx_queue;
+    struct vr_dpdk_tx_queue *tx_queue;
+
+    switch (cmd) {
+    case VR_DPDK_LCORE_RX_RM_CMD:
+        vif_idx = cmd_param;
+        /* find the RX queue */
+        rx_queue = dpdk_lcore_rx_queue_find(lcore, vif_idx);
+        if (rx_queue) {
+            /* remove the queue from the lcore */
+            dpdk_lcore_rx_queue_remove(lcore, rx_queue);
+        }
+        break;
+    case VR_DPDK_LCORE_TX_RM_CMD:
+        vif_idx = cmd_param;
+        /* find the TX queue */
+        tx_queue = &lcore->lcore_tx_queues[vif_idx];
+        if (tx_queue->txq_queue_h) {
+            /* remove the queue from the lcore */
+            dpdk_lcore_tx_queue_remove(lcore, tx_queue);
+        }
+        break;
+    case VR_DPDK_LCORE_STOP_CMD:
+        ret = -1;
+        break;
+    }
+
+    rte_atomic16_set(&lcore->lcore_cmd, VR_DPDK_LCORE_NO_CMD);
+
+    return ret;
+}
+
 /* Forwarding lcore main loop */
 int
 dpdk_lcore_fwd_loop(struct vr_dpdk_lcore *lcore)
@@ -559,8 +658,8 @@ dpdk_lcore_fwd_loop(struct vr_dpdk_lcore *lcore)
                 usleep(VR_DPDK_SLEEP_NO_QUEUES_US);
             }
 
-            /* check for the stop flag */
-            if (unlikely(rte_atomic16_read(&lcore->lcore_stop_flag) != 0))
+            /* handle an IPC command */
+            if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
                 break;
         } /* flush TX queues */
     } /* lcore loop */
@@ -605,8 +704,8 @@ dpdk_lcore_service_loop(struct vr_dpdk_lcore *lcore, unsigned netlink_lcore_id,
             break;
 
         usleep(VR_DPDK_SLEEP_SERVICE_US);
-        /* check for the stop flag */
-        if (unlikely(rte_atomic16_read(&lcore->lcore_stop_flag) != 0))
+        /* handle an IPC command */
+        if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
             break;
     } /* lcore loop */
 

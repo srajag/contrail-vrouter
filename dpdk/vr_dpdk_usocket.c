@@ -1046,7 +1046,8 @@ vr_usocket_io(void *transport)
 
         rcu_thread_offline();
 
-        if (unlikely(rte_atomic16_read(&lcore->lcore_stop_flag) != 0))
+        /* handle an IPC command */
+        if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
             break;
 
         ret = poll(usockp->usock_pfds, usockp->usock_max_cfds,
