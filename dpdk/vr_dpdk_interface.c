@@ -675,17 +675,17 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     /* TODO: use pkt_len instead? */
     m->pkt.pkt_len = pkt_head_len(pkt);
 
-    if (vif->vif_flags & VIF_FLAG_MONITORED) {
+    if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             p_clone = vr_pclone(pkt);
-            if (p_clone)
+            if (likely(p_clone != NULL))
                 monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
                     vr_dpdk_pkt_to_mbuf(p_clone));
         }
     }
 
-    if (vif->vif_type == VIF_TYPE_AGENT) {
+    if (unlikely(vif->vif_type == VIF_TYPE_AGENT)) {
         rte_ring_enqueue_burst(vr_dpdk.packet_ring, (void *)&m, 1);
 #ifdef VR_DPDK_TX_PKT_DUMP
         rte_pktmbuf_dump(stdout, m, 0x60);
@@ -754,11 +754,11 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     /* TODO: use pkt_len instead? */
     m->pkt.pkt_len = pkt_head_len(pkt);
 
-    if (vif->vif_flags & VIF_FLAG_MONITORED) {
+    if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             p_clone = vr_pclone(pkt);
-            if (p_clone)
+            if (likely(p_clone != NULL))
                 monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
                     vr_dpdk_pkt_to_mbuf(p_clone));
         }

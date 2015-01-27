@@ -399,7 +399,7 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
     RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
 
-    if (vif->vif_flags & VIF_FLAG_MONITORED) {
+    if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         lcore_id = rte_lcore_id();
         lcore = vr_dpdk.lcores[lcore_id];
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif->vif_idx]];
@@ -413,7 +413,7 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
                 /* convert mbuf to vr_packet */
                 pkt = vr_dpdk_packet_get(mbuf, vif);
                 p_clone = vr_pclone(pkt);
-                if (p_clone)
+                if (likely(p_clone != NULL))
                     monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
                         vr_dpdk_pkt_to_mbuf(p_clone));
             }
@@ -449,7 +449,7 @@ vr_dpdk_packets_vroute(struct vr_interface *vif, struct vr_packet *pkts[VR_DPDK_
     RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
 
-    if (vif->vif_flags & VIF_FLAG_MONITORED) {
+    if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         lcore_id = rte_lcore_id();
         lcore = vr_dpdk.lcores[lcore_id];
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif->vif_idx]];
@@ -459,7 +459,7 @@ vr_dpdk_packets_vroute(struct vr_interface *vif, struct vr_packet *pkts[VR_DPDK_
                 rte_prefetch0(pkt);
 
                 p_clone = vr_pclone(pkt);
-                if (p_clone)
+                if (likely(p_clone != NULL))
                     monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
                         vr_dpdk_pkt_to_mbuf(p_clone));
             }
