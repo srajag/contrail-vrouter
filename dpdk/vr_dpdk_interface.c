@@ -447,13 +447,6 @@ dpdk_agent_if_add(struct vr_interface *vif)
     RTE_LOG(INFO, VROUTER, "Adding vif %u packet device %s\n",
                 vif->vif_idx, vif->vif_name);
 
-    /* check if packet device is already added */
-    if (vr_dpdk.packet_ring != NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror adding packet device %s: already exist\n",
-                vif->vif_name);
-        return -EEXIST;
-    }
-
     /* init packet device */
     ret = dpdk_packet_socket_init();
     if (ret)
@@ -490,8 +483,6 @@ dpdk_if_add(struct vr_interface *vif)
     } else if (vif_is_vhost(vif)) {
         return dpdk_vhost_if_add(vif);
     } else if (vif->vif_type == VIF_TYPE_AGENT) {
-        /* TODO: remove xconnect */
-        vhost_remove_xconnect();
         if (vif->vif_transport == VIF_TRANSPORT_SOCKET)
             return dpdk_agent_if_add(vif);
     } else if (vif->vif_type == VIF_TYPE_MONITORING) {
