@@ -86,7 +86,13 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
 
     vum_msg = &vru_cl->vruc_msg.memory;
 
+    vr_uvhost_log("Num Regions %d\n", vum_msg->nregions);
     for (i = 0; i < vum_msg->nregions; i++) {
+        vr_uvhost_log("Region %d: physical address %x, size %d, offset %d\n",
+                i, vum_msg->regions[i].guest_phys_addr,
+                vum_msg->regions[i].memory_size,
+                vum_msg->regions[i].mmap_offset);
+
         if (vru_cl->vruc_fds_sent[i]) {
             region = &vru_cl->vruc_mem_regions[i];
 
@@ -103,9 +109,11 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
                                             vru_cl->vruc_fds_sent[i], 0);
 
             if (region->vrucmr_mmap_addr == ((uint64_t)MAP_FAILED)) {
-                vr_uvhost_log("mmap failed for fd %d on vhost client %s\n",
-                              vru_cl->vruc_fds_sent[i],
-                              vru_cl->vruc_path);
+                vr_uvhost_log("mmap for size %d failed for fd %d"
+                        " on vhost client %s (%s)\n",
+                        size,
+                        vru_cl->vruc_fds_sent[i],
+                        vru_cl->vruc_path, strerror(errno));
                 return -1;
             }
 

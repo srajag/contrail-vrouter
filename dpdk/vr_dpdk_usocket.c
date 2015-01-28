@@ -133,11 +133,11 @@ usock_bind_usockets(struct vr_usocket *parent, struct vr_usocket *child)
 {
     unsigned int i;
     int ret;
-//    struct vr_usocket *child_pair;
+    struct vr_usocket *child_pair;
 
     if (parent->usock_state == LIMITED)
         return -ENOSPC;
-/*
+
     if (child->usock_proto == EVENT) {
         child_pair = vr_usocket(EVENT, RAW);
         if (!child_pair)
@@ -147,7 +147,7 @@ usock_bind_usockets(struct vr_usocket *parent, struct vr_usocket *child)
         child->usock_fd = child_pair->usock_fd;
         child = child_pair;
     }
-*/
+
     ret = usock_init_poll(parent);
     if (ret)
         return ret;
@@ -305,11 +305,13 @@ __usock_write(struct vr_usocket *usockp)
     int ret;
     unsigned int len;
     unsigned char *buf;
-    struct vr_usocket *parent;
+    struct vr_usocket *parent = NULL;
 
-    parent = usockp->usock_parent;
-    if (!parent)
-        return -1;
+    if (usockp->usock_proto != EVENT) {
+        parent = usockp->usock_parent;
+        if (!parent)
+            return -1;
+    }
 
     buf = usockp->usock_tx_buf;
     if (!buf || !usockp->usock_write_len)
@@ -326,10 +328,12 @@ retry_write:
         usockp->usock_write_offset += ret;
         if (usockp->usock_write_offset == usockp->usock_write_len) {
             /* remove from output poll */
-            parent->usock_pfds[usockp->usock_child_index].events = POLLIN;
+            if (parent)
+                parent->usock_pfds[usockp->usock_child_index].events = POLLIN;
             usockp->usock_tx_buf = NULL;
         } else {
-            parent->usock_pfds[usockp->usock_child_index].events = POLLOUT;
+            if (parent)
+                parent->usock_pfds[usockp->usock_child_index].events = POLLOUT;
         }
     } else if (ret < 0) {
         usock_set_error(usockp, ret);
@@ -338,8 +342,10 @@ retry_write:
             goto retry_write;
 
         if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-            parent->usock_pfds[usockp->usock_child_index].events = POLLOUT;
-            return 0;
+            if (parent) {
+                parent->usock_pfds[usockp->usock_child_index].events = POLLOUT;
+                return 0;
+            }
         }
         usockp->usock_tx_buf = NULL;
     }
@@ -545,15 +551,15 @@ __usock_read(struct vr_usocket *usockp)
 retry_read:
     ret = read(usockp->usock_fd, buf + offset, toread);
     if (ret <= 0) {
+        if (!ret)
+            return -1;
+
         if (errno == EINTR)
             goto retry_read;
 
         if ((errno == EAGAIN) ||
                 (errno == EWOULDBLOCK))
             return 0;
-
-        if (!ret)
-            return -1;
 
         return ret;
     }
