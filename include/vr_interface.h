@@ -202,8 +202,6 @@ extern void vr_interface_exit(struct vrouter *, bool);
 extern void vr_interface_shut(struct vrouter *);
 extern struct vr_interface *vrouter_get_interface(unsigned int, unsigned int);
 extern struct vr_interface *__vrouter_get_interface(struct vrouter *, unsigned int);
-extern struct vr_interface *__vrouter_get_interface_os(struct vrouter *,
-        unsigned int);
 extern void vrouter_put_interface(struct vr_interface *);
 extern int vr_interface_dump_wrapper(vr_interface_req *);
 extern int vr_interface_add(vr_interface_req *, bool);
