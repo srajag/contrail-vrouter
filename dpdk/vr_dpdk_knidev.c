@@ -278,16 +278,41 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 static int
 dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
 {
-    /* TODO: not implemented */
+    struct vrouter *router = vrouter_get(0);
+    struct vr_interface *vif;
+    int i = 0;
+    uint8_t ethdev_port_id;
+    int ret = 0;
+
+    RTE_LOG(INFO, VROUTER, "Change MTU of eth device %" PRIu8 " to %u\n", 
+                    port_id, new_mtu);
     if (port_id >= rte_eth_dev_count()) {
         RTE_LOG(ERR, VROUTER, "Invalid eth device %" PRIu8 "\n", port_id);
         return -EINVAL;
     }
 
-    RTE_LOG(INFO, VROUTER, "Change MTU of eth device %" PRIu8 " to %u\n",
-        port_id, new_mtu);
+    ret =  rte_eth_dev_set_mtu(port_id, new_mtu);
 
-    return 0;
+    if (ret < 0) {
+        RTE_LOG(ERR, VROUTER, "Change MTU of eth device %" PRIu8 " to %u"
+                        " failed (%d)\n", port_id, new_mtu, ret);
+    }
+    else { /* On success, inform vrouter about new MTU */
+        for (i = 0; i < router->vr_max_interfaces; i++) {
+            vif = __vrouter_get_interface(router, i);
+            if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL)) {
+                ethdev_port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->
+                            ethdev_port_id);
+                if (ethdev_port_id == port_id) {
+                    vif->vif_mtu = new_mtu;
+                    if (vif->vif_bridge)
+                        vif->vif_bridge->vif_mtu = new_mtu;
+                }
+            }
+        }
+    }
+
+    return ret;
 }
 
 
@@ -295,6 +320,8 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
 static int
 dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
 {
+    int ret = 0;
+
     RTE_LOG(INFO, VROUTER, "Configuring eth device %" PRIu8 " %s\n",
                     port_id, if_up ? "UP" : "DOWN");
     if (port_id >= rte_eth_dev_count() || port_id >= RTE_MAX_ETHPORTS) {
@@ -302,9 +329,17 @@ dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
         return -EINVAL;
     }
 
-    /* TODO: not implemented */
+    if(if_up)
+        ret = rte_eth_dev_start(port_id);
+    else
+        rte_eth_dev_stop(port_id);
 
-    return 0;
+    if(ret < 0) {
+        RTE_LOG(ERR, VROUTER, "Configuring eth device %" PRIu8 " UP"
+                    "failed (%d)", port_id, ret);
+    }
+
+    return ret;
 }
 
 /* Init KNI */
