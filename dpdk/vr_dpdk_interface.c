@@ -252,9 +252,19 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 static int
 dpdk_vhost_if_add(struct vr_interface *vif)
 {
-    uint8_t port_id = vif->vif_os_idx;
+    uint8_t port_id;
     int ret;
     struct ether_addr mac_addr;
+    struct rte_pci_addr pci_address;
+
+    if (vif->vif_flags & VIF_FLAG_PMD) {
+        port_id = vif->vif_os_idx;
+    }
+    else {
+        memset(&pci_address, 0, sizeof(pci_address));
+        dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
+        port_id = dpdk_find_port_id_by_pci_addr(&pci_address);
+    }
 
     /* get interface MAC address */
     memset(&mac_addr, 0, sizeof(mac_addr));
