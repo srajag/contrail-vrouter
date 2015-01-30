@@ -70,7 +70,7 @@ dpdk_ring_free(unsigned host_lcore_id, struct rte_ring *ring)
 /* Add the ring to the list of rings to push */
 void
 dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
-    struct vr_dpdk_tx_queue *tx_queue)
+    struct vr_dpdk_queue *tx_queue)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     struct vr_dpdk_ring_to_push *rtp = &lcore->lcore_rings_to_push[0];
@@ -114,36 +114,36 @@ static void
 dpdk_ring_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif->vif_idx];
-    struct vr_dpdk_tx_queue_params *tx_queue_params
+    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif->vif_idx];
+    struct vr_dpdk_queue_params *tx_queue_params
                         = &lcore->lcore_tx_queue_params[vif->vif_idx];
 
     /* flush and free the queue */
-    if (tx_queue->txq_ops.f_free(tx_queue->txq_queue_h)) {
+    if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
         RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u ring\n", lcore_id);
     }
 
     /* remove the ring from the list of rings to push */
-    dpdk_ring_to_push_remove(tx_queue_params->txqp_ring.host_lcore_id,
-            tx_queue_params->txqp_ring.tx_ring);
+    dpdk_ring_to_push_remove(tx_queue_params->qp_ring.host_lcore_id,
+            tx_queue_params->qp_ring.ring_p);
 
     /* deallocate the ring */
-    dpdk_ring_free(tx_queue_params->txqp_ring.host_lcore_id,
-                            tx_queue_params->txqp_ring.tx_ring);
+    dpdk_ring_free(tx_queue_params->qp_ring.host_lcore_id,
+                            tx_queue_params->qp_ring.ring_p);
 
     /* reset the queue */
-    tx_queue_params->txqp_release_op = NULL;
-    tx_queue->txq_queue_h = NULL;
+    tx_queue_params->qp_release_op = NULL;
+    tx_queue->q_queue_h = NULL;
     rte_wmb();
 
-    memset(&tx_queue_params->txqp_ring, 0, sizeof(tx_queue_params->txqp_ring));
+    memset(&tx_queue_params->qp_ring, 0, sizeof(tx_queue_params->qp_ring));
     memset(&tx_queue->txq_ops, 0, sizeof(tx_queue->txq_ops));
-    vrouter_put_interface(tx_queue->txq_vif);
-    tx_queue->txq_vif = NULL;
+    vrouter_put_interface(tx_queue->q_vif);
+    tx_queue->q_vif = NULL;
 }
 
 /* Init ring TX queue */
-struct vr_dpdk_tx_queue *
+struct vr_dpdk_queue *
 vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id)
 {
@@ -152,10 +152,10 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
     uint8_t port_id;
     unsigned vif_idx = vif->vif_idx;
-    struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
-    struct vr_dpdk_tx_queue_params *tx_queue_params
+    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue_params *tx_queue_params
                 = &lcore->lcore_tx_queue_params[vif_idx];
-    struct vr_dpdk_tx_queue *host_tx_queue = &host_lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue *host_tx_queue = &host_lcore->lcore_tx_queues[vif_idx];
     struct rte_ring *tx_ring;
 
     if (vif->vif_type == VIF_TYPE_PHYSICAL) {
@@ -166,8 +166,8 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
     /* init queue */
     tx_queue->txq_ops = rte_port_ring_writer_ops;
-    tx_queue->txq_queue_h = NULL;
-    tx_queue->txq_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
+    tx_queue->q_queue_h = NULL;
+    tx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* allocate a ring on the host lcore */
     tx_ring = dpdk_ring_allocate(host_lcore_id, vif_idx, lcore_id);
@@ -185,23 +185,23 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
         .ring = tx_ring,
         .tx_burst_sz = VR_DPDK_RING_TX_BURST_SZ,
     };
-    tx_queue->txq_queue_h = tx_queue->txq_ops.f_create(&writer_params,
+    tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params,
                                                         socket_id);
-    if (tx_queue->txq_queue_h == NULL) {
+    if (tx_queue->q_queue_h == NULL) {
         RTE_LOG(ERR, VROUTER, "\terror creating ring for device %" PRIu8 "\n",
             port_id);
         return NULL;
     }
     /* store queue params */
-    tx_queue_params->txqp_release_op = &dpdk_ring_tx_queue_release;
-    tx_queue_params->txqp_ring.tx_ring = tx_ring;
-    tx_queue_params->txqp_ring.host_lcore_id = host_lcore_id;
+    tx_queue_params->qp_release_op = &dpdk_ring_tx_queue_release;
+    tx_queue_params->qp_ring.ring_p = tx_ring;
+    tx_queue_params->qp_ring.host_lcore_id = host_lcore_id;
 
     return tx_queue;
 }
 
 /* Init ring RX queue */
-struct vr_dpdk_rx_queue *
+struct vr_dpdk_queue *
 vr_dpdk_ring_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id)
 {

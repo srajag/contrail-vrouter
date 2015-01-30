@@ -649,8 +649,8 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct vr_dpdk_lcore * const lcore = vr_dpdk.lcores[lcore_id];
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
     unsigned vif_idx = vif->vif_idx;
-    struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
-    struct vr_dpdk_tx_queue *monitoring_tx_queue;
+    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue *monitoring_tx_queue;
     struct vr_packet *p_clone;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
@@ -667,7 +667,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             p_clone = vr_pclone(pkt);
             if (likely(p_clone != NULL))
-                monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
+                monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
                     vr_dpdk_pkt_to_mbuf(p_clone));
         }
     }
@@ -716,7 +716,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 #endif
 
     if (likely(tx_queue->txq_ops.f_tx != NULL))
-        tx_queue->txq_ops.f_tx(tx_queue->txq_queue_h, m);
+        tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
 
     return 0;
 }
@@ -728,8 +728,8 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     struct vr_dpdk_lcore * const lcore = vr_dpdk.lcores[lcore_id];
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
     unsigned vif_idx = vif->vif_idx;
-    struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
-    struct vr_dpdk_tx_queue *monitoring_tx_queue;
+    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue *monitoring_tx_queue;
     struct vr_packet *p_clone;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
@@ -746,7 +746,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             p_clone = vr_pclone(pkt);
             if (likely(p_clone != NULL))
-                monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
+                monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
                     vr_dpdk_pkt_to_mbuf(p_clone));
         }
     }
@@ -756,7 +756,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
 #endif
 
     if (likely(tx_queue->txq_ops.f_tx != NULL))
-        tx_queue->txq_ops.f_tx(tx_queue->txq_queue_h, m);
+        tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
 
     return 0;
 }
