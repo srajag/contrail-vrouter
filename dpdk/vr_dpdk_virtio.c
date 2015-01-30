@@ -64,18 +64,15 @@ vr_dpdk_virtio_ntxqs(struct vr_interface *vif)
  *
  * Returns a pointer to the RX queue on success, NULL otherwise.
  */
-struct vr_dpdk_rx_queue *
+struct vr_dpdk_queue *
 vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
                              unsigned int queue_or_lcore_id)
 {
     uint16_t queue_id = queue_or_lcore_id;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     unsigned int vif_idx = vif->vif_idx;
-    struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[0];
+    struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
     char ring_name[64];
-
-    /* find an empty RX queue */
-    while (rx_queue->rxq_queue_h) rx_queue++;
 
     if (queue_id >= vr_dpdk_virtio_nrxqs(vif)) {
         return NULL;
@@ -107,9 +104,9 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_soft_avail_idx = 0;
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_soft_used_idx = 0;
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
-    rx_queue->rxq_queue_h = (void *) &vr_dpdk_virtio_rxqs[vif_idx][queue_id];
+    rx_queue->q_queue_h = (void *) &vr_dpdk_virtio_rxqs[vif_idx][queue_id];
     rx_queue->rxq_burst_size = VR_DPDK_VIRTIO_RX_BURST_SZ;
-    rx_queue->rxq_vif = vif;
+    rx_queue->q_vif = vif;
 
     return rx_queue;
 }
@@ -119,14 +116,14 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
  *
  * Returns a pointer to the TX queue on success, NULL otherwise.
  */
-struct vr_dpdk_tx_queue *
+struct vr_dpdk_queue *
 vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
                              unsigned int queue_or_lcore_id)
 {
     uint16_t queue_id = queue_or_lcore_id;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     unsigned int vif_idx = vif->vif_idx;
-    struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
 
     if (queue_id >= vr_dpdk_virtio_ntxqs(vif)) {
         return NULL;
@@ -139,8 +136,8 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_soft_used_idx = 0;
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_tx_mbuf_count = 0;
-    tx_queue->txq_queue_h = (void *) &vr_dpdk_virtio_txqs[vif_idx][queue_id];
-    tx_queue->txq_vif = vif;
+    tx_queue->q_queue_h = (void *) &vr_dpdk_virtio_txqs[vif_idx][queue_id];
+    tx_queue->q_vif = vif;
 
     return tx_queue;
 }
@@ -689,14 +686,14 @@ vr_dpdk_virtio_get_vif_client(unsigned int idx)
  * Returns nothing.
  */
 void
-vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_rx_queue *rx_queue,
+vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
                                       struct vr_packet **pkt_arr,
                                       uint32_t npkts)
 {
     vr_dpdk_virtioq_t *vq;
     struct rte_ring *vq_pring;
 
-    vq = (vr_dpdk_virtioq_t *) rx_queue->rxq_queue_h;
+    vq = (vr_dpdk_virtioq_t *) rx_queue->q_queue_h;
     vq_pring = vq->vdv_pring;
 
     rte_ring_sp_enqueue_bulk(vq_pring, (void **) pkt_arr, npkts);

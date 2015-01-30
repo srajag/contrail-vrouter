@@ -48,10 +48,10 @@ typedef struct vr_dpdk_virtioq {
 
 uint16_t vr_dpdk_virtio_nrxqs(struct vr_interface *vif);
 uint16_t vr_dpdk_virtio_ntxqs(struct vr_interface *vif);
-struct vr_dpdk_rx_queue *
+struct vr_dpdk_queue *
 vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
                              unsigned int queue_id);
-struct vr_dpdk_tx_queue *
+struct vr_dpdk_queue *
 vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
                              unsigned int queue_id);
 int vr_dpdk_virtio_set_vring_base(unsigned int vif_idx, unsigned int vring_idx,
@@ -70,7 +70,7 @@ int vr_dpdk_set_virtq_ready(unsigned int vif_idx, unsigned int vring_idx,
                             vq_ready_state_t ready);
 void vr_dpdk_virtio_set_vif_client(unsigned int idx, void *client);
 void *vr_dpdk_virtio_get_vif_client(unsigned int idx);
-void vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_rx_queue *rx_queue,
+void vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
                                            struct vr_packet **pkt_arr,
                                            uint32_t npkts);
 #endif /* __VR_DPDK_VIRTIO_H__ */

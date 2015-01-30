@@ -200,7 +200,7 @@ struct rte_port_out_ops dpdk_knidev_writer_ops = {
 };
 
 /* Init KNI RX queue */
-struct vr_dpdk_rx_queue *
+struct vr_dpdk_queue *
 vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id)
 {
@@ -208,10 +208,7 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
     uint8_t port_id = 0;
     unsigned vif_idx = vif->vif_idx;
-    struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[0];
-
-    /* find an empty RX queue */
-    while (rx_queue->rxq_queue_h) rx_queue++;
+    struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
 
     if (vif->vif_type == VIF_TYPE_HOST) {
         port_id = (((struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os))->
@@ -220,16 +217,16 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
     /* init queue */
     rx_queue->rxq_ops = dpdk_knidev_reader_ops;
-    rx_queue->rxq_queue_h = NULL;
+    rx_queue->q_queue_h = NULL;
     rx_queue->rxq_burst_size = VR_DPDK_KNI_RX_BURST_SZ;
-    rx_queue->rxq_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
+    rx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* create the queue */
     struct dpdk_knidev_reader_params rx_queue_params = {
         .kni = vif->vif_os,
     };
-    rx_queue->rxq_queue_h = rx_queue->rxq_ops.f_create(&rx_queue_params, socket_id);
-    if (rx_queue->rxq_queue_h == NULL) {
+    rx_queue->q_queue_h = rx_queue->rxq_ops.f_create(&rx_queue_params, socket_id);
+    if (rx_queue->q_queue_h == NULL) {
         RTE_LOG(ERR, VROUTER, "\terror creating KNI device %s RX queue at eth device %"
             PRIu8 "\n", vif->vif_name, port_id);
         return NULL;
@@ -239,7 +236,7 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 }
 
 /* Init KNI TX queue */
-struct vr_dpdk_tx_queue *
+struct vr_dpdk_queue *
 vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id)
 {
@@ -247,7 +244,7 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
     uint8_t port_id = 0;
     unsigned vif_idx = vif->vif_idx;
-    struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
 
     if (vif->vif_type == VIF_TYPE_HOST) {
         port_id = (((struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os))->
@@ -256,16 +253,16 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
     /* init queue */
     tx_queue->txq_ops = dpdk_knidev_writer_ops;
-    tx_queue->txq_queue_h = NULL;
-    tx_queue->txq_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
+    tx_queue->q_queue_h = NULL;
+    tx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* create the queue */
     struct dpdk_knidev_writer_params tx_queue_params = {
         .kni = vif->vif_os,
         .tx_burst_sz = VR_DPDK_KNI_TX_BURST_SZ,
     };
-    tx_queue->txq_queue_h = tx_queue->txq_ops.f_create(&tx_queue_params, socket_id);
-    if (tx_queue->txq_queue_h == NULL) {
+    tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&tx_queue_params, socket_id);
+    if (tx_queue->q_queue_h == NULL) {
         RTE_LOG(ERR, VROUTER, "\terror creating KNI device %s TX queue at eth device %"
             PRIu8 "\n", vif->vif_name, port_id);
         return NULL;

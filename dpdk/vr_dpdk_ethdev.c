@@ -163,7 +163,7 @@ vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif)
 }
 
 /* Init eth RX queue */
-struct vr_dpdk_rx_queue *
+struct vr_dpdk_queue *
 vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned queue_or_lcore_id)
 {
@@ -174,27 +174,24 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
     struct vr_dpdk_ethdev *ethdev;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[0];
-
-    /* find an empty RX queue */
-    while (rx_queue->rxq_queue_h) rx_queue++;
+    struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
 
     ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
     port_id = ethdev->ethdev_port_id;
 
     /* init queue */
     rx_queue->rxq_ops = rte_port_ethdev_reader_ops;
-    rx_queue->rxq_queue_h = NULL;
+    rx_queue->q_queue_h = NULL;
     rx_queue->rxq_burst_size = VR_DPDK_ETH_RX_BURST_SZ;
-    rx_queue->rxq_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
+    rx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* create the queue */
     struct rte_port_ethdev_reader_params rx_queue_params = {
         .port_id = port_id,
         .queue_id = rx_queue_id,
     };
-    rx_queue->rxq_queue_h = rx_queue->rxq_ops.f_create(&rx_queue_params, socket_id);
-    if (rx_queue->rxq_queue_h == NULL) {
+    rx_queue->q_queue_h = rx_queue->rxq_ops.f_create(&rx_queue_params, socket_id);
+    if (rx_queue->q_queue_h == NULL) {
         RTE_LOG(ERR, VROUTER, "\terror creating eth device %" PRIu8
                 " RX queue %" PRIu16 "\n", port_id, rx_queue_id);
         return NULL;
@@ -204,7 +201,7 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 }
 
 /* Init eth TX queue */
-struct vr_dpdk_tx_queue *
+struct vr_dpdk_queue *
 vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned queue_or_lcore_id)
 {
@@ -215,15 +212,15 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
     struct vr_dpdk_ethdev *ethdev;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
 
     ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
     port_id = ethdev->ethdev_port_id;
 
     /* init queue */
     tx_queue->txq_ops = rte_port_ethdev_writer_ops;
-    tx_queue->txq_queue_h = NULL;
-    tx_queue->txq_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
+    tx_queue->q_queue_h = NULL;
+    tx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* create the queue */
     struct rte_port_ethdev_writer_params tx_queue_params = {
@@ -231,8 +228,8 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
         .queue_id = tx_queue_id,
         .tx_burst_sz = VR_DPDK_ETH_TX_BURST_SZ,
     };
-    tx_queue->txq_queue_h = tx_queue->txq_ops.f_create(&tx_queue_params, socket_id);
-    if (tx_queue->txq_queue_h == NULL) {
+    tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&tx_queue_params, socket_id);
+    if (tx_queue->q_queue_h == NULL) {
         RTE_LOG(ERR, VROUTER, "\terror creating eth device %" PRIu8
                 " TX queue %" PRIu16 "\n", port_id, tx_queue_id);
         return NULL;
