@@ -172,7 +172,9 @@ dpdk_init(void)
     /* init timer subsystem */
     rte_timer_subsystem_init();
 
-    /* init interface lock */
+    /* Init the interface configuration mutex
+     * ATM we use it just to synchronize access between the NetLink interface
+     * and kernel KNI events. The datapath is not affected. */
     return pthread_mutex_init(&vr_dpdk.if_lock, NULL);
 }
 
