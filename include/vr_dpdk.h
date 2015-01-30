@@ -328,7 +328,9 @@ struct vr_dpdk_global {
     struct vr_dpdk_ethdev ethdevs[RTE_MAX_ETHPORTS];
     /* Table of monitoring redirections (for tcpdump) */
     uint16_t monitorings[VR_MAX_INTERFACES];
-    /* Interface configuration mutex */
+    /* Interface configuration mutex
+     * ATM we use it just to synchronize access between the NetLink interface
+     * and kernel KNI events. The datapath is not affected. */
     pthread_mutex_t if_lock;
 };
 
