@@ -688,6 +688,7 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
     }
 
     rte_atomic16_set(&lcore->lcore_cmd, VR_DPDK_LCORE_NO_CMD);
+    rte_wmb();
 
     return ret;
 }
