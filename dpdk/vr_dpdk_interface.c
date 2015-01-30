@@ -345,13 +345,14 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
     int ret;
     unsigned short monitored_vif_id = vif->vif_os_idx;
     struct vr_interface *monitored_vif;
+    struct vrouter *router = vrouter_get(vif->vif_rid);
 
     RTE_LOG(INFO, VROUTER, "Adding monitoring vif %u KNI device %s"
                 " to monitor vif %u\n",
                 vif->vif_idx, vif->vif_name, monitored_vif_id);
 
     /* check if vif exist */
-    monitored_vif = vrouter_get_interface(vif->vif_rid, monitored_vif_id);
+    monitored_vif = __vrouter_get_interface(router, monitored_vif_id);
     if (!monitored_vif) {
         RTE_LOG(ERR, VROUTER, "\terror getting vif to monitor: vif %u does not exist\n",
                 monitored_vif_id);
@@ -386,8 +387,6 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
 
     /* start monitoring */
     dpdk_monitoring_start(monitored_vif, vif);
-
-    vrouter_put_interface(monitored_vif);
 
     return 0;
 }
