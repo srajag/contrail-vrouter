@@ -136,6 +136,9 @@ dpdk_init(void)
         return ret;
     }
 
+    /* TODO: for DPDK 1.8+ */
+    /* rte_kni_init(max_kni_ifaces); */
+
     ret = dpdk_mempools_create();
     if (ret < 0)
         return ret;
@@ -169,7 +172,10 @@ dpdk_init(void)
     /* init timer subsystem */
     rte_timer_subsystem_init();
 
-    return 0;
+    /* Init the interface configuration mutex
+     * ATM we use it just to synchronize access between the NetLink interface
+     * and kernel KNI events. The datapath is not affected. */
+    return pthread_mutex_init(&vr_dpdk.if_lock, NULL);
 }
 
 /* Shutdown DPDK EAL */
@@ -178,10 +184,12 @@ dpdk_exit(void)
 {
     int i;
 
+    vr_dpdk_if_lock();
     RTE_LOG(INFO, VROUTER, "Releasing KNI devices...\n");
     for (i = 0; i < VR_MAX_INTERFACES; i++) {
         if (vr_dpdk.knis[i] != NULL) {
             rte_kni_release(vr_dpdk.knis[i]);
+            vr_dpdk.knis[i] = NULL;
         }
     }
 
@@ -190,7 +198,14 @@ dpdk_exit(void)
         if (vr_dpdk.ethdevs[i].ethdev_ptr != NULL) {
             rte_eth_dev_stop(i);
             rte_eth_dev_close(i);
+            vr_dpdk.ethdevs[i].ethdev_ptr = NULL;
         }
+    }
+    vr_dpdk_if_unlock();
+
+    /* destroy interface lock */
+    if (pthread_mutex_destroy(&vr_dpdk.if_lock)) {
+        RTE_LOG(ERR, VROUTER, "Error destroying interface lock\n");
     }
 }
 
@@ -238,7 +253,7 @@ dpdk_stop_flag_set(void) {
 
     RTE_LCORE_FOREACH(lcore_id) {
         lcore = vr_dpdk.lcores[lcore_id];
-        rte_atomic16_inc(&lcore->lcore_stop_flag);
+        vr_dpdk_lcore_cmd_post(lcore, VR_DPDK_LCORE_STOP_CMD, 0);
     }
 
     rte_atomic16_inc(&vr_dpdk.stop_flag);

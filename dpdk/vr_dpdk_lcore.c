@@ -82,53 +82,64 @@ vr_dpdk_lcore_least_used_get(void)
     return least_used_id;
 }
 
-/* Add a RX queue to a lcore */
+/* Add a queue to a lcore */
 void
-dpdk_lcore_rx_queue_add(unsigned lcore_id, struct vr_dpdk_rx_queue *rx_queue)
+dpdk_lcore_queue_add(unsigned lcore_id, struct vr_dpdk_q_slist *q_head,
+                        struct vr_dpdk_queue *queue)
 {
-    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    uint16_t queue_id = rx_queue - &lcore->lcore_rx_queues[0];
-
-    rte_wmb();
-
-    /* set mask to enable the queue */
-    lcore->lcore_rx_queues_mask |= 1ULL << queue_id;
-
-    /* increase the number of RX queues */
-    lcore->lcore_nb_rx_queues++;
-}
-
-/* Add a TX queue to a lcore */
-void
-dpdk_lcore_tx_queue_add(unsigned lcore_id, struct vr_dpdk_tx_queue *tx_queue)
-{
-    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    unsigned vif_idx = tx_queue->txq_vif->vif_idx;
-    struct vr_dpdk_tx_queue *prev_tx_queue;
-    struct vr_dpdk_tx_queue *cur_tx_queue;
+    unsigned vif_idx = queue->q_vif->vif_idx;
+    struct vr_dpdk_queue *prev_queue;
+    struct vr_dpdk_queue *cur_queue;
 
     /* write barrier */
     rte_wmb();
 
     /* add queue to the list */
-    if (SLIST_EMPTY(&lcore->lcore_tx_head)) {
+    if (SLIST_EMPTY(q_head)) {
         /* insert first queue */
-        SLIST_INSERT_HEAD(&lcore->lcore_tx_head, tx_queue, txq_next);
+        SLIST_INSERT_HEAD(q_head, queue, q_next);
     } else {
         /* sort TX queues by vif_idx to optimize CPU cache usage */
-        prev_tx_queue = NULL;
-        SLIST_FOREACH(cur_tx_queue, &lcore->lcore_tx_head, txq_next) {
-            if (cur_tx_queue->txq_vif->vif_idx < vif_idx)
-                prev_tx_queue = cur_tx_queue;
+        prev_queue = NULL;
+        SLIST_FOREACH(cur_queue, q_head, q_next) {
+            if (cur_queue->q_vif->vif_idx < vif_idx)
+                prev_queue = cur_queue;
             else
                 break;
         }
         /* insert new queue */
-        if (prev_tx_queue == NULL)
-            SLIST_INSERT_HEAD(&lcore->lcore_tx_head, tx_queue, txq_next);
+        if (prev_queue == NULL)
+            SLIST_INSERT_HEAD(q_head, queue, q_next);
         else
-            SLIST_INSERT_AFTER(prev_tx_queue, tx_queue, txq_next);
+            SLIST_INSERT_AFTER(prev_queue, queue, q_next);
     }
+}
+
+/* Flush and remove TX queue from a lcore */
+static void
+dpdk_lcore_tx_queue_remove(struct vr_dpdk_lcore *lcore,
+                            struct vr_dpdk_queue *tx_queue)
+{
+    tx_queue->txq_ops.f_tx = NULL;
+    SLIST_REMOVE(&lcore->lcore_tx_head, tx_queue, vr_dpdk_queue,
+        q_next);
+    rte_wmb();
+    tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+}
+
+/* Remove RX queue from a lcore */
+static void
+dpdk_lcore_rx_queue_remove(struct vr_dpdk_lcore *lcore,
+                            struct vr_dpdk_queue *rx_queue)
+{
+    rx_queue->rxq_ops.f_rx = NULL;
+    SLIST_REMOVE(&lcore->lcore_rx_head, rx_queue, vr_dpdk_queue,
+        q_next);
+
+    /* decrease the number of RX queues */
+    lcore->lcore_nb_rx_queues--;
+    rte_wmb();
+    RTE_VERIFY(lcore->lcore_nb_rx_queues < VR_MAX_INTERFACES);
 }
 
 /* Schedule an MPLS label queue */
@@ -138,7 +149,7 @@ vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
 {
     int ret;
     uint16_t queue_id;
-    struct vr_dpdk_rx_queue *rx_queue;
+    struct vr_dpdk_queue *rx_queue;
     unsigned least_used_id = vr_dpdk_lcore_least_used_get();
 
     if (least_used_id == RTE_MAX_LCORE) {
@@ -163,7 +174,8 @@ vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
         return -EFAULT;
 
     /* add the queue to the lcore */
-    dpdk_lcore_rx_queue_add(least_used_id, rx_queue);
+    dpdk_lcore_queue_add(least_used_id, &vr_dpdk.lcores[least_used_id]->lcore_rx_head,
+                        rx_queue);
 
     return 0;
 }
@@ -171,13 +183,13 @@ vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
 /* Schedule an interface */
 int
 vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
-    uint16_t nb_rx_queues, vr_dpdk_rx_queue_init_op rx_queue_init_op,
-    uint16_t nb_tx_queues, vr_dpdk_tx_queue_init_op tx_queue_init_op)
+    uint16_t nb_rx_queues, vr_dpdk_queue_init_op rx_queue_init_op,
+    uint16_t nb_tx_queues, vr_dpdk_queue_init_op tx_queue_init_op)
 {
     unsigned lcore_id;
     uint16_t queue_id;
-    struct vr_dpdk_rx_queue *rx_queue;
-    struct vr_dpdk_tx_queue *tx_queue;
+    struct vr_dpdk_queue *rx_queue;
+    struct vr_dpdk_queue *tx_queue;
     struct vr_dpdk_lcore *lcore;
 
     if (least_used_id == RTE_MAX_LCORE) {
@@ -219,7 +231,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
         }
 
         /* add the queue to the lcore */
-        dpdk_lcore_tx_queue_add(lcore_id, tx_queue);
+        dpdk_lcore_queue_add(lcore_id, &lcore->lcore_tx_head, tx_queue);
 
         /* do not skip master lcore but wrap */
         lcore_id = rte_get_next_lcore(lcore_id, 0, 1);
@@ -238,7 +250,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
             continue;
         }
 
-        /* init hardware or ring queue */
+        /* init hardware queue */
         if (lcore_id != vr_dpdk.packet_lcore_id) {
             if (queue_id < nb_rx_queues) {
                 /* there is a hardware queue available */
@@ -249,7 +261,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
                     return -EFAULT;
 
                 /* add the queue to the lcore */
-                dpdk_lcore_rx_queue_add(lcore_id, rx_queue);
+                dpdk_lcore_queue_add(lcore_id, &lcore->lcore_rx_head, rx_queue);
 
                 /* next queue */
                 queue_id++;
@@ -266,6 +278,92 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     return 0;
 }
 
+/* Post an lcore command */
+void
+vr_dpdk_lcore_cmd_post(struct vr_dpdk_lcore *lcore, uint16_t cmd,
+    uint32_t cmd_param)
+{
+    uint64_t event = 1;
+
+    rte_atomic32_set(&lcore->lcore_cmd_param, cmd_param);
+    rte_atomic16_set(&lcore->lcore_cmd, cmd);
+
+    /* wake up the pkt0 thread */
+    if (lcore->lcore_event_sock) {
+        vr_usocket_write(lcore->lcore_event_sock, (unsigned char *)&event,
+                sizeof(event));
+    }
+}
+
+/* Wait for the command completion */
+static void
+dpdk_lcore_cmd_wait(struct vr_dpdk_lcore *lcore)
+{
+    while (rte_atomic16_read(&lcore->lcore_cmd) != VR_DPDK_LCORE_NO_CMD);
+}
+
+/* Release RX and TX queues */
+void
+dpdk_lcore_rxtx_release(unsigned lcore_id, struct vr_interface *vif)
+{
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
+    struct vr_dpdk_queue_params *rx_queue_params;
+    struct vr_dpdk_queue_params *tx_queue_params;
+
+    rx_queue_params = &lcore->lcore_rx_queue_params[vif->vif_idx];
+    if (rx_queue_params->qp_release_op) {
+        RTE_LOG(INFO, VROUTER, "\treleasing lcore %u RX queue\n", lcore_id);
+        rx_queue_params->qp_release_op(lcore_id, vif);
+    }
+
+    tx_queue_params = &lcore->lcore_tx_queue_params[vif->vif_idx];
+    if (tx_queue_params->qp_release_op) {
+        RTE_LOG(INFO, VROUTER, "\treleasing lcore %u TX queue\n", lcore_id);
+        tx_queue_params->qp_release_op(lcore_id, vif);
+    }
+}
+
+/* Unschedule an interface */
+void
+vr_dpdk_lcore_if_unschedule(struct vr_interface *vif)
+{
+    unsigned lcore_id;
+    struct vr_dpdk_lcore *lcore;
+
+    /* remove RX queues first */
+    RTE_LCORE_FOREACH(lcore_id) {
+        lcore = vr_dpdk.lcores[lcore_id];
+        /* never use netlink lcore */
+        if (lcore->lcore_nb_rx_queues >= VR_MAX_INTERFACES)
+            continue;
+        vr_dpdk_lcore_cmd_post(lcore, VR_DPDK_LCORE_RX_RM_CMD,
+                        (uint32_t)vif->vif_idx);
+    }
+    RTE_LCORE_FOREACH(lcore_id) {
+        lcore = vr_dpdk.lcores[lcore_id];
+        dpdk_lcore_cmd_wait(lcore);
+    }
+
+    /* flush and remove TX queues */
+    RTE_LCORE_FOREACH(lcore_id) {
+        /* never use service lcores */
+        lcore = vr_dpdk.lcores[lcore_id];
+        if (lcore->lcore_nb_rx_queues >= VR_MAX_INTERFACES)
+            continue;
+        vr_dpdk_lcore_cmd_post(lcore, VR_DPDK_LCORE_TX_RM_CMD,
+                        (uint32_t)vif->vif_idx);
+    }
+    RTE_LCORE_FOREACH(lcore_id) {
+        lcore = vr_dpdk.lcores[lcore_id];
+        dpdk_lcore_cmd_wait(lcore);
+    }
+
+    /* release RX and TX queues */
+    RTE_LCORE_FOREACH(lcore_id) {
+        dpdk_lcore_rxtx_release(lcore_id, vif);
+    }
+}
+
 /* Send a burst of packets to vRouter */
 static inline void
 dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ],
@@ -276,17 +374,17 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
     struct vr_packet *pkt;
     unsigned lcore_id;
     struct vr_dpdk_lcore * lcore;
-    struct vr_dpdk_tx_queue *monitoring_tx_queue;
+    struct vr_dpdk_queue *monitoring_tx_queue;
     struct vr_packet *p_clone;
 
     RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
 
-    if (vif->vif_flags & VIF_FLAG_MONITORED) {
+    if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         lcore_id = rte_lcore_id();
         lcore = vr_dpdk.lcores[lcore_id];
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif->vif_idx]];
-        if (monitoring_tx_queue) {
+        if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             for (i = 0; i < nb_pkts; i++) {
                 mbuf = pkts[i];
 
@@ -296,8 +394,8 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
                 /* convert mbuf to vr_packet */
                 pkt = vr_dpdk_packet_get(mbuf, vif);
                 p_clone = vr_pclone(pkt);
-                if (p_clone)
-                    monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
+                if (likely(p_clone != NULL))
+                    monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
                         vr_dpdk_pkt_to_mbuf(p_clone));
             }
         }
@@ -326,24 +424,24 @@ vr_dpdk_packets_vroute(struct vr_interface *vif, struct vr_packet *pkts[VR_DPDK_
     struct vr_packet *pkt;
     unsigned lcore_id;
     struct vr_dpdk_lcore * lcore;
-    struct vr_dpdk_tx_queue *monitoring_tx_queue;
+    struct vr_dpdk_queue *monitoring_tx_queue;
     struct vr_packet *p_clone;
 
     RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
 
-    if (vif->vif_flags & VIF_FLAG_MONITORED) {
+    if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         lcore_id = rte_lcore_id();
         lcore = vr_dpdk.lcores[lcore_id];
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif->vif_idx]];
-        if (monitoring_tx_queue) {
+        if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             for (i = 0; i < nb_pkts; i++) {
                 pkt = pkts[i];
                 rte_prefetch0(pkt);
 
                 p_clone = vr_pclone(pkt);
-                if (p_clone)
-                    monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->txq_queue_h,
+                if (likely(p_clone != NULL))
+                    monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
                         vr_dpdk_pkt_to_mbuf(p_clone));
             }
         }
@@ -363,76 +461,58 @@ vr_dpdk_packets_vroute(struct vr_interface *vif, struct vr_packet *pkts[VR_DPDK_
 
 /* Forwarding lcore RX */
 static inline uint32_t
-dpdk_lcore_fwd_rx(struct vr_dpdk_lcore *lcore, struct rte_mbuf **pkts,
-    uint64_t *rx_queues_mask)
+dpdk_lcore_fwd_rx(struct vr_dpdk_lcore *lcore)
 {
-    struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[0];
-    uint64_t cur_queues_mask = *rx_queues_mask;
-    uint64_t cur_queue = 1;
-    uint32_t nb_pkts = 0;
+    uint64_t total_pkts = 0;
+    struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ];
+    struct vr_dpdk_queue *rx_queue;
+    uint32_t nb_pkts;
     struct vr_packet *pkt_arr[VR_DPDK_MAX_BURST_SZ];
     int pkti;
 
     /* for all RX queues */
-    while (cur_queues_mask) {
-        rte_prefetch0(rx_queue);
-        if (likely(cur_queues_mask & cur_queue)) {
-            /* burst RX */
-            nb_pkts = rx_queue->rxq_ops.f_rx(rx_queue->rxq_queue_h, pkts,
+    SLIST_FOREACH(rx_queue, &lcore->lcore_rx_head, q_next) {
+        /* burst RX */
+        nb_pkts = rx_queue->rxq_ops.f_rx(rx_queue->q_queue_h, pkts,
                 rx_queue->rxq_burst_size);
-            cur_queues_mask &= ~cur_queue;
-            if (likely(nb_pkts > 0)) {
-                /* transmit packets to vrouter */
-                if (vif_is_virtual(rx_queue->rxq_vif)) {
-                    for (pkti = 0; pkti < nb_pkts; pkti++) {
-                        pkt_arr[pkti] = vr_dpdk_packet_get(pkts[pkti],
-                                                           rx_queue->rxq_vif);
-                    }
-                    vr_dpdk_virtio_enq_pkts_to_phys_lcore(rx_queue,
-                                                          pkt_arr, nb_pkts);
-                } else {
-                    dpdk_vroute(rx_queue->rxq_vif, pkts, nb_pkts);
+        if (likely(nb_pkts > 0)) {
+            total_pkts += nb_pkts;
+            /* transmit packets to vrouter */
+            if (vif_is_virtual(rx_queue->q_vif)) {
+                for (pkti = 0; pkti < nb_pkts; pkti++) {
+                    pkt_arr[pkti] = vr_dpdk_packet_get(pkts[pkti],
+                                                       rx_queue->q_vif);
                 }
+                vr_dpdk_virtio_enq_pkts_to_phys_lcore(rx_queue,
+                                                      pkt_arr, nb_pkts);
             } else {
-                /* mark the queue as empty */
-                *rx_queues_mask &= ~cur_queue;
+                dpdk_vroute(rx_queue->q_vif, pkts, nb_pkts);
             }
         }
-        cur_queue <<= 1;
-        rx_queue++;
     }
-    return nb_pkts;
+    return total_pkts;
 }
 
 /* Forwarding lcore IO */
 static inline void
 dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
 {
-    uint64_t rx_queues_mask = lcore->lcore_rx_queues_mask;
     uint64_t total_pkts = 0;
     struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ];
     uint32_t nb_pkts;
     int i;
     struct vr_dpdk_ring_to_push *rtp;
-    uint16_t num_tx_rings, max_tx_rings;
+    uint16_t nb_rtp;
 
-    total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
-    total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
-    total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
-    total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
-    total_pkts += dpdk_lcore_fwd_rx(lcore, &pkts[0], &rx_queues_mask);
+    total_pkts += dpdk_lcore_fwd_rx(lcore);
+    total_pkts += dpdk_lcore_fwd_rx(lcore);
 
     /* for all TX rings to push */
     rtp = &lcore->lcore_rings_to_push[0];
-    max_tx_rings = lcore->lcore_nb_rings_to_push;
-    num_tx_rings = 0;
-    while ((num_tx_rings < max_tx_rings) &&
-              ((rtp - &lcore->lcore_rings_to_push[0]) < VR_DPDK_MAX_RINGS)) {
-        if (rtp->rtp_tx_ring == NULL) {
-            /*
-             * TODO - need ot handle decrementing lcore_nb_rings_to_push
-             * when vif is deleted.
-             */
+    nb_rtp = lcore->lcore_nb_rings_to_push;
+    while (nb_rtp > 0) {
+        nb_rtp--;
+        if (unlikely(rtp->rtp_tx_ring == NULL)) {
             rtp++;
             continue;
         }
@@ -442,12 +522,12 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
         if (likely(nb_pkts != 0)) {
             total_pkts += nb_pkts;
 
-            if (rtp->rtp_tx_queue) {
+            if (likely(rtp->rtp_tx_queue && rtp->rtp_tx_queue->txq_ops.f_tx)) {
                 /* push packets to the TX queue */
                 /* TODO: use f_tx_bulk instead */
                 for (i = 0; i < nb_pkts; i++) {
                     rtp->rtp_tx_queue->txq_ops.f_tx(
-                        rtp->rtp_tx_queue->txq_queue_h, pkts[i]);
+                        rtp->rtp_tx_queue->q_queue_h, pkts[i]);
                 }
             } else {
                 vr_dpdk_packets_vroute(((struct vr_packet*)pkts[0])->vp_if,
@@ -455,7 +535,6 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
             }
         }
         rtp++;
-        num_tx_rings++;
     }
 
     rcu_quiescent_state();
@@ -514,6 +593,47 @@ dpdk_lcore_exit()
     rte_free(lcore);
 }
 
+/* Handle an IPC command
+ * Returns -1 if if there is a stop command
+ */
+int
+vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
+{
+    uint16_t cmd = (uint16_t)rte_atomic16_read(&lcore->lcore_cmd);
+    uint32_t cmd_param = (uint32_t)rte_atomic32_read(&lcore->lcore_cmd_param);
+    int ret = 0;
+    unsigned vif_idx;
+    struct vr_dpdk_queue *rx_queue;
+    struct vr_dpdk_queue *tx_queue;
+
+    switch (cmd) {
+    case VR_DPDK_LCORE_RX_RM_CMD:
+        vif_idx = cmd_param;
+        rx_queue = &lcore->lcore_rx_queues[vif_idx];
+        if (rx_queue) {
+            /* remove the queue from the lcore */
+            dpdk_lcore_rx_queue_remove(lcore, rx_queue);
+        }
+        break;
+    case VR_DPDK_LCORE_TX_RM_CMD:
+        vif_idx = cmd_param;
+        tx_queue = &lcore->lcore_tx_queues[vif_idx];
+        if (tx_queue->q_queue_h) {
+            /* remove the queue from the lcore */
+            dpdk_lcore_tx_queue_remove(lcore, tx_queue);
+        }
+        break;
+    case VR_DPDK_LCORE_STOP_CMD:
+        ret = -1;
+        break;
+    }
+
+    rte_atomic16_set(&lcore->lcore_cmd, VR_DPDK_LCORE_NO_CMD);
+    rte_wmb();
+
+    return ret;
+}
+
 /* Forwarding lcore main loop */
 int
 dpdk_lcore_fwd_loop(struct vr_dpdk_lcore *lcore)
@@ -559,8 +679,8 @@ dpdk_lcore_fwd_loop(struct vr_dpdk_lcore *lcore)
                 usleep(VR_DPDK_SLEEP_NO_QUEUES_US);
             }
 
-            /* check for the stop flag */
-            if (unlikely(rte_atomic16_read(&lcore->lcore_stop_flag) != 0))
+            /* handle an IPC command */
+            if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
                 break;
         } /* flush TX queues */
     } /* lcore loop */
@@ -605,8 +725,8 @@ dpdk_lcore_service_loop(struct vr_dpdk_lcore *lcore, unsigned netlink_lcore_id,
             break;
 
         usleep(VR_DPDK_SLEEP_SERVICE_US);
-        /* check for the stop flag */
-        if (unlikely(rte_atomic16_read(&lcore->lcore_stop_flag) != 0))
+        /* handle an IPC command */
+        if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
             break;
     } /* lcore loop */
 
