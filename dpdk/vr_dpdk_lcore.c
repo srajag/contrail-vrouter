@@ -311,7 +311,7 @@ vr_dpdk_lcore_cmd_post(struct vr_dpdk_lcore *lcore, uint16_t cmd,
     rte_atomic32_set(&lcore->lcore_cmd_param, cmd_param);
     rte_atomic16_set(&lcore->lcore_cmd, cmd);
 
-    /* TODO: wake up the pkt0 thread? */
+    /* wake up the pkt0 thread */
     if (lcore->lcore_event_sock) {
         vr_usocket_write(lcore->lcore_event_sock, (unsigned char *)&event,
                 sizeof(event));
