@@ -497,4 +497,7 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 void dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
     struct vr_dpdk_queue *tx_queue);
 
+void
+dpdk_ring_to_push_remove(unsigned lcore_id, struct rte_ring *tx_ring);
+
 #endif /*_VR_DPDK_H_ */
