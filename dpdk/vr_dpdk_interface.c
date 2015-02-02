@@ -361,7 +361,12 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
                 " to monitor vif %u\n",
                 vif->vif_idx, vif->vif_name, monitored_vif_id);
 
-    /* check if vif exist */
+    /* Check if vif exist.
+     * We don't need vif reference in order to monitor it.
+     * We use the VIF_FLAG_MONITORED to copy in/out packet to the
+     * monitoring interface. If the monitored vif get deleted, we simply
+     * get no more packets.
+     */
     monitored_vif = __vrouter_get_interface(router, monitored_vif_id);
     if (!monitored_vif) {
         RTE_LOG(ERR, VROUTER, "\terror getting vif to monitor: vif %u does not exist\n",

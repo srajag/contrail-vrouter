@@ -85,7 +85,9 @@ dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
     RTE_VERIFY(lcore->lcore_nb_rings_to_push < VR_DPDK_MAX_RINGS);
 }
 
-/* Remove the ring from the list of rings to push */
+/* Remove the ring from the list of rings to push
+ * The function is called by the NetLink lcore only.
+ */
 void
 dpdk_ring_to_push_remove(unsigned lcore_id, struct rte_ring *tx_ring)
 {
@@ -109,7 +111,9 @@ dpdk_ring_to_push_remove(unsigned lcore_id, struct rte_ring *tx_ring)
     last_rtp->rtp_tx_queue = NULL;
 }
 
-/* Release ring TX queue */
+/* Release ring TX queue
+ * The function is called by the NetLink lcore only.
+ */
 static void
 dpdk_ring_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
 {

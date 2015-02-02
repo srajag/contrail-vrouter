@@ -82,7 +82,9 @@ vr_dpdk_lcore_least_used_get(void)
     return least_used_id;
 }
 
-/* Add a queue to a lcore */
+/* Add a queue to a lcore
+ * The moment the function is called from the NetLink lcore ATM.
+ */
 void
 dpdk_lcore_queue_add(unsigned lcore_id, struct vr_dpdk_q_slist *q_head,
                         struct vr_dpdk_queue *queue)
@@ -115,7 +117,9 @@ dpdk_lcore_queue_add(unsigned lcore_id, struct vr_dpdk_q_slist *q_head,
     }
 }
 
-/* Flush and remove TX queue from a lcore */
+/* Flush and remove TX queue from a lcore
+ * The function is called by each forwaring lcore
+ */
 static void
 dpdk_lcore_tx_queue_remove(struct vr_dpdk_lcore *lcore,
                             struct vr_dpdk_queue *tx_queue)
@@ -126,7 +130,9 @@ dpdk_lcore_tx_queue_remove(struct vr_dpdk_lcore *lcore,
     tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
 }
 
-/* Remove RX queue from a lcore */
+/* Remove RX queue from a lcore
+ * The function is called by each forwaring lcore
+ */
 static void
 dpdk_lcore_rx_queue_remove(struct vr_dpdk_lcore *lcore,
                             struct vr_dpdk_queue *rx_queue)
@@ -300,7 +306,9 @@ dpdk_lcore_cmd_wait(struct vr_dpdk_lcore *lcore)
     while (rte_atomic16_read(&lcore->lcore_cmd) != VR_DPDK_LCORE_NO_CMD);
 }
 
-/* Release RX and TX queues */
+/* Release RX and TX queues
+ * The function is called by the NetLink lcore only.
+ */
 void
 dpdk_lcore_rxtx_release(unsigned lcore_id, struct vr_interface *vif)
 {
