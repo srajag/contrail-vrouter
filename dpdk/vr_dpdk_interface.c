@@ -385,9 +385,6 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
     /* add interface to the table of KNIs */
     vr_dpdk.knis[vif->vif_idx] = vif->vif_os;
 
-    /* add interface to the table of vHosts */
-    vr_dpdk.vhosts[vif->vif_idx] = vrouter_get_interface(vif->vif_rid, vif->vif_idx);
-
     /* write-only interface */
     ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
             0, NULL,
@@ -436,12 +433,6 @@ dpdk_monitoring_if_del(struct vr_interface *vif)
 
     /* del the interface from the table of KNIs */
     vr_dpdk.knis[vif->vif_idx] = NULL;
-
-    /* del the interface from the table of vHosts */
-    if (vr_dpdk.vhosts[vif->vif_idx]) {
-        vrouter_put_interface(vr_dpdk.vhosts[vif->vif_idx]);
-        vr_dpdk.vhosts[vif->vif_idx] = NULL;
-    }
 
     /* release KNI */
     return vr_dpdk_knidev_release(vif);
