@@ -259,6 +259,30 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     return rx_queue;
 }
 
+/* Release KNI TX queue */
+static void
+dpdk_kni_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+{
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
+    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif->vif_idx];
+    struct vr_dpdk_queue_params *tx_queue_params
+                        = &lcore->lcore_tx_queue_params[vif->vif_idx];
+
+    /* flush and free the queue */
+    if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
+        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u ring\n", lcore_id);
+    }
+
+    /* reset the queue */
+    tx_queue_params->qp_release_op = NULL;
+    tx_queue->q_queue_h = NULL;
+    rte_wmb();
+
+    memset(&tx_queue->txq_ops, 0, sizeof(tx_queue->txq_ops));
+    vrouter_put_interface(tx_queue->q_vif);
+    tx_queue->q_vif = NULL;
+}
+
 /* Init KNI TX queue */
 struct vr_dpdk_queue *
 vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
@@ -269,6 +293,8 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     uint8_t port_id = 0;
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue_params *tx_queue_params
+                    = &lcore->lcore_tx_queue_params[vif_idx];
 
     if (vif->vif_type == VIF_TYPE_HOST) {
         port_id = (((struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os))->
@@ -281,16 +307,19 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     tx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* create the queue */
-    struct dpdk_knidev_writer_params tx_queue_params = {
+    struct dpdk_knidev_writer_params writer_params = {
         .kni = vif->vif_os,
         .tx_burst_sz = VR_DPDK_KNI_TX_BURST_SZ,
     };
-    tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&tx_queue_params, socket_id);
+    tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params, socket_id);
     if (tx_queue->q_queue_h == NULL) {
         RTE_LOG(ERR, VROUTER, "\terror creating KNI device %s TX queue at eth device %"
             PRIu8 "\n", vif->vif_name, port_id);
         return NULL;
     }
+
+    /* store queue params */
+    tx_queue_params->qp_release_op = &dpdk_kni_tx_queue_release;
 
     return tx_queue;
 }
