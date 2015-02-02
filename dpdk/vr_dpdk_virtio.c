@@ -145,6 +145,39 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
 }
 
 /*
+ * dpdk_virtio_tx_queue_release - releases a virtio TX queue.
+ *
+ * Returns nothing.
+ */
+static void
+dpdk_virtio_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+{
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
+    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif->vif_idx];
+    struct vr_dpdk_queue_params *tx_queue_params
+                        = &lcore->lcore_tx_queue_params[vif->vif_idx];
+
+    /* remove the ring from the list of rings to push */
+    dpdk_ring_to_push_remove(tx_queue_params->qp_ring.host_lcore_id,
+            tx_queue_params->qp_ring.ring_p);
+
+    /* flush and free the queue */
+    if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
+        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u ring\n", lcore_id);
+    }
+
+    /* reset the queue */
+    tx_queue_params->qp_release_op = NULL;
+    tx_queue->q_queue_h = NULL;
+    rte_wmb();
+
+    memset(&tx_queue_params->qp_ring, 0, sizeof(tx_queue_params->qp_ring));
+    memset(&tx_queue->txq_ops, 0, sizeof(tx_queue->txq_ops));
+    vrouter_put_interface(tx_queue->q_vif);
+    tx_queue->q_vif = NULL;
+}
+
+/*
  * vr_dpdk_virtio_tx_queue_init - initializes a virtio TX queue.
  *
  * Returns a pointer to the TX queue on success, NULL otherwise.
@@ -157,6 +190,8 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     unsigned int vif_idx = vif->vif_idx;
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue_params *tx_queue_params
+                = &lcore->lcore_tx_queue_params[vif_idx];
 
     if (queue_id >= vr_dpdk_virtio_ntxqs(vif)) {
         return NULL;
@@ -171,6 +206,9 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_tx_mbuf_count = 0;
     tx_queue->q_queue_h = (void *) &vr_dpdk_virtio_txqs[vif_idx][queue_id];
     tx_queue->q_vif = vif;
+
+    /* store queue params */
+    tx_queue_params->qp_release_op = &dpdk_virtio_tx_queue_release;
 
     return tx_queue;
 }
