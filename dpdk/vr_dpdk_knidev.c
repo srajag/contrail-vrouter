@@ -199,6 +199,25 @@ struct rte_port_out_ops dpdk_knidev_writer_ops = {
     .f_flush = dpdk_knidev_writer_flush,
 };
 
+/* Release KNI RX queue */
+static void
+dpdk_kni_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+{
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
+    struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif->vif_idx];
+    struct vr_dpdk_queue_params *rx_queue_params
+                        = &lcore->lcore_rx_queue_params[vif->vif_idx];
+
+    /* reset the queue */
+    rx_queue_params->qp_release_op = NULL;
+    rx_queue->q_queue_h = NULL;
+    rte_wmb();
+
+    memset(&rx_queue->rxq_ops, 0, sizeof(rx_queue->rxq_ops));
+    vrouter_put_interface(rx_queue->q_vif);
+    rx_queue->q_vif = NULL;
+}
+
 /* Init KNI RX queue */
 struct vr_dpdk_queue *
 vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
@@ -209,6 +228,8 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     uint8_t port_id = 0;
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
+    struct vr_dpdk_queue_params *rx_queue_params
+                    = &lcore->lcore_rx_queue_params[vif_idx];
 
     if (vif->vif_type == VIF_TYPE_HOST) {
         port_id = (((struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os))->
@@ -222,15 +243,18 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     rx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* create the queue */
-    struct dpdk_knidev_reader_params rx_queue_params = {
+    struct dpdk_knidev_reader_params reader_params = {
         .kni = vif->vif_os,
     };
-    rx_queue->q_queue_h = rx_queue->rxq_ops.f_create(&rx_queue_params, socket_id);
+    rx_queue->q_queue_h = rx_queue->rxq_ops.f_create(&reader_params, socket_id);
     if (rx_queue->q_queue_h == NULL) {
         RTE_LOG(ERR, VROUTER, "\terror creating KNI device %s RX queue at eth device %"
             PRIu8 "\n", vif->vif_name, port_id);
         return NULL;
     }
+
+    /* store queue params */
+    rx_queue_params->qp_release_op = &dpdk_kni_rx_queue_release;
 
     return rx_queue;
 }
