@@ -502,7 +502,12 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
     struct vr_dpdk_ring_to_push *rtp;
     uint16_t nb_rtp;
 
-    total_pkts += dpdk_lcore_fwd_rx(lcore);
+    /* TODO: skip RX queues with no packets to read
+     * RX operation for KNIs is quite expensive. We used rx_queue_mask to
+     * mask out the ports with no packets to read (i.e. read them less
+     * frequently). We need to implement the same functionality for the
+     * list of RX queues now.
+     */
     total_pkts += dpdk_lcore_fwd_rx(lcore);
 
     /* for all TX rings to push */
