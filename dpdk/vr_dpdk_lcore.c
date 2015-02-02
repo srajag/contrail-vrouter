@@ -123,7 +123,6 @@ dpdk_lcore_tx_queue_remove(struct vr_dpdk_lcore *lcore,
     tx_queue->txq_ops.f_tx = NULL;
     SLIST_REMOVE(&lcore->lcore_tx_head, tx_queue, vr_dpdk_queue,
         q_next);
-    rte_wmb();
     tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
 }
 
@@ -138,7 +137,6 @@ dpdk_lcore_rx_queue_remove(struct vr_dpdk_lcore *lcore,
 
     /* decrease the number of RX queues */
     lcore->lcore_nb_rx_queues--;
-    rte_wmb();
     RTE_VERIFY(lcore->lcore_nb_rx_queues < VR_MAX_INTERFACES);
 }
 
