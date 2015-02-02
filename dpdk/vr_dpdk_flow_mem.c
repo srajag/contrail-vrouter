@@ -25,9 +25,9 @@
 
 struct vr_hugepage_info {
     char *mnt;
-    unsigned int page_size;
-    unsigned int num_pages;
-    unsigned int size;
+    size_t page_size;
+    size_t size;
+    uint32_t num_pages;
 } vr_hugepage_md[HPI_MAX];
 
 extern struct vr_btable *vr_flow_table;
