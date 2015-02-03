@@ -415,7 +415,8 @@ dpdk_monitoring_if_del(struct vr_interface *vif)
                 vif->vif_idx, monitored_vif_id);
 
     /* check if vif exist */
-    monitored_vif = __vrouter_get_interface(vif->vif_rid, monitored_vif_id);
+    monitored_vif = __vrouter_get_interface(vrouter_get(vif->vif_rid),
+                                                    monitored_vif_id);
     if (!monitored_vif) {
         RTE_LOG(ERR, VROUTER, "\terror getting vif to monitor: vif %u does not exist\n",
                 monitored_vif_id);

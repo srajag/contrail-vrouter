@@ -249,12 +249,12 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     tx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* create the queue */
-    struct rte_port_ethdev_writer_params tx_queue_params = {
+    struct rte_port_ethdev_writer_params writer_params = {
         .port_id = port_id,
         .queue_id = tx_queue_id,
         .tx_burst_sz = VR_DPDK_ETH_TX_BURST_SZ,
     };
-    tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&tx_queue_params, socket_id);
+    tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params, socket_id);
     if (tx_queue->q_queue_h == NULL) {
         RTE_LOG(ERR, VROUTER, "\terror creating eth device %" PRIu8
                 " TX queue %" PRIu16 "\n", port_id, tx_queue_id);
