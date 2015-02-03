@@ -72,17 +72,14 @@ dpdk_virtio_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     struct vr_dpdk_queue_params *rx_queue_params
                         = &lcore->lcore_rx_queue_params[vif->vif_idx];
 
-    rx_queue->rxq_ops.f_rx = NULL;
-
     /* remove the ring from the list of rings to push */
     dpdk_ring_to_push_remove(rx_queue_params->qp_ring.host_lcore_id,
             rx_queue_params->qp_ring.ring_p);
 
-    rte_wmb();
-
     /* free the queue */
     if (rx_queue->rxq_ops.f_free(rx_queue->q_queue_h)) {
-        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u ring\n", lcore_id);
+        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u virtio RX queue\n",
+                    lcore_id);
     }
 
     /* reset the queue */
@@ -162,16 +159,16 @@ dpdk_virtio_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
                         = &lcore->lcore_tx_queue_params[vif->vif_idx];
 
     tx_queue->txq_ops.f_tx = NULL;
+    rte_wmb();
 
     /* remove the ring from the list of rings to push */
     dpdk_ring_to_push_remove(tx_queue_params->qp_ring.host_lcore_id,
             tx_queue_params->qp_ring.ring_p);
 
-    rte_wmb();
-
     /* flush and free the queue */
     if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
-        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u ring\n", lcore_id);
+        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u virtio TX queue\n",
+                    lcore_id);
     }
 
     /* reset the queue */

@@ -123,6 +123,7 @@ dpdk_ring_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
                         = &lcore->lcore_tx_queue_params[vif->vif_idx];
 
     tx_queue->txq_ops.f_tx = NULL;
+    rte_wmb();
 
     /* remove the ring from the list of rings to push */
     dpdk_ring_to_push_remove(tx_queue_params->qp_ring.host_lcore_id,
@@ -131,8 +132,6 @@ dpdk_ring_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     /* deallocate the ring */
     dpdk_ring_free(tx_queue_params->qp_ring.host_lcore_id,
                             tx_queue_params->qp_ring.ring_p);
-
-    rte_wmb();
 
     /* flush and free the queue */
     if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
