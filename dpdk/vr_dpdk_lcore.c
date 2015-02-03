@@ -92,6 +92,7 @@ dpdk_lcore_queue_add(unsigned lcore_id, struct vr_dpdk_q_slist *q_head,
     unsigned vif_idx = queue->q_vif->vif_idx;
     struct vr_dpdk_queue *prev_queue;
     struct vr_dpdk_queue *cur_queue;
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
 
     /* write barrier */
     rte_wmb();
@@ -115,6 +116,10 @@ dpdk_lcore_queue_add(unsigned lcore_id, struct vr_dpdk_q_slist *q_head,
         else
             SLIST_INSERT_AFTER(prev_queue, queue, q_next);
     }
+
+    /* increase the number of RX queues */
+    if (q_head == &lcore->lcore_rx_head)
+        lcore->lcore_nb_rx_queues++;
 }
 
 /* Flush and remove TX queue from a lcore
