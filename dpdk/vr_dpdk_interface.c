@@ -340,6 +340,10 @@ static void
 dpdk_monitoring_stop(struct vr_interface *monitored_vif,
     struct vr_interface *monitoring_vif)
 {
+    /* check if the monitored vif was reused */
+    if (vr_dpdk.monitorings[monitored_vif->vif_idx] != monitoring_vif->vif_idx)
+        return;
+
     /* clear vif flag */
     monitored_vif->vif_flags &= ~((unsigned int)VIF_FLAG_MONITORED);
     rte_wmb();
