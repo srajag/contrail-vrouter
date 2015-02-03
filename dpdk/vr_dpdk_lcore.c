@@ -137,19 +137,12 @@ static void
 dpdk_lcore_rx_queue_remove(struct vr_dpdk_lcore *lcore,
                             struct vr_dpdk_queue *rx_queue)
 {
-    struct vr_dpdk_queue *queue;
     rx_queue->rxq_ops.f_rx = NULL;
+    SLIST_REMOVE(&lcore->lcore_rx_head, rx_queue, vr_dpdk_queue,
+        q_next);
 
-    SLIST_FOREACH(queue, &lcore->lcore_rx_head, q_next) {
-        if (queue == rx_queue) {
-            SLIST_REMOVE(&lcore->lcore_rx_head, queue, vr_dpdk_queue, q_next);
-
-            /* decrease the number of RX queues */
-            lcore->lcore_nb_rx_queues--;
-            break;
-        }
-    }
-
+    /* decrease the number of RX queues */
+    lcore->lcore_nb_rx_queues--;
     RTE_VERIFY(lcore->lcore_nb_rx_queues < VR_MAX_INTERFACES);
 }
 
