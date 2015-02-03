@@ -171,14 +171,19 @@ dpdk_ethdev_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     struct vr_dpdk_queue_params *rx_queue_params
                         = &lcore->lcore_rx_queue_params[vif->vif_idx];
 
-    /* reset the queue */
-    rx_queue_params->qp_release_op = NULL;
-    rx_queue->q_queue_h = NULL;
+    rx_queue->rxq_ops.f_rx = NULL;
+
+    /* free the queue */
+    if (rx_queue->rxq_ops.f_free(rx_queue->q_queue_h)) {
+        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u ring\n", lcore_id);
+    }
+
     rte_wmb();
 
-    memset(&rx_queue->rxq_ops, 0, sizeof(rx_queue->rxq_ops));
+    /* reset the queue */
     vrouter_put_interface(rx_queue->q_vif);
-    rx_queue->q_vif = NULL;
+    memset(rx_queue, 0, sizeof(*rx_queue));
+    memset(rx_queue_params, 0, sizeof(*rx_queue_params));
 }
 
 /* Init eth RX queue */
@@ -233,19 +238,19 @@ dpdk_ethdev_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     struct vr_dpdk_queue_params *tx_queue_params
                         = &lcore->lcore_tx_queue_params[vif->vif_idx];
 
+    tx_queue->txq_ops.f_tx = NULL;
+
     /* flush and free the queue */
     if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
         RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u ring\n", lcore_id);
     }
 
-    /* reset the queue */
-    tx_queue_params->qp_release_op = NULL;
-    tx_queue->q_queue_h = NULL;
     rte_wmb();
 
-    memset(&tx_queue->txq_ops, 0, sizeof(tx_queue->txq_ops));
+    /* reset the queue */
     vrouter_put_interface(tx_queue->q_vif);
-    tx_queue->q_vif = NULL;
+    memset(tx_queue, 0, sizeof(*tx_queue));
+    memset(tx_queue_params, 0, sizeof(*tx_queue_params));
 }
 
 /* Init eth TX queue */

@@ -72,19 +72,23 @@ dpdk_virtio_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     struct vr_dpdk_queue_params *rx_queue_params
                         = &lcore->lcore_rx_queue_params[vif->vif_idx];
 
+    rx_queue->rxq_ops.f_rx = NULL;
+
     /* remove the ring from the list of rings to push */
     dpdk_ring_to_push_remove(rx_queue_params->qp_ring.host_lcore_id,
             rx_queue_params->qp_ring.ring_p);
 
-    /* reset the queue */
-    rx_queue_params->qp_release_op = NULL;
-    rx_queue->q_queue_h = NULL;
     rte_wmb();
 
-    memset(&rx_queue_params->qp_ring, 0, sizeof(rx_queue_params->qp_ring));
-    memset(&rx_queue->txq_ops, 0, sizeof(rx_queue->txq_ops));
+    /* free the queue */
+    if (rx_queue->rxq_ops.f_free(rx_queue->q_queue_h)) {
+        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u ring\n", lcore_id);
+    }
+
+    /* reset the queue */
     vrouter_put_interface(rx_queue->q_vif);
-    rx_queue->q_vif = NULL;
+    memset(rx_queue, 0, sizeof(*rx_queue));
+    memset(rx_queue_params, 0, sizeof(*rx_queue_params));
 }
 
 /*
@@ -157,9 +161,13 @@ dpdk_virtio_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     struct vr_dpdk_queue_params *tx_queue_params
                         = &lcore->lcore_tx_queue_params[vif->vif_idx];
 
+    tx_queue->txq_ops.f_tx = NULL;
+
     /* remove the ring from the list of rings to push */
     dpdk_ring_to_push_remove(tx_queue_params->qp_ring.host_lcore_id,
             tx_queue_params->qp_ring.ring_p);
+
+    rte_wmb();
 
     /* flush and free the queue */
     if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
@@ -167,14 +175,9 @@ dpdk_virtio_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     }
 
     /* reset the queue */
-    tx_queue_params->qp_release_op = NULL;
-    tx_queue->q_queue_h = NULL;
-    rte_wmb();
-
-    memset(&tx_queue_params->qp_ring, 0, sizeof(tx_queue_params->qp_ring));
-    memset(&tx_queue->txq_ops, 0, sizeof(tx_queue->txq_ops));
     vrouter_put_interface(tx_queue->q_vif);
-    tx_queue->q_vif = NULL;
+    memset(tx_queue, 0, sizeof(*tx_queue));
+    memset(tx_queue_params, 0, sizeof(*tx_queue_params));
 }
 
 /*
