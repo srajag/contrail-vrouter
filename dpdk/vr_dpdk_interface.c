@@ -315,11 +315,44 @@ dpdk_vhost_if_add(struct vr_interface *vif)
 static int
 dpdk_vhost_if_del(struct vr_interface *vif)
 {
-    RTE_LOG(INFO, VROUTER, "Deleting vif %u KNI device\n",
-                vif->vif_idx);
+    uint8_t port_id;
+    struct ether_addr mac_addr;
+    struct rte_pci_addr pci_address;
 
-    /* TODO: not implemented */
-    return 0;
+    /* check if KNI exists */
+    if (vr_dpdk.knis[vif->vif_idx] == NULL) {
+        RTE_LOG(ERR, VROUTER, "\terror deleting KNI device %u: "
+                    "device does not exist\n", vif->vif_idx);
+        return -EEXIST;
+    }
+
+    if (vif->vif_flags & VIF_FLAG_PMD) {
+        port_id = vif->vif_os_idx;
+    }
+    else {
+        memset(&pci_address, 0, sizeof(pci_address));
+        dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
+        port_id = dpdk_find_port_id_by_pci_addr(&pci_address);
+    }
+
+    /* get interface MAC address */
+    memset(&mac_addr, 0, sizeof(mac_addr));
+    rte_eth_macaddr_get(port_id, &mac_addr);
+
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u KNI device %s at eth device %" PRIu8
+                " MAC " MAC_FORMAT "\n", vif->vif_idx, vif->vif_name, port_id,
+                MAC_VALUE(mac_addr.addr_bytes));
+
+    vr_dpdk_lcore_if_unschedule(vif);
+
+    /* del the interface from the table of vHosts */
+    vr_dpdk.vhosts[vif->vif_idx] = NULL;
+
+    /* del the interface from the table of KNIs */
+    vr_dpdk.knis[vif->vif_idx] = NULL;
+
+    /* release KNI */
+    return vr_dpdk_knidev_release(vif);
 }
 
 /* Start interface monitoring */
