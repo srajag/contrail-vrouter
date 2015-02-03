@@ -621,7 +621,7 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
     case VR_DPDK_LCORE_RX_RM_CMD:
         vif_idx = cmd_param;
         rx_queue = &lcore->lcore_rx_queues[vif_idx];
-        if (rx_queue) {
+        if (rx_queue->q_queue_h) {
             /* remove the queue from the lcore */
             dpdk_lcore_rx_queue_remove(lcore, rx_queue);
         }
