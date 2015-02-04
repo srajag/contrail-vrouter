@@ -82,10 +82,10 @@ dpdk_virtual_if_del(struct vr_interface *vif)
 
     ret = vr_netlink_uvhost_vif_del(vif->vif_idx);
 
+    vr_dpdk_lcore_if_unschedule(vif);
+
     /*
-     * TODO - forwarding lcores need to be informed and they need to ack the
-     * vif removal. Also, user space vhost thread need to ack the deletion
-     * of the vif.
+     * TODO - User space vhost thread need to ack the deletion of the vif.
      */
 
     return ret;
