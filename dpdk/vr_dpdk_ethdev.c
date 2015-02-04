@@ -510,3 +510,13 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
 
     return 0;
 }
+
+/* Release ethernet device */
+int
+vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *ethdev)
+{
+    /* TODO */
+    ethdev->ethdev_ptr = NULL;
+
+    return 0;
+}

@@ -165,7 +165,6 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
     return ret;
 }
 
-
 /* Add fabric interface */
 static int
 dpdk_fabric_if_add(struct vr_interface *vif)
@@ -255,10 +254,56 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 static int
 dpdk_fabric_if_del(struct vr_interface *vif)
 {
-    RTE_LOG(INFO, VROUTER, "Deleting vif %u eth device\n",
-        vif->vif_idx);
+    int ret;
+    uint8_t port_id;
+    struct rte_pci_addr pci_address;
+    struct vr_dpdk_ethdev *ethdev;
+    struct ether_addr mac_addr;
 
-    /* TODO: not implemented */
+    memset(&pci_address, 0, sizeof(pci_address));
+    if (vif->vif_flags & VIF_FLAG_PMD) {
+        port_id = vif->vif_os_idx;
+    }
+    else {
+        dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
+        port_id = dpdk_find_port_id_by_pci_addr(&pci_address);
+        if (port_id == VR_DPDK_INVALID_PORT_ID) {
+            RTE_LOG(ERR, VROUTER, "Invalid PCI address %d:%d:%d:%d\n",
+                    pci_address.domain, pci_address.bus,
+                    pci_address.devid, pci_address.function);
+            return -ENOENT;
+        }
+    }
+
+    memset(&mac_addr, 0, sizeof(mac_addr));
+    rte_eth_macaddr_get(port_id, &mac_addr);
+    if (vif->vif_flags & VIF_FLAG_PMD) {
+        dpdk_find_pci_addr_by_port(&pci_address, port_id);
+    }
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u eth device %" PRIu8 " PCI %d:%d.%d"
+        " MAC " MAC_FORMAT "\n",
+        vif->vif_idx, port_id, pci_address.bus, pci_address.devid, pci_address.function,
+        MAC_VALUE(mac_addr.addr_bytes));
+
+    ethdev = &vr_dpdk.ethdevs[port_id];
+    if (ethdev->ethdev_ptr == NULL) {
+        RTE_LOG(ERR, VROUTER, "\terror deleting eth dev %s: already removed\n",
+                vif->vif_name);
+        return -EEXIST;
+    }
+    ethdev->ethdev_port_id = port_id;
+
+    /* unschedule RX/TX queues */
+    vr_dpdk_lcore_if_unschedule(vif);
+
+    rte_eth_dev_stop(port_id);
+
+    /* release eth device */
+    /* TODO vr_dpdk_ethdev_release() */
+    ret = vr_dpdk_ethdev_release(ethdev);
+    if (ret != 0)
+        return ret;
+
     return 0;
 }
 

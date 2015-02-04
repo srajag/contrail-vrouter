@@ -374,6 +374,8 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned tx_queue_id);
 /* Init ethernet device */
 int vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *);
+/* Release ethernet device */
+int vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *);
 /* Get free queue ID */
 uint16_t vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif);
 /* Add hardware filter */
