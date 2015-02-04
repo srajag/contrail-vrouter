@@ -259,44 +259,21 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 static int
 dpdk_fabric_if_del(struct vr_interface *vif)
 {
-    int ret;
     uint8_t port_id;
-    struct rte_pci_addr pci_address;
-    struct vr_dpdk_ethdev *ethdev;
-    struct ether_addr mac_addr;
 
-    memset(&pci_address, 0, sizeof(pci_address));
-    if (vif->vif_flags & VIF_FLAG_PMD) {
-        port_id = vif->vif_os_idx;
-    }
-    else {
-        dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
-        port_id = dpdk_find_port_id_by_pci_addr(&pci_address);
-        if (port_id == VR_DPDK_INVALID_PORT_ID) {
-            RTE_LOG(ERR, VROUTER, "Invalid PCI address %d:%d:%d:%d\n",
-                    pci_address.domain, pci_address.bus,
-                    pci_address.devid, pci_address.function);
-            return -ENOENT;
-        }
-    }
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u\n", vif->vif_idx);
 
-    memset(&mac_addr, 0, sizeof(mac_addr));
-    rte_eth_macaddr_get(port_id, &mac_addr);
-    if (vif->vif_flags & VIF_FLAG_PMD) {
-        dpdk_find_pci_addr_by_port(&pci_address, port_id);
-    }
-    RTE_LOG(INFO, VROUTER, "Deleting vif %u eth device %" PRIu8 " PCI %d:%d.%d"
-        " MAC " MAC_FORMAT "\n",
-        vif->vif_idx, port_id, pci_address.bus, pci_address.devid, pci_address.function,
-        MAC_VALUE(mac_addr.addr_bytes));
-
-    ethdev = &vr_dpdk.ethdevs[port_id];
-    if (ethdev->ethdev_ptr == NULL) {
+    /* 
+     * If dpdk_fabric_if_add() failed before dpdk_vif_attach_ethdev,
+     * then vif->vif_os will be NULL.
+     */
+    if (vif->vif_os == NULL) {
         RTE_LOG(ERR, VROUTER, "\terror deleting eth dev %s: already removed\n",
                 vif->vif_name);
         return -EEXIST;
     }
-    ethdev->ethdev_port_id = port_id;
+
+    port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id);
 
     /* unschedule RX/TX queues */
     vr_dpdk_lcore_if_unschedule(vif);
@@ -305,11 +282,7 @@ dpdk_fabric_if_del(struct vr_interface *vif)
 
     /* release eth device */
     /* TODO vr_dpdk_ethdev_release() */
-    ret = vr_dpdk_ethdev_release(ethdev);
-    if (ret != 0)
-        return ret;
-
-    return 0;
+    return vr_dpdk_ethdev_release(vif->vif_os);
 }
 
 /* Add vhost interface */
@@ -365,9 +338,8 @@ dpdk_vhost_if_add(struct vr_interface *vif)
 static int
 dpdk_vhost_if_del(struct vr_interface *vif)
 {
-    uint8_t port_id;
-    struct ether_addr mac_addr;
-    struct rte_pci_addr pci_address;
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u KNI device %s\n",
+                vif->vif_idx, vif->vif_name);
 
     /* check if KNI exists */
     if (vr_dpdk.knis[vif->vif_idx] == NULL) {
@@ -375,23 +347,6 @@ dpdk_vhost_if_del(struct vr_interface *vif)
                     "device does not exist\n", vif->vif_idx);
         return -EEXIST;
     }
-
-    if (vif->vif_flags & VIF_FLAG_PMD) {
-        port_id = vif->vif_os_idx;
-    }
-    else {
-        memset(&pci_address, 0, sizeof(pci_address));
-        dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
-        port_id = dpdk_find_port_id_by_pci_addr(&pci_address);
-    }
-
-    /* get interface MAC address */
-    memset(&mac_addr, 0, sizeof(mac_addr));
-    rte_eth_macaddr_get(port_id, &mac_addr);
-
-    RTE_LOG(INFO, VROUTER, "Deleting vif %u KNI device %s at eth device %" PRIu8
-                " MAC " MAC_FORMAT "\n", vif->vif_idx, vif->vif_name, port_id,
-                MAC_VALUE(mac_addr.addr_bytes));
 
     vr_dpdk_lcore_if_unschedule(vif);
 
