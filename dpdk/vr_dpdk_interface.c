@@ -55,7 +55,12 @@ dpdk_virtual_if_add(struct vr_interface *vif)
                                     nrxqs, ntxqs);
     if (ret) {
         /*
-         * TODO - remove queues from lcores.
+         * When something goes wrong, vr_netlink_uvhost_vif_add() returns
+         * non-zero value. Then we return this value here. It is handled by
+         * dp-core and dpdk_virtual_if_del() is called, so there is no need
+         * to do it manually here.
+         *
+         * Check dp-core/vf_interface.c:eth_drv_add() for reference.
          */
         return ret;
     }
