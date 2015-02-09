@@ -122,10 +122,8 @@ dpdk_ring_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     struct vr_dpdk_queue_params *tx_queue_params
                         = &lcore->lcore_tx_queue_params[vif->vif_idx];
 
-    /* flush and free the queue */
-    if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
-        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u ring\n", lcore_id);
-    }
+    tx_queue->txq_ops.f_tx = NULL;
+    rte_wmb();
 
     /* remove the ring from the list of rings to push */
     dpdk_ring_to_push_remove(tx_queue_params->qp_ring.host_lcore_id,
@@ -135,15 +133,15 @@ dpdk_ring_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     dpdk_ring_free(tx_queue_params->qp_ring.host_lcore_id,
                             tx_queue_params->qp_ring.ring_p);
 
-    /* reset the queue */
-    tx_queue_params->qp_release_op = NULL;
-    tx_queue->q_queue_h = NULL;
-    rte_wmb();
+    /* flush and free the queue */
+    if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
+        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u ring\n", lcore_id);
+    }
 
-    memset(&tx_queue_params->qp_ring, 0, sizeof(tx_queue_params->qp_ring));
-    memset(&tx_queue->txq_ops, 0, sizeof(tx_queue->txq_ops));
+    /* reset the queue */
     vrouter_put_interface(tx_queue->q_vif);
-    tx_queue->q_vif = NULL;
+    memset(tx_queue, 0, sizeof(*tx_queue));
+    memset(tx_queue_params, 0, sizeof(*tx_queue_params));
 }
 
 /* Init ring TX queue */

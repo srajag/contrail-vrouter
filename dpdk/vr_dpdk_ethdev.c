@@ -162,6 +162,27 @@ vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif)
     return VR_DPDK_INVALID_QUEUE_ID;
 }
 
+/* Release ethdev RX queue */
+static void
+dpdk_ethdev_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+{
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
+    struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif->vif_idx];
+    struct vr_dpdk_queue_params *rx_queue_params
+                        = &lcore->lcore_rx_queue_params[vif->vif_idx];
+
+    /* free the queue */
+    if (rx_queue->rxq_ops.f_free(rx_queue->q_queue_h)) {
+        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u eth device RX queue\n",
+                    lcore_id);
+    }
+
+    /* reset the queue */
+    vrouter_put_interface(rx_queue->q_vif);
+    memset(rx_queue, 0, sizeof(*rx_queue));
+    memset(rx_queue_params, 0, sizeof(*rx_queue_params));
+}
+
 /* Init eth RX queue */
 struct vr_dpdk_queue *
 vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
@@ -175,6 +196,8 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     struct vr_dpdk_ethdev *ethdev;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
+    struct vr_dpdk_queue_params *rx_queue_params
+                    = &lcore->lcore_rx_queue_params[vif_idx];
 
     ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
     port_id = ethdev->ethdev_port_id;
@@ -186,16 +209,19 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     rx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* create the queue */
-    struct rte_port_ethdev_reader_params rx_queue_params = {
+    struct rte_port_ethdev_reader_params reader_params = {
         .port_id = port_id,
         .queue_id = rx_queue_id,
     };
-    rx_queue->q_queue_h = rx_queue->rxq_ops.f_create(&rx_queue_params, socket_id);
+    rx_queue->q_queue_h = rx_queue->rxq_ops.f_create(&reader_params, socket_id);
     if (rx_queue->q_queue_h == NULL) {
         RTE_LOG(ERR, VROUTER, "\terror creating eth device %" PRIu8
                 " RX queue %" PRIu16 "\n", port_id, rx_queue_id);
         return NULL;
     }
+
+    /* store queue params */
+    rx_queue_params->qp_release_op = &dpdk_ethdev_rx_queue_release;
 
     return rx_queue;
 }
@@ -209,19 +235,19 @@ dpdk_ethdev_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     struct vr_dpdk_queue_params *tx_queue_params
                         = &lcore->lcore_tx_queue_params[vif->vif_idx];
 
+    tx_queue->txq_ops.f_tx = NULL;
+    rte_wmb();
+
     /* flush and free the queue */
     if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
-        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u ring\n", lcore_id);
+        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u eth device TX queue\n",
+                    lcore_id);
     }
 
     /* reset the queue */
-    tx_queue_params->qp_release_op = NULL;
-    tx_queue->q_queue_h = NULL;
-    rte_wmb();
-
-    memset(&tx_queue->txq_ops, 0, sizeof(tx_queue->txq_ops));
     vrouter_put_interface(tx_queue->q_vif);
-    tx_queue->q_vif = NULL;
+    memset(tx_queue, 0, sizeof(*tx_queue));
+    memset(tx_queue_params, 0, sizeof(*tx_queue_params));
 }
 
 /* Init eth TX queue */
@@ -481,6 +507,17 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
 #if VR_DPDK_ENABLE_PROMISC
     rte_eth_promiscuous_enable(port_id);
 #endif
+
+    return 0;
+}
+
+/* Release ethernet device */
+int
+vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *ethdev)
+{
+    ethdev->ethdev_ptr = NULL;
+
+    dpdk_ethdev_mempools_free(ethdev);
 
     return 0;
 }

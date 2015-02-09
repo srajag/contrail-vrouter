@@ -55,7 +55,12 @@ dpdk_virtual_if_add(struct vr_interface *vif)
                                     nrxqs, ntxqs);
     if (ret) {
         /*
-         * TODO - remove queues from lcores.
+         * When something goes wrong, vr_netlink_uvhost_vif_add() returns
+         * non-zero value. Then we return this value here. It is handled by
+         * dp-core and dpdk_virtual_if_del() is called, so there is no need
+         * to do it manually here.
+         *
+         * Check dp-core/vf_interface.c:eth_drv_add() for reference.
          */
         return ret;
     }
@@ -77,10 +82,10 @@ dpdk_virtual_if_del(struct vr_interface *vif)
 
     ret = vr_netlink_uvhost_vif_del(vif->vif_idx);
 
+    vr_dpdk_lcore_if_unschedule(vif);
+
     /*
-     * TODO - forwarding lcores need to be informed and they need to ack the
-     * vif removal. Also, user space vhost thread need to ack the deletion
-     * of the vif.
+     * TODO - User space vhost thread need to ack the deletion of the vif.
      */
 
     return ret;
@@ -164,7 +169,6 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
 
     return ret;
 }
-
 
 /* Add fabric interface */
 static int
@@ -255,11 +259,29 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 static int
 dpdk_fabric_if_del(struct vr_interface *vif)
 {
-    RTE_LOG(INFO, VROUTER, "Deleting vif %u eth device\n",
-        vif->vif_idx);
+    uint8_t port_id;
 
-    /* TODO: not implemented */
-    return 0;
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u\n", vif->vif_idx);
+
+    /* 
+     * If dpdk_fabric_if_add() failed before dpdk_vif_attach_ethdev,
+     * then vif->vif_os will be NULL.
+     */
+    if (vif->vif_os == NULL) {
+        RTE_LOG(ERR, VROUTER, "\terror deleting eth dev %s: already removed\n",
+                vif->vif_name);
+        return -EEXIST;
+    }
+
+    port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id);
+
+    /* unschedule RX/TX queues */
+    vr_dpdk_lcore_if_unschedule(vif);
+
+    rte_eth_dev_stop(port_id);
+
+    /* release eth device */
+    return vr_dpdk_ethdev_release(vif->vif_os);
 }
 
 /* Add vhost interface */
@@ -315,11 +337,26 @@ dpdk_vhost_if_add(struct vr_interface *vif)
 static int
 dpdk_vhost_if_del(struct vr_interface *vif)
 {
-    RTE_LOG(INFO, VROUTER, "Deleting vif %u KNI device\n",
-                vif->vif_idx);
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u KNI device %s\n",
+                vif->vif_idx, vif->vif_name);
 
-    /* TODO: not implemented */
-    return 0;
+    /* check if KNI exists */
+    if (vr_dpdk.knis[vif->vif_idx] == NULL) {
+        RTE_LOG(ERR, VROUTER, "\terror deleting KNI device %u: "
+                    "device does not exist\n", vif->vif_idx);
+        return -EEXIST;
+    }
+
+    vr_dpdk_lcore_if_unschedule(vif);
+
+    /* del the interface from the table of vHosts */
+    vr_dpdk.vhosts[vif->vif_idx] = NULL;
+
+    /* del the interface from the table of KNIs */
+    vr_dpdk.knis[vif->vif_idx] = NULL;
+
+    /* release KNI */
+    return vr_dpdk_knidev_release(vif);
 }
 
 /* Start interface monitoring */

@@ -60,6 +60,29 @@ vr_dpdk_virtio_ntxqs(struct vr_interface *vif)
 }
 
 /*
+ * dpdk_virtio_rx_queue_release - releases a virtio RX queue.
+ *
+ * Returns nothing.
+ */
+static void
+dpdk_virtio_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+{
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
+    struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif->vif_idx];
+    struct vr_dpdk_queue_params *rx_queue_params
+                        = &lcore->lcore_rx_queue_params[vif->vif_idx];
+
+    /* remove the ring from the list of rings to push */
+    dpdk_ring_to_push_remove(rx_queue_params->qp_ring.host_lcore_id,
+            rx_queue_params->qp_ring.ring_p);
+
+    /* reset the queue */
+    vrouter_put_interface(rx_queue->q_vif);
+    memset(rx_queue, 0, sizeof(*rx_queue));
+    memset(rx_queue_params, 0, sizeof(*rx_queue_params));
+}
+
+/*
  * vr_dpdk_virtio_rx_queue_init - initializes a virtio RX queue.
  *
  * Returns a pointer to the RX queue on success, NULL otherwise.
@@ -73,6 +96,8 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     unsigned int vif_idx = vif->vif_idx;
     struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
     char ring_name[64];
+    struct vr_dpdk_queue_params *rx_queue_params
+                    = &lcore->lcore_rx_queue_params[vif_idx];
 
     if (queue_id >= vr_dpdk_virtio_nrxqs(vif)) {
         return NULL;
@@ -108,7 +133,36 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     rx_queue->rxq_burst_size = VR_DPDK_VIRTIO_RX_BURST_SZ;
     rx_queue->q_vif = vif;
 
+    /* store queue params */
+    rx_queue_params->qp_release_op = &dpdk_virtio_rx_queue_release;
+    rx_queue_params->qp_ring.ring_p = 
+                vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring;
+    rx_queue_params->qp_ring.host_lcore_id =
+                vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id;
+
     return rx_queue;
+}
+
+/*
+ * dpdk_virtio_tx_queue_release - releases a virtio TX queue.
+ *
+ * Returns nothing.
+ */
+static void
+dpdk_virtio_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+{
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
+    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif->vif_idx];
+    struct vr_dpdk_queue_params *tx_queue_params
+                        = &lcore->lcore_tx_queue_params[vif->vif_idx];
+
+    tx_queue->txq_ops.f_tx = NULL;
+    rte_wmb();
+
+    /* reset the queue */
+    vrouter_put_interface(tx_queue->q_vif);
+    memset(tx_queue, 0, sizeof(*tx_queue));
+    memset(tx_queue_params, 0, sizeof(*tx_queue_params));
 }
 
 /*
@@ -124,6 +178,8 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     unsigned int vif_idx = vif->vif_idx;
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue_params *tx_queue_params
+                = &lcore->lcore_tx_queue_params[vif_idx];
 
     if (queue_id >= vr_dpdk_virtio_ntxqs(vif)) {
         return NULL;
@@ -138,6 +194,9 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_tx_mbuf_count = 0;
     tx_queue->q_queue_h = (void *) &vr_dpdk_virtio_txqs[vif_idx][queue_id];
     tx_queue->q_vif = vif;
+
+    /* store queue params */
+    tx_queue_params->qp_release_op = &dpdk_virtio_tx_queue_release;
 
     return tx_queue;
 }
@@ -700,4 +759,3 @@ vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
 
     return;
 }
-
