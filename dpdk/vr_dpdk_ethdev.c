@@ -515,8 +515,9 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
 int
 vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *ethdev)
 {
-    /* TODO */
     ethdev->ethdev_ptr = NULL;
+
+    dpdk_ethdev_mempools_free(ethdev);
 
     return 0;
 }

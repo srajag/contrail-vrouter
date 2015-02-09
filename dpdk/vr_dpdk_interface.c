@@ -281,7 +281,6 @@ dpdk_fabric_if_del(struct vr_interface *vif)
     rte_eth_dev_stop(port_id);
 
     /* release eth device */
-    /* TODO vr_dpdk_ethdev_release() */
     return vr_dpdk_ethdev_release(vif->vif_os);
 }
 
