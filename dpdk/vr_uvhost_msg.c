@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <linux/vhost.h>
+#include <linux/virtio_net.h>
 #include <stdint.h>
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -30,6 +31,7 @@ typedef int (*vr_uvh_msg_handler_fn)(vr_uvh_client_t *vru_cl);
  * Prototypes for user space vhost message handlers
  */
 static int vr_uvmh_get_features(vr_uvh_client_t *vru_cl);
+static int vr_uvmh_set_features(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_ring_num_desc(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl);
@@ -40,7 +42,7 @@ static int vr_uvhm_set_call_fd(vr_uvh_client_t *vru_cl);
 static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
     NULL,
     vr_uvmh_get_features,
-    NULL,
+    vr_uvmh_set_features,
     NULL,
     NULL,
     vr_uvhm_set_mem_table,
@@ -64,8 +66,24 @@ static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
 static int
 vr_uvmh_get_features(vr_uvh_client_t *vru_cl)
 {
-    vru_cl->vruc_msg.u64 = 0;
+    vru_cl->vruc_msg.u64 = VIRTIO_NET_F_CSUM | VIRTIO_NET_F_GUEST_CSUM;
     vru_cl->vruc_msg.size = sizeof(vru_cl->vruc_msg.u64);
+
+    return 0;
+}
+
+/*
+ * vr_uvmh_set_features - handle VHOST_USER_SET_FEATURES message from user space
+ * vhost client.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+static int
+vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
+{
+    if (vru_cl->vruc_msg.size == sizeof(vru_cl->vruc_msg.u64)) {
+        printf("Messag ewith contentsr:; %lu\n", vru_cl->vruc_msg.u64);
+    }
 
     return 0;
 }
