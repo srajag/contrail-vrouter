@@ -77,7 +77,6 @@ dpdk_virtio_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
             rx_queue_params->qp_ring.ring_p);
 
     /* reset the queue */
-    vrouter_put_interface(rx_queue->q_vif);
     memset(rx_queue, 0, sizeof(*rx_queue));
     memset(rx_queue_params, 0, sizeof(*rx_queue_params));
 }
@@ -160,7 +159,6 @@ dpdk_virtio_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     rte_wmb();
 
     /* reset the queue */
-    vrouter_put_interface(tx_queue->q_vif);
     memset(tx_queue, 0, sizeof(*tx_queue));
     memset(tx_queue_params, 0, sizeof(*tx_queue_params));
 }
