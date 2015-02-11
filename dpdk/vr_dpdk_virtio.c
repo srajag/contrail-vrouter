@@ -261,7 +261,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
             if (mbuf != NULL) {
                 mbuf->pkt.data_len = pkt_len;
                 mbuf->pkt.pkt_len = mbuf->pkt.data_len;
-                mbuf->ol_flags |= PKT_TX_IP_CKSUM;
+                mbuf->ol_flags |= mbuf_flags;
 
                 rte_memcpy(mbuf->pkt.data, pkt_addr, pkt_len);
                 pkts[pkts_sent] = mbuf;
