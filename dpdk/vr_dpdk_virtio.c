@@ -16,6 +16,8 @@
 #include "qemu_uvhost.h"
 #include "vr_uvhost_client.h"
 
+#include <rte_errno.h>
+
 void *vr_dpdk_vif_clients[VR_MAX_INTERFACES];
 vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][RTE_MAX_LCORE];
 vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][RTE_MAX_LCORE];
@@ -105,12 +107,25 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
 
     sprintf(ring_name, "vif_%d_%" PRIu16 "_ring", vif_idx, queue_id);
 
-    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring =
-        rte_ring_create(ring_name, VR_DPDK_VIRTIO_TX_RING_SZ, rte_socket_id(),
-                        RING_F_SP_ENQ | RING_F_SC_DEQ);
-    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring == NULL) {
-        return NULL;
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring = rte_ring_lookup(ring_name);
+    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring != NULL) {
+        RTE_LOG(INFO, VROUTER, "\treusing lcore %u RX ring for queue %u vif %u\n",
+            lcore_id, queue_id, vif_idx);
+    } else {
+        RTE_LOG(INFO, VROUTER, "\tcreating lcore %u RX ring for queue %u vif %u\n",
+            lcore_id, queue_id, vif_idx);
+
+        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring =
+            rte_ring_create(ring_name, VR_DPDK_VIRTIO_TX_RING_SZ,
+            rte_socket_id(), RING_F_SP_ENQ | RING_F_SC_DEQ);
+
+        if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring == NULL) {
+            RTE_LOG(ERR, VROUTER, "\terror creating lcore %u RX ring: %s (%d)\n",
+                lcore_id, rte_strerror(rte_errno), rte_errno);
+            return NULL;
+        }
     }
+
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id =
          vr_dpdk_phys_lcore_least_used_get();
     if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id ==
