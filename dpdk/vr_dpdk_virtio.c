@@ -261,6 +261,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     char *pkt_addr;
     struct rte_mbuf *mbuf;
     uint32_t pkt_len;
+    typeof(mbuf->ol_flags) mbuf_flags = 0;
 
     if (vq->vdv_ready_state == VQ_NOT_READY) {
         return 0;
@@ -305,6 +306,9 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         } else {
             pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
             if (pkt_addr) {
+                if (((struct virtio_net_hdr *)pkt_addr)->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
+                    mbuf_flags |= PKT_TX_IP_CKSUM;
+                }
                 pkt_addr += sizeof(struct virtio_net_hdr);
                 pkt_len = desc->len - sizeof(struct virtio_net_hdr);
             }
@@ -315,6 +319,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
             if (mbuf != NULL) {
                 mbuf->pkt.data_len = pkt_len;
                 mbuf->pkt.pkt_len = mbuf->pkt.data_len;
+                mbuf->ol_flags |= mbuf_flags;
 
                 rte_memcpy(mbuf->pkt.data, pkt_addr, pkt_len);
                 pkts[pkts_sent] = mbuf;
