@@ -82,7 +82,10 @@ static int
 vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
 {
     if (vru_cl->vruc_msg.size == sizeof(vru_cl->vruc_msg.u64)) {
-        printf("Messag ewith contentsr:; %lu\n", vru_cl->vruc_msg.u64);
+        vr_uvhost_log("Requested feature bitmap: 0x%llx\n", vru_cl->vruc_msg.u64);
+    } else {
+        vr_uvhost_log("Incorrect feature bitmap length; expected: %u, received %u\n",
+            sizeof(vru_cl->vruc_msg.u64), vru_cl->vruc_msg.size);
     }
 
     return 0;
