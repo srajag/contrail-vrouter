@@ -33,7 +33,7 @@
 
 #define RTE_LOGTYPE_VROUTER         RTE_LOGTYPE_USER1
 #undef RTE_LOG_LEVEL
-#define RTE_LOG_LEVEL               RTE_LOG_INFO
+#define RTE_LOG_LEVEL               RTE_LOG_DEBUG
 /*
  * Debug options:
  *

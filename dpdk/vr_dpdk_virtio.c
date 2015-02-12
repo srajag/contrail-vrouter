@@ -311,10 +311,19 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         }
 
         if (pkt_addr) {
+            typeof(mbuf->ol_flags) mbuf_flags = 0;
+
+            RTE_LOG(DEBUG, VROUTER, "%s %x Setting PKT_TX_IP_CKSUM \n", __func__, ((struct virtio_net_hdr *)pkt_addr)->flags);
+            if (((struct virtio_net_hdr *)pkt_addr)->flags & VIRTIO_NET_HDR_F_DATA_VALID) {
+                RTE_LOG(DEBUG, VROUTER, "Setting VIRTIO_NET_HDR_F_NEED_CSUM\n");
+                mbuf_flags |= PKT_TX_IP_CKSUM;
+            }
+
             mbuf = rte_pktmbuf_alloc(vr_dpdk_virtio_get_mempool());
             if (mbuf != NULL) {
                 mbuf->pkt.data_len = pkt_len;
                 mbuf->pkt.pkt_len = mbuf->pkt.data_len;
+                mbuf->ol_flags |= mbuf_flags;
 
                 rte_memcpy(mbuf->pkt.data, pkt_addr, pkt_len);
                 pkts[pkts_sent] = mbuf;
