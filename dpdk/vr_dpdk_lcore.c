@@ -622,6 +622,9 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
     struct vr_dpdk_queue *rx_queue;
     struct vr_dpdk_queue *tx_queue;
 
+    if (likely(cmd == VR_DPDK_LCORE_NO_CMD))
+        return 0;
+
     switch (cmd) {
     case VR_DPDK_LCORE_RX_RM_CMD:
         vif_idx = cmd_param;
