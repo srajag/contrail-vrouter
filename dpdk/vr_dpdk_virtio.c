@@ -261,6 +261,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     char *pkt_addr;
     struct rte_mbuf *mbuf;
     uint32_t pkt_len;
+    typeof(mbuf->ol_flags) mbuf_flags = 0;
 
     if (vq->vdv_ready_state == VQ_NOT_READY) {
         return 0;
@@ -304,6 +305,11 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
             pkt_len = desc->len;
         } else {
             pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
+            RTE_LOG(DEBUG, VROUTER, "%s %x Setting PKT_TX_IP_CKSUM \n", __func__, ((struct virtio_net_hdr *)pkt_addr)->flags);
+            if (((struct virtio_net_hdr *)pkt_addr)->flags & VIRTIO_NET_HDR_F_DATA_VALID) {
+                RTE_LOG(DEBUG, VROUTER, "Setting VIRTIO_NET_HDR_F_NEED_CSUM\n");
+                mbuf_flags |= PKT_TX_IP_CKSUM;
+            }
             if (pkt_addr) {
                 pkt_addr += sizeof(struct virtio_net_hdr);
                 pkt_len = desc->len - sizeof(struct virtio_net_hdr);
@@ -311,13 +317,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         }
 
         if (pkt_addr) {
-            typeof(mbuf->ol_flags) mbuf_flags = 0;
 
-            RTE_LOG(DEBUG, VROUTER, "%s %x Setting PKT_TX_IP_CKSUM \n", __func__, ((struct virtio_net_hdr *)pkt_addr)->flags);
-            if (((struct virtio_net_hdr *)pkt_addr)->flags & VIRTIO_NET_HDR_F_DATA_VALID) {
-                RTE_LOG(DEBUG, VROUTER, "Setting VIRTIO_NET_HDR_F_NEED_CSUM\n");
-                mbuf_flags |= PKT_TX_IP_CKSUM;
-            }
 
             mbuf = rte_pktmbuf_alloc(vr_dpdk_virtio_get_mempool());
             if (mbuf != NULL) {
