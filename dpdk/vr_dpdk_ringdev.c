@@ -28,17 +28,7 @@ dpdk_ring_allocate(unsigned host_lcore_id, unsigned vif_idx, unsigned for_lcore_
     int ret;
     char ring_name[RTE_RING_NAMESIZE];
     struct rte_ring *ring;
-    struct vr_dpdk_lcore *host_lcore = vr_dpdk.lcores[host_lcore_id];
 
-    if (host_lcore->lcore_nb_free_rings > 0) {
-        /* reuse free ring */
-        RTE_LOG(INFO, VROUTER, "\treusing lcore %u TX ring for lcore %u vif %u\n",
-            host_lcore_id, for_lcore_id, vif_idx);
-        return host_lcore->lcore_free_rings[--host_lcore->lcore_nb_free_rings];
-    }
-
-    RTE_LOG(INFO, VROUTER, "\tcreating lcore %u TX ring for lcore %u vif %u\n",
-        host_lcore_id, for_lcore_id, vif_idx);
     ret = snprintf(ring_name, sizeof(ring_name), "vr_dpdk_ring_%u_%u_%u",
             host_lcore_id, vif_idx, for_lcore_id);
     if (ret >= sizeof(ring_name)) {
@@ -46,25 +36,27 @@ dpdk_ring_allocate(unsigned host_lcore_id, unsigned vif_idx, unsigned for_lcore_
             host_lcore_id);
         return NULL;
     }
-    /* create single-producer single-consumer ring */
-    ring = rte_ring_create(ring_name, VR_DPDK_TX_RING_SZ,
-        rte_lcore_to_socket_id(host_lcore_id), RING_F_SP_ENQ | RING_F_SC_DEQ);
-    if (ring == NULL) {
-        RTE_LOG(INFO, VROUTER, "\terror creating lcore %u TX ring: %s (%d)\n",
-            host_lcore_id, rte_strerror(rte_errno), rte_errno);
-        return NULL;
+
+    ring = rte_ring_lookup(ring_name);
+    if (ring != NULL) {
+        RTE_LOG(INFO, VROUTER, "\treusing lcore %u TX ring for lcore %u vif %u\n",
+            host_lcore_id, for_lcore_id, vif_idx);
+    } else {
+        RTE_LOG(INFO, VROUTER, "\tcreating lcore %u TX ring for lcore %u vif %u\n",
+            host_lcore_id, for_lcore_id, vif_idx);
+
+        /* create single-producer single-consumer ring */
+        ring = rte_ring_create(ring_name, VR_DPDK_TX_RING_SZ,
+            rte_lcore_to_socket_id(host_lcore_id), RING_F_SP_ENQ | RING_F_SC_DEQ);
+
+        if (ring == NULL) {
+            RTE_LOG(INFO, VROUTER, "\terror creating lcore %u TX ring: %s (%d)\n",
+                host_lcore_id, rte_strerror(rte_errno), rte_errno);
+            return NULL;
+        }
     }
+
     return ring;
-}
-
-/* Free the ring */
-static void
-dpdk_ring_free(unsigned host_lcore_id, struct rte_ring *ring)
-{
-    struct vr_dpdk_lcore *host_lcore = vr_dpdk.lcores[host_lcore_id];
-
-    host_lcore->lcore_free_rings[host_lcore->lcore_nb_free_rings++] =
-        ring;
 }
 
 /* Add the ring to the list of rings to push */
@@ -128,10 +120,6 @@ dpdk_ring_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     /* remove the ring from the list of rings to push */
     dpdk_ring_to_push_remove(tx_queue_params->qp_ring.host_lcore_id,
             tx_queue_params->qp_ring.ring_p);
-
-    /* deallocate the ring */
-    dpdk_ring_free(tx_queue_params->qp_ring.host_lcore_id,
-                            tx_queue_params->qp_ring.ring_p);
 
     /* flush and free the queue */
     if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {

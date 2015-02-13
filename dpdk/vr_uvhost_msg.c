@@ -217,6 +217,9 @@ vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl)
     vrucv_used = (struct vring_used *)
         vr_uvhm_map_addr(vru_cl, vaddr->used_user_addr);
 
+    if (!vrucv_desc || !vrucv_avail || !vrucv_used)
+        return -1;
+
     if (vr_dpdk_set_vring_addr(vru_cl->vruc_idx, vring_idx, vrucv_desc,
                                vrucv_avail, vrucv_used)) {
         vr_uvhost_log("Couldn't set vring addresses in vhost server, %d %d\n",

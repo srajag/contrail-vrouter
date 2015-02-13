@@ -216,10 +216,6 @@ struct vr_dpdk_lcore {
     struct vr_dpdk_queue_params lcore_rx_queue_params[VR_MAX_INTERFACES];
     /* Table of TX queue params */
     struct vr_dpdk_queue_params lcore_tx_queue_params[VR_MAX_INTERFACES];
-    /* Number of free rings available for the lcore */
-    uint16_t lcore_nb_free_rings;
-    /* List of free rings */
-    struct rte_ring *lcore_free_rings[VR_DPDK_MAX_RINGS];
     /* Event socket */
     void *lcore_event_sock;
     /* Lcore command param */
