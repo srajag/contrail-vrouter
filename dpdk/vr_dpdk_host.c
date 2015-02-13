@@ -475,9 +475,57 @@ dpdk_get_mono_time(unsigned int *sec, unsigned int *nsec)
 }
 
 static void
+dpdk_work_timer(struct rte_timer *timer, void *arg)
+{
+    struct vr_timer *vtimer = (struct vr_timer *)arg;
+
+    dpdk_timer(timer, arg);
+
+    dpdk_delete_timer(vtimer);
+    dpdk_free(vtimer);
+
+    return;
+}
+
+static void
 dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 {
-    /* TODO: not implemented */
+    uint64_t hz, ticks;
+
+    struct rte_timer *timer;
+    struct vr_timer *vtimer;
+
+    hz = rte_get_timer_hz();
+    ticks = hz / 10000;
+
+    timer = dpdk_malloc(sizeof(struct rte_timer));
+    if (!timer) {
+        RTE_LOG(ERR, VROUTER, "Error allocating RTE timer\n");
+        return;
+    }
+
+    vtimer = dpdk_malloc(sizeof(*vtimer));
+    if (!vtimer) {
+        dpdk_free(timer);
+        RTE_LOG(ERR, VROUTER, "Error allocating VR timer for work\n");
+        return;
+    }
+    vtimer->vt_timer = fn;
+    vtimer->vt_vr_arg = arg;
+    vtimer->vt_os_arg = timer;
+    vtimer->vt_msecs = ticks * 1000;
+
+    rte_timer_init(timer);
+
+    if (rte_timer_reset(timer, ticks, SINGLE, rte_lcore_id(),
+        dpdk_work_timer, vtimer) == -1) {
+        RTE_LOG(ERR, VROUTER, "Error resetting timer\n");
+        rte_free(timer);
+        rte_free(vtimer);
+
+        return;
+    }
+
     return;
 }
 
@@ -943,7 +991,7 @@ struct host_os dpdk_host = {
     .hos_pgso_size                  =    dpdk_pgso_size, /* not implemented, returns 0 */
 
     .hos_get_cpu                    =    dpdk_get_cpu,
-    .hos_schedule_work              =    dpdk_schedule_work, /* not implemented */
+    .hos_schedule_work              =    dpdk_schedule_work,
     .hos_delay_op                   =    dpdk_delay_op, /* do nothing */
     .hos_defer                      =    dpdk_defer, /* for mirroring? */
     .hos_get_defer_data             =    dpdk_get_defer_data, /* for mirroring? */
