@@ -15,7 +15,6 @@
  */
 #define _GNU_SOURCE
 #include <sched.h>
-#include <stdlib.h>
 
 #include <getopt.h>
 #include <signal.h>
@@ -130,7 +129,7 @@ dpdk_mempools_create(void)
  *      VR_DPDK_LCORE_MASK on failure
  */
 static uint64_t
-dpdk_compute_core_mask(void) {
+dpdk_core_mask_get(void) {
     cpu_set_t cs;
     uint64_t cpu_core_mask = 0;
     int i;
@@ -174,8 +173,10 @@ dpdk_compute_core_mask(void) {
      *      * we have more CPUs (bits set) than defined in VR_DPDK_LCORE_MASK.
      *      This will left some CPUs available for other tasks, eg. VMs.
      */
-    cpu_core_mask_ones = __builtin_popcountll((uint64_t)cpu_core_mask);
-    vr_dpdk_lcore_mask_ones = __builtin_popcountll((uint64_t)VR_DPDK_LCORE_MASK);
+    cpu_core_mask_ones
+                = __builtin_popcountll((unsigned long long)cpu_core_mask);
+    vr_dpdk_lcore_mask_ones
+                = __builtin_popcountll((unsigned long long)VR_DPDK_LCORE_MASK);
 
     if(cpu_core_mask_ones > vr_dpdk_lcore_mask_ones)
         return (cpu_core_mask & VR_DPDK_LCORE_MASK);
@@ -188,8 +189,8 @@ static void
 dpdk_argv_update(void) {
     static char core_mask_string[19];
 
-    snprintf(core_mask_string, sizeof(core_mask_string),
-                "0x%" PRIx64, dpdk_compute_core_mask());
+    snprintf(core_mask_string, sizeof(core_mask_string), "0x%" PRIx64,
+                dpdk_core_mask_get());
     dpdk_argv[4] = core_mask_string;
 }
 
