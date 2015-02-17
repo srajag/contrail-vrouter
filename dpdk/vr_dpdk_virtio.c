@@ -16,6 +16,8 @@
 #include "qemu_uvhost.h"
 #include "vr_uvhost_client.h"
 
+#include <rte_malloc.h>
+
 void *vr_dpdk_vif_clients[VR_MAX_INTERFACES];
 vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][RTE_MAX_LCORE];
 vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][RTE_MAX_LCORE];

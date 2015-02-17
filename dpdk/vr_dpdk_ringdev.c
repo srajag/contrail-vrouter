@@ -186,7 +186,7 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     return tx_queue;
 
 error:
-    RTE_LOG(ERR, VROUTER, "\terror initializing ring TX queue for device % "
+    RTE_LOG(ERR, VROUTER, "\terror initializing ring TX queue for device %"
         PRIu8 "\n", port_id);
     return NULL;
 }
