@@ -484,6 +484,14 @@ int dpdk_netlink_io(void);
 /*
  * vr_dpdk_ringdev.c
  */
+/* Allocates a new ring */
+struct rte_ring *
+dpdk_ring_allocate(unsigned host_lcore_id, unsigned vif_idx,
+    unsigned for_lcore_id, char *ring_name, unsigned vr_dpdk_tx_ring_sz,
+    int socket, int flags);
+/* deallocate the ring */
+void
+dpdk_ring_free(struct rte_ring *ring);
 /* Init ring RX queue */
 struct vr_dpdk_queue *
 vr_dpdk_ring_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,

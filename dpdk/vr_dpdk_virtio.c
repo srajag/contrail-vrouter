@@ -16,8 +16,6 @@
 #include "qemu_uvhost.h"
 #include "vr_uvhost_client.h"
 
-#include <rte_errno.h>
-
 void *vr_dpdk_vif_clients[VR_MAX_INTERFACES];
 vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][RTE_MAX_LCORE];
 vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][RTE_MAX_LCORE];
@@ -78,6 +76,8 @@ dpdk_virtio_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     dpdk_ring_to_push_remove(rx_queue_params->qp_ring.host_lcore_id,
             rx_queue_params->qp_ring.ring_p);
 
+    dpdk_ring_free(rx_queue_params->qp_ring.ring_p);
+
     /* reset the queue */
     memset(rx_queue->q_queue_h, 0, sizeof(vr_dpdk_virtioq_t));
     memset(rx_queue, 0, sizeof(*rx_queue));
@@ -98,38 +98,33 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     unsigned int vif_idx = vif->vif_idx;
     struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
     char ring_name[64];
-    struct vr_dpdk_queue_params *rx_queue_params
-                    = &lcore->lcore_rx_queue_params[vif_idx];
+    struct vr_dpdk_queue_params *rx_queue_params =
+        &lcore->lcore_rx_queue_params[vif_idx];
+    int ret;
+
+    RTE_LOG(INFO, VROUTER, "\tcreating lcore %u RX ring for queue %u vif %u\n",
+        lcore_id, queue_id, vif_idx);
 
     if (queue_id >= vr_dpdk_virtio_nrxqs(vif)) {
         return NULL;
     }
 
-    sprintf(ring_name, "vif_%d_%" PRIu16 "_ring", vif_idx, queue_id);
+    ret = snprintf(ring_name, sizeof(ring_name), "vif_%d_%" PRIu16 "_ring",
+        vif_idx, queue_id);
+    if (ret >= sizeof(ring_name))
+        goto error;
 
-    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring = rte_ring_lookup(ring_name);
-    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring != NULL) {
-        RTE_LOG(INFO, VROUTER, "\treusing lcore %u RX ring for queue %u vif %u\n",
-            lcore_id, queue_id, vif_idx);
-    } else {
-        RTE_LOG(INFO, VROUTER, "\tcreating lcore %u RX ring for queue %u vif %u\n",
-            lcore_id, queue_id, vif_idx);
-
-        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring =
-            rte_ring_create(ring_name, VR_DPDK_VIRTIO_TX_RING_SZ,
-            rte_socket_id(), RING_F_SP_ENQ | RING_F_SC_DEQ);
-
-        if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring == NULL) {
-            RTE_LOG(ERR, VROUTER, "\terror creating lcore %u RX ring: %s (%d)\n",
-                lcore_id, rte_strerror(rte_errno), rte_errno);
-            return NULL;
-        }
-    }
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring =
+        dpdk_ring_allocate(lcore_id, vif_idx, queue_id, ring_name,
+            VR_DPDK_VIRTIO_TX_RING_SZ, rte_socket_id(),
+            RING_F_SP_ENQ | RING_F_SC_DEQ);
+    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring == NULL)
+        goto error;
 
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id =
-         vr_dpdk_phys_lcore_least_used_get();
+        vr_dpdk_phys_lcore_least_used_get();
     if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id ==
-                RTE_MAX_LCORE) {
+        RTE_MAX_LCORE) {
         vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id =
             vr_dpdk_lcore_least_used_get();
     }
@@ -151,11 +146,16 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     /* store queue params */
     rx_queue_params->qp_release_op = &dpdk_virtio_rx_queue_release;
     rx_queue_params->qp_ring.ring_p = 
-                vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring;
+        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring;
     rx_queue_params->qp_ring.host_lcore_id =
-                vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id;
+        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id;
 
     return rx_queue;
+
+error:
+    RTE_LOG(INFO, VROUTER, "\tcreating lcore %u RX ring for queue %u vif %u\n",
+        lcore_id, queue_id, vif_idx);
+    return NULL;
 }
 
 /*
