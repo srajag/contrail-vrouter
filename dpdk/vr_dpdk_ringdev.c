@@ -23,9 +23,8 @@
 
 /* Allocates a new ring */
 struct rte_ring *
-dpdk_ring_allocate(unsigned host_lcore_id, unsigned vif_idx,
-    unsigned for_lcore_id, char *ring_name, unsigned vr_dpdk_tx_ring_sz,
-    int socket, int flags)
+vr_dpdk_ring_allocate(unsigned host_lcore_id, char *ring_name,
+    unsigned vr_dpdk_tx_ring_sz)
 {
     int ret;
     ssize_t ring_size;
@@ -35,25 +34,20 @@ dpdk_ring_allocate(unsigned host_lcore_id, unsigned vif_idx,
     if (ring_size == -EINVAL)
         return NULL;
 
-    ring = (struct rte_ring *)rte_malloc_socket(NULL, ring_size, 0, socket);
+    ring = (struct rte_ring *)rte_malloc_socket(ring_name, ring_size,
+        CACHE_LINE_SIZE,  rte_lcore_to_socket_id(host_lcore_id));
     if (ring == NULL)
         return NULL;
 
     /* create single-producer single-consumer ring */
-    ret = rte_ring_init(ring, ring_name, vr_dpdk_tx_ring_sz, flags);
+    ret = rte_ring_init(ring, ring_name, vr_dpdk_tx_ring_sz,
+        RING_F_SP_ENQ | RING_F_SC_DEQ);
     if (ret < 0) {
         rte_free(ring);
         return NULL;
     }
 
     return ring;
-}
-
-/* deallocate the ring */
-void
-dpdk_ring_free(struct rte_ring *ring)
-{
-    rte_free(ring);
 }
 
 /* Add the ring to the list of rings to push */
@@ -118,7 +112,7 @@ dpdk_ring_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     dpdk_ring_to_push_remove(tx_queue_params->qp_ring.host_lcore_id,
             tx_queue_params->qp_ring.ring_p);
 
-    dpdk_ring_free(tx_queue_params->qp_ring.ring_p);
+    rte_free(tx_queue_params->qp_ring.ring_p);
 
     /* flush and free the queue */
     if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
@@ -146,7 +140,7 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
                 = &lcore->lcore_tx_queue_params[vif_idx];
     struct vr_dpdk_queue *host_tx_queue = &host_lcore->lcore_tx_queues[vif_idx];
     struct rte_ring *tx_ring;
-    char ring_name[64];
+    char ring_name[RTE_RING_NAMESIZE];
     int ret;
 
 
@@ -167,9 +161,7 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
         goto error;
 
     /* allocate a ring on the host lcore */
-    tx_ring = dpdk_ring_allocate(host_lcore_id, vif_idx, lcore_id, ring_name,
-        VR_DPDK_TX_RING_SZ, rte_lcore_to_socket_id(host_lcore_id),
-        RING_F_SP_ENQ | RING_F_SC_DEQ);
+    tx_ring = vr_dpdk_ring_allocate(host_lcore_id, ring_name, VR_DPDK_TX_RING_SZ);
     if (tx_ring == NULL)
         goto error;
 
@@ -194,8 +186,8 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     return tx_queue;
 
 error:
-    RTE_LOG(ERR, VROUTER, "\terror allocating ring for device %" PRIu8 "\n",
-        port_id);
+    RTE_LOG(ERR, VROUTER, "\terror initializing ring TX queue for device % "
+        PRIu8 "\n", port_id);
     return NULL;
 }
 

@@ -76,7 +76,7 @@ dpdk_virtio_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     dpdk_ring_to_push_remove(rx_queue_params->qp_ring.host_lcore_id,
             rx_queue_params->qp_ring.ring_p);
 
-    dpdk_ring_free(rx_queue_params->qp_ring.ring_p);
+    rte_free(rx_queue_params->qp_ring.ring_p);
 
     /* reset the queue */
     memset(rx_queue->q_queue_h, 0, sizeof(vr_dpdk_virtioq_t));
@@ -115,9 +115,7 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
         goto error;
 
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring =
-        dpdk_ring_allocate(lcore_id, vif_idx, queue_id, ring_name,
-            VR_DPDK_VIRTIO_TX_RING_SZ, rte_socket_id(),
-            RING_F_SP_ENQ | RING_F_SC_DEQ);
+        vr_dpdk_ring_allocate(lcore_id, ring_name, VR_DPDK_VIRTIO_TX_RING_SZ);
     if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring == NULL)
         goto error;
 
@@ -153,7 +151,7 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     return rx_queue;
 
 error:
-    RTE_LOG(INFO, VROUTER, "\tcreating lcore %u RX ring for queue %u vif %u\n",
+    RTE_LOG(ERR, VROUTER, "\terror creating lcore %u RX ring for queue %u vif %u\n",
         lcore_id, queue_id, vif_idx);
     return NULL;
 }
