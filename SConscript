@@ -2,12 +2,12 @@
 # Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
 #
 
-print 'Hi!'
-print ''
-print 'Please use dpdk-for-review branch from now on for the latest vRouter/DPDK.'
-print 'Please make sure all of your branches and commits are rebased there!'
-print ''
-print 'Thanks!'
+print '  Hi!'
+print '  '
+print '  Please use dpdk-for-review branch from now on for the latest vRouter/DPDK.'
+print '  Please make sure all of your branches and commits are rebased there!'
+print '  '
+print '  Thanks!'
 exit(1)
 
 import subprocess
