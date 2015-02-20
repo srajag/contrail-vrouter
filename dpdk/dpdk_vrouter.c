@@ -13,6 +13,9 @@
  * dpdk_vrouter.c -- vRouter/DPDK application
  *
  */
+#define _GNU_SOURCE
+#include <sched.h>
+
 #include <getopt.h>
 #include <signal.h>
 #include <linux/vhost.h>
@@ -34,7 +37,7 @@ struct vr_dpdk_global vr_dpdk;
 static char *dpdk_argv[] = {
     "dpdk",
     "-m", VR_DPDK_MAX_MEM,
-    "-c", VR_DPDK_LCORE_MASK,
+    "-c", "",
     "-n", VR_DPDK_MAX_MEMCHANNELS
 };
 static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv);
@@ -117,6 +120,80 @@ dpdk_mempools_create(void)
     return 0;
 }
 
+/*
+ * Figure out a number of CPU cores/threads and compute an affinity mask
+ * which will be passed to EAL initialization in dpdk_init().
+ *
+ * Returns:
+ *      new core mask on success
+ *      VR_DPDK_LCORE_MASK on failure
+ */
+static uint64_t
+dpdk_core_mask_get(void) {
+    cpu_set_t cs;
+    uint64_t cpu_core_mask = 0;
+    int i;
+    unsigned int cpu_core_mask_ones, vr_dpdk_lcore_mask_ones;
+
+    /*
+     * If it is impossible to get the cpu_set_t structure, return
+     * VR_DPDK_LCORE_MASK as a default value.
+     */
+    if (sched_getaffinity(0, sizeof(cs), &cs) < 0)
+        return VR_DPDK_LCORE_MASK;
+
+    /*
+     * Go through all the CPUs in the cpu_set_t structure to check
+     * if they are available or not. Build an affinity mask based on that.
+     * There is no official way to obtain the mask directly, as there is
+     * no macro for this.
+     *
+     * Due to size of uint64_t, maximum number of supported CPUs is 64.
+     */
+    for (i = 0; i < RTE_MIN(CPU_SETSIZE, 64); i++) {
+        if (CPU_ISSET(i, &cs))
+            cpu_core_mask |= (uint64_t)1 << i;
+    }
+
+    if(!cpu_core_mask)
+        return VR_DPDK_LCORE_MASK;
+
+    /*
+     * After successfully building the affinity mask, we should return one of
+     * the following:
+     *
+     * return cpu_core_mask, if:
+     *      * we have as many CPUs (bits set) as in VR_DPDK_LCORE_MASK.
+     *      CPUs may have different affinity than set in the default mask
+     *      and we want to prioritize that setting.
+     *
+     *      * we have less CPUs than defined in VR_DPDK_LCORE_MASK.
+     *
+     * return (cpu_core_mask & VR_DPDK_LCORE_MASK), if:
+     *      * we have more CPUs (bits set) than defined in VR_DPDK_LCORE_MASK.
+     *      This will left some CPUs available for other tasks, eg. VMs.
+     */
+    cpu_core_mask_ones
+                = __builtin_popcountll((unsigned long long)cpu_core_mask);
+    vr_dpdk_lcore_mask_ones
+                = __builtin_popcountll((unsigned long long)VR_DPDK_LCORE_MASK);
+
+    if(cpu_core_mask_ones > vr_dpdk_lcore_mask_ones)
+        return (cpu_core_mask & VR_DPDK_LCORE_MASK);
+    else
+        return cpu_core_mask;
+}
+
+/* Updates parameters of EAL initialization in dpdk_argv[]. */
+static void
+dpdk_argv_update(void) {
+    static char core_mask_string[19];
+
+    snprintf(core_mask_string, sizeof(core_mask_string), "0x%" PRIx64,
+                dpdk_core_mask_get());
+    dpdk_argv[4] = core_mask_string;
+}
+
 /* Init DPDK EAL */
 static int
 dpdk_init(void)
@@ -129,6 +206,8 @@ dpdk_init(void)
             rte_strerror(-ret), -ret);
         return ret;
     }
+
+    dpdk_argv_update();
 
     ret = rte_eal_init(dpdk_argc, dpdk_argv);
     if (ret < 0) {

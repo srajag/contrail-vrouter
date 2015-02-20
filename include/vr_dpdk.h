@@ -43,7 +43,7 @@
  */
 
 /* lcore mask */
-#define VR_DPDK_LCORE_MASK          "0x3f"
+#define VR_DPDK_LCORE_MASK          0x3f
 /* Number of service lcores */
 #define VR_DPDK_NB_SERVICE_LCORES   2
 /* Minimum number of lcores */
