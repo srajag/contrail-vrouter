@@ -127,21 +127,20 @@ dpdk_mempools_create(void)
  *
  * Returns:
  *      new core mask on success
- *      VR_DPDK_LCORE_MASK on failure
+ *      VR_DPDK_DEF_LCORE_MASK on failure
  */
 static uint64_t
 dpdk_core_mask_get(void) {
     cpu_set_t cs;
     uint64_t cpu_core_mask = 0;
     int i;
-    unsigned int cpu_core_mask_ones, vr_dpdk_lcore_mask_ones;
 
     /*
      * If it is impossible to get the cpu_set_t structure, return
-     * VR_DPDK_LCORE_MASK as a default value.
+     * VR_DPDK_DEF_LCORE_MASK as a default value.
      */
     if (sched_getaffinity(0, sizeof(cs), &cs) < 0)
-        return VR_DPDK_LCORE_MASK;
+        return VR_DPDK_DEF_LCORE_MASK;
 
     /*
      * Go through all the CPUs in the cpu_set_t structure to check
@@ -157,32 +156,9 @@ dpdk_core_mask_get(void) {
     }
 
     if(!cpu_core_mask)
-        return VR_DPDK_LCORE_MASK;
+        return VR_DPDK_DEF_LCORE_MASK;
 
-    /*
-     * After successfully building the affinity mask, we should return one of
-     * the following:
-     *
-     * return cpu_core_mask, if:
-     *      * we have as many CPUs (bits set) as in VR_DPDK_LCORE_MASK.
-     *      CPUs may have different affinity than set in the default mask
-     *      and we want to prioritize that setting.
-     *
-     *      * we have less CPUs than defined in VR_DPDK_LCORE_MASK.
-     *
-     * return (cpu_core_mask & VR_DPDK_LCORE_MASK), if:
-     *      * we have more CPUs (bits set) than defined in VR_DPDK_LCORE_MASK.
-     *      This will left some CPUs available for other tasks, eg. VMs.
-     */
-    cpu_core_mask_ones
-                = __builtin_popcountll((unsigned long long)cpu_core_mask);
-    vr_dpdk_lcore_mask_ones
-                = __builtin_popcountll((unsigned long long)VR_DPDK_LCORE_MASK);
-
-    if(cpu_core_mask_ones > vr_dpdk_lcore_mask_ones)
-        return (cpu_core_mask & VR_DPDK_LCORE_MASK);
-    else
-        return cpu_core_mask;
+    return cpu_core_mask;
 }
 
 /* Updates parameters of EAL initialization in dpdk_argv[]. */

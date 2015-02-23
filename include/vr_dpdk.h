@@ -44,8 +44,8 @@
 #define VR_DPDK_TX_PKT_DUMP
  */
 
-/* lcore mask */
-#define VR_DPDK_LCORE_MASK          0x3f
+/* Default lcore mask. Used only when sched_getaffinity() is failed */
+#define VR_DPDK_DEF_LCORE_MASK      0xf
 /* Number of service lcores */
 #define VR_DPDK_NB_SERVICE_LCORES   2
 /* Minimum number of lcores */
