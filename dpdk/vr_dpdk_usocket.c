@@ -11,6 +11,7 @@
 #include <poll.h>
 #include <stdbool.h>
 
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -930,17 +931,19 @@ vr_usocket_bind(struct vr_usocket *usockp)
         addr = (struct sockaddr *)&sun;
         addrlen = sizeof(sun);
         server = true;
+        mkdir(VR_SOCKET_DIR, VR_SOCKET_DIR_MODE);
 
         break;
 
     case RAW:
-        unlink(VR_PACKET_UNIX_FILE);
         sun.sun_family = AF_UNIX;
         bzero(sun.sun_path, sizeof(sun.sun_path));
         strncpy(sun.sun_path, VR_PACKET_UNIX_FILE, sizeof(sun.sun_path) - 1);
         addr = (struct sockaddr *)&sun;
         addrlen = sizeof(sun);
         server = false;
+        mkdir(VR_SOCKET_DIR, VR_SOCKET_DIR_MODE);
+        unlink(sun.sun_path);
 
         break;
 

@@ -4,6 +4,7 @@
  *
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -19,6 +20,7 @@
 #include "vr_uvhost_msg.h"
 #include "qemu_uvhost.h"
 #include "vr_uvhost_client.h"
+#include "vr_dpdk_usocket.h"
 
 /*
  * Prototypes
@@ -87,11 +89,12 @@ vr_uvhost_start(void *arg)
     }
     vr_uvhost_log("\tserver socket FD is %d\n", s);
 
-    unlink(VR_UVH_NL_SOCK);
     memset(&sun, 0, sizeof(sun));
     sun.sun_family = AF_UNIX;
     strncpy(sun.sun_path, VR_UVH_NL_SOCK, sizeof(sun.sun_path) - 1);
 
+    mkdir(VR_SOCKET_DIR, VR_SOCKET_DIR_MODE);
+    unlink(sun.sun_path);
     ret = bind(s, (struct sockaddr *) &sun, sizeof(sun));
     if (ret == -1) {
         vr_uvhost_log("\terror binding server FD %d to %s: %s (%d)\n",

@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <sys/un.h>
+#include <sys/stat.h>
 
 #include <linux/netlink.h>
 #include <linux/genetlink.h>
@@ -231,11 +232,12 @@ vr_nl_uvhost_connect(void)
     }
     RTE_LOG(INFO, VROUTER, "\tNetLink socket FD is %d\n", s);
 
-    unlink(VR_NL_UVH_SOCK);
     memset(&nl_sun, 0, sizeof(nl_sun));
     nl_sun.sun_family = AF_UNIX;
     strncpy(nl_sun.sun_path, VR_NL_UVH_SOCK, sizeof(nl_sun.sun_path) - 1);
 
+    mkdir(VR_SOCKET_DIR, VR_SOCKET_DIR_MODE);
+    unlink(nl_sun.sun_path);
     ret = bind(s, (struct sockaddr *) &nl_sun, sizeof(nl_sun));
     if (ret == -1) {
         RTE_LOG(ERR, VROUTER, "\terror binding NetLink FD %d to %s: %s (%d)\n",

@@ -23,6 +23,7 @@
 #include "qemu_uvhost.h"
 #include "vr_uvhost_client.h"
 #include "vr_dpdk_virtio.h"
+#include "vr_dpdk_usocket.h"
 
 typedef int (*vr_uvh_msg_handler_fn)(vr_uvh_client_t *vru_cl);
 
@@ -678,6 +679,7 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
         sizeof(sun.sun_path) - strlen(sun.sun_path) - 1);
     sun.sun_family = AF_UNIX;
 
+    mkdir(VR_SOCKET_DIR, VR_SOCKET_DIR_MODE);
     unlink(sun.sun_path);
 
     /*
