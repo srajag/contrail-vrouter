@@ -129,7 +129,7 @@ int vr_usocket_write(struct vr_usocket *usockp, unsigned char *buf,
 
 #define VR_NETLINK_TCP_PORT         20914
 #define VR_SOCKET_DIR               "/var/run/vrouter"
-#define VR_SOCKET_DIR_MODE          (S_IRWXU | S_IRWXG)
+#define VR_SOCKET_DIR_MODE          (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 #define VR_NETLINK_UNIX_FILE        VR_SOCKET_DIR"/dpdk_netlink"
 #define VR_PACKET_UNIX_FILE         VR_SOCKET_DIR"/dpdk_pkt0"
 #define VR_PACKET_AGENT_UNIX_FILE   VR_SOCKET_DIR"/agent_pkt0"
