@@ -932,6 +932,7 @@ vr_usocket_bind(struct vr_usocket *usockp)
         addrlen = sizeof(sun);
         server = true;
         mkdir(VR_SOCKET_DIR, VR_SOCKET_DIR_MODE);
+        unlink(sun.sun_path);
 
         break;
 
