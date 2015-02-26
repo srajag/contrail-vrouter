@@ -879,7 +879,8 @@ vr_usocket_connect(struct vr_usocket *usockp)
     memset(sun.sun_path, 0, sizeof(sun.sun_path));
     strncpy(sun.sun_path, VR_PACKET_AGENT_UNIX_FILE, sizeof(sun.sun_path) - 1);
 
-    return connect(usockp->usock_fd, (struct sockaddr *)&sun, sizeof(sun));
+    return vr_dpdk_retry_connect(usockp->usock_fd, (struct sockaddr *)&sun,
+                                        sizeof(sun));
 }
 
 static int

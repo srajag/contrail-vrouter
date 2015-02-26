@@ -129,6 +129,8 @@
 #define VR_DPDK_INVALID_PORT_ID     0xFF
 /* Invalid queue ID */
 #define VR_DPDK_INVALID_QUEUE_ID    0xFFFF
+/* Socket connection retry timeout in seconds (use power of 2) */
+#define VR_DPDK_RETRY_CONNECT_SECS  64
 
 /*
  * VRouter/DPDK Data Structures
@@ -397,6 +399,9 @@ int vr_dpdk_host_init(void);
 void vr_dpdk_host_exit(void);
 /* Convert internal packet fields */
 struct vr_packet * vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *vif);
+/* Retry socket connection */
+int vr_dpdk_retry_connect(int sockfd, const struct sockaddr *addr,
+                            socklen_t alen);
 
 /*
  * vr_dpdk_interface.c

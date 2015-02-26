@@ -1162,3 +1162,23 @@ init_fail:
     return ret;
 }
 
+/* Retry socket connection */
+int
+vr_dpdk_retry_connect(int sockfd, const struct sockaddr *addr,
+                        socklen_t alen)
+{
+    int nsec;
+
+    for (nsec = 1; nsec < VR_DPDK_RETRY_CONNECT_SECS; nsec <<= 1) {
+        if (connect(sockfd, addr, alen) == 0)
+            return 0;
+
+        if (nsec < VR_DPDK_RETRY_CONNECT_SECS/2) {
+            sleep(nsec);
+            RTE_LOG(INFO, VROUTER, "Retrying connection for socket %d...\n",
+                    sockfd);
+        }
+    }
+
+    return -1;
+}

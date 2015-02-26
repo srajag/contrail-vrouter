@@ -252,7 +252,7 @@ vr_nl_uvhost_connect(void)
     memset(&uvh_sun, 0, sizeof(uvh_sun));
     uvh_sun.sun_family = AF_UNIX;
     strncpy(uvh_sun.sun_path, VR_UVH_NL_SOCK, sizeof(uvh_sun.sun_path) - 1);
-    ret = connect(s, (struct sockaddr *) &uvh_sun, sizeof(uvh_sun));
+    ret = vr_dpdk_retry_connect(s, (struct sockaddr *) &uvh_sun, sizeof(uvh_sun));
     if (ret == -1) {
         RTE_LOG(ERR, VROUTER, "\terror connecting NetLink socket FD %d to %s: %s (%d)\n",
                         s, uvh_sun.sun_path, strerror(errno), errno);
