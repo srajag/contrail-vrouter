@@ -457,14 +457,14 @@ main(int argc, char *argv[])
             return -1;
     }
 
-    /* Create user space vhost thread */
-    if ((ret = vr_uvhost_init(&vr_dpdk.uvh_thread, vr_dpdk_exit_trigger))) {
-        return ret;
-    }
-
     /* init DPDK first since vRouter uses DPDK mallocs and logs */
     ret = dpdk_init();
     if (ret != 0) {
+        return ret;
+    }
+
+    /* Create user space vhost thread */
+    if ((ret = vr_uvhost_init(&vr_dpdk.uvh_thread, vr_dpdk_exit_trigger))) {
         return ret;
     }
 
