@@ -63,7 +63,7 @@
 
 #define USOCK_MAX_CHILD_FDS     64
 #define USOCK_RX_BUF_LEN        4096
-#define USOCK_EVENT_BUF_LEN     8
+#define USOCK_EVENT_BUF_LEN     sizeof(uint64_t)
 
 #define PKT0_MBUF_POOL_SIZE     512
 #define PKT0_MBUF_POOL_CACHE_SZ (VR_DPDK_MAX_BURST_SZ*8)

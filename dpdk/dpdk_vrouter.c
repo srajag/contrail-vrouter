@@ -263,6 +263,7 @@ dpdk_exit(void)
     if (pthread_mutex_destroy(&vr_dpdk.if_lock)) {
         RTE_LOG(ERR, VROUTER, "Error destroying interface lock\n");
     }
+    RTE_LOG(INFO, VROUTER, "Stopped.\n");
 }
 
 /* Timer handling loop */
@@ -433,7 +434,8 @@ main(int argc, char *argv[])
 {
     int ret, opt, option_index;
 
-    fprintf(stdout, "vRouter/DPDK version: %s\n", ContrailBuildInfo);
+    fprintf(stdout, "Starting vRouter/DPDK...\nBuild information: %s\n",
+                ContrailBuildInfo);
     fflush(stdout);
 
     while ((opt = getopt_long(argc, argv, "", long_options, &option_index))

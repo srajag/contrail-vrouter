@@ -220,7 +220,7 @@ dpdk_netlink_exit(void)
 static int
 vr_nl_uvhost_connect(void)
 {
-    int s = 0, ret = -1;
+    int s = 0, ret = -1, err;
     struct sockaddr_un nl_sun, uvh_sun;
 
     RTE_LOG(INFO, VROUTER, "Starting NetLink...\n");
@@ -265,9 +265,11 @@ vr_nl_uvhost_connect(void)
 
 error:
 
+    err = errno;
     if (s > 0) {
         close(s);
     }
+    errno = err;
 
     return ret;
 }
@@ -276,7 +278,6 @@ int
 dpdk_netlink_init(void)
 {
     int ret;
-    int num_cores = rte_lcore_count();
 
     ret = vr_message_transport_register(&dpdk_nl_transport);
     if (ret)
@@ -297,8 +298,10 @@ dpdk_netlink_init(void)
         return -1;
     }
 
-    if (num_cores == VR_DPDK_MIN_LCORES)
+    if (rte_lcore_count() == VR_DPDK_MIN_LCORES) {
+        RTE_LOG(INFO, VROUTER, "Setting NetLink socket to non-blocking\n");
         vr_usocket_non_blocking(vr_dpdk.netlink_sock);
+    }
 
     return 0;
 }

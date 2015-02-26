@@ -74,7 +74,7 @@ vr_uvhost_exit(void)
 static void *
 vr_uvhost_start(void *arg)
 {
-    int s = 0, ret;
+    int s = 0, ret, err;
     struct sockaddr_un sun;
     fd_set *rfdset, *wfdset;
 
@@ -133,11 +133,15 @@ vr_uvhost_start(void *arg)
     }
 
 error:
+
+    err = errno;
     if (s) {
         close(s);
+        unlink(sun.sun_path);
     }
 
     vr_uvhost_exit();
+    errno = err;
 
     return NULL;
 }

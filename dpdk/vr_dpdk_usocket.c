@@ -724,6 +724,8 @@ usock_alloc(unsigned short proto, unsigned short type)
     return usockp;
 
 error_exit:
+
+    error = errno;
     if (sock_fd >= 0) {
         close(sock_fd);
         sock_fd = -1;
@@ -731,6 +733,7 @@ error_exit:
 
     usock_close(usockp);
     usockp = NULL;
+    errno = error;
 
     return usockp;
 }
@@ -873,7 +876,7 @@ vr_usocket_connect(struct vr_usocket *usockp)
         return -EINVAL;
 
     sun.sun_family = AF_UNIX;
-    bzero(sun.sun_path, sizeof(sun.sun_path));
+    memset(sun.sun_path, 0, sizeof(sun.sun_path));
     strncpy(sun.sun_path, VR_PACKET_AGENT_UNIX_FILE, sizeof(sun.sun_path) - 1);
 
     return connect(usockp->usock_fd, (struct sockaddr *)&sun, sizeof(sun));
@@ -926,7 +929,7 @@ vr_usocket_bind(struct vr_usocket *usockp)
 
     case UNIX:
         sun.sun_family = AF_UNIX;
-        bzero(sun.sun_path, sizeof(sun.sun_path));
+        memset(sun.sun_path, 0, sizeof(sun.sun_path));
         strncpy(sun.sun_path, VR_NETLINK_UNIX_FILE, sizeof(sun.sun_path) - 1);
         addr = (struct sockaddr *)&sun;
         addrlen = sizeof(sun);
@@ -938,7 +941,7 @@ vr_usocket_bind(struct vr_usocket *usockp)
 
     case RAW:
         sun.sun_family = AF_UNIX;
-        bzero(sun.sun_path, sizeof(sun.sun_path));
+        memset(sun.sun_path, 0, sizeof(sun.sun_path));
         strncpy(sun.sun_path, VR_PACKET_UNIX_FILE, sizeof(sun.sun_path) - 1);
         addr = (struct sockaddr *)&sun;
         addrlen = sizeof(sun);

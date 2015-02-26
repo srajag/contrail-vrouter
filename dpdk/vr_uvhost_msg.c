@@ -563,7 +563,7 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
 static int
 vr_uvh_cl_listen_handler(int fd, void *arg)
 {
-    int s = 0;
+    int s = 0, err;
     struct sockaddr_un sun;
     socklen_t len = sizeof(sun);
     vr_uvh_client_t *vru_cl = (vr_uvh_client_t *) arg;
@@ -595,6 +595,7 @@ vr_uvh_cl_listen_handler(int fd, void *arg)
 
 error:
 
+    err = errno;
     if (s) {
         close(s);
     }
@@ -602,6 +603,7 @@ error:
     if (vru_cl) {
         vr_uvhost_del_client(vru_cl);
     }
+    errno = err;
 
     return -1;
 }
@@ -653,7 +655,7 @@ vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
 static int
 vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
 {
-    int s = 0, ret = -1;
+    int s = 0, ret = -1, err;
     struct sockaddr_un sun;
     int flags;
     vr_uvh_client_t *vru_cl = NULL;
@@ -664,7 +666,7 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
         return -1;
     }
 
-    vr_uvhost_log("NetLink adding vif %s...\n", msg->vrnu_vif_name);
+    vr_uvhost_log("Adding vif %s...\n", msg->vrnu_vif_name);
     s = socket(AF_UNIX, SOCK_STREAM, 0);
     if (s == -1) {
         vr_uvhost_log("\terror creating socket: %s (%d)\n",
@@ -734,6 +736,7 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
 
 error:
 
+    err = errno;
     if (s) {
         close(s);
     }
@@ -741,6 +744,7 @@ error:
     if (vru_cl) {
         vr_uvhost_del_client(vru_cl);
     }
+    errno = err;
 
     return ret;
 }
@@ -809,15 +813,15 @@ vr_uvh_nl_listen_handler(int fd, void *arg)
     struct sockaddr_un sun;
     socklen_t len = sizeof(sun);
 
-    vr_uvhost_log("Handling NetLink connection FD %d...\n", fd);
+    vr_uvhost_log("Handling connection FD %d...\n", fd);
     s = accept(fd, (struct sockaddr *) &sun, &len);
     if (s < 0) {
-        vr_uvhost_log("\terror accepting NetLink connection FD %d\n", fd);
+        vr_uvhost_log("\terror accepting connection FD %d\n", fd);
         return -1;
     }
 
     if (vr_uvhost_add_fd(s, UVH_FD_READ, NULL, vr_uvh_nl_msg_handler)) {
-        vr_uvhost_log("\terror adding NetLink %s FD %d read handler\n",
+        vr_uvhost_log("\terror adding socket %s FD %d read handler\n",
                       sun.sun_path, fd);
         return -1;
     }
