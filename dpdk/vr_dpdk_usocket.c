@@ -975,6 +975,9 @@ vr_usocket_close(void *sock)
 {
     struct vr_usocket *usockp = (struct vr_usocket *)sock;
 
+    if (usockp == NULL)
+        return;
+
     if (usockp->usock_io_in_progress) {
         usockp->usock_should_close = 1;
         return;
