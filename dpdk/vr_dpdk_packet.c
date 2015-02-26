@@ -14,13 +14,11 @@
 
 int dpdk_packet_core_id = -1;
 
-int
-vr_dpdk_packet_tx(void)
+void
+vr_dpdk_packet_tx(struct vr_dpdk_lcore *lcorep)
 {
     int ret;
     uint64_t event = 1;
-    unsigned int lcore_id = rte_lcore_id();
-    struct vr_dpdk_lcore *lcorep = vr_dpdk.lcores[lcore_id];
 
     if (lcorep->lcore_event_sock) {
         ret = vr_usocket_write(lcorep->lcore_event_sock, (unsigned char *)&event,
@@ -30,8 +28,6 @@ vr_dpdk_packet_tx(void)
             lcorep->lcore_event_sock = NULL;
         }
     }
-
-    return 0;
 }
 
 int

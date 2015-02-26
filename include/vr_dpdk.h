@@ -434,7 +434,7 @@ void vr_dpdk_knidev_all_handle(void);
 /*
  * vr_dpdk_packet.c
  */
-int vr_dpdk_packet_tx(void);
+void vr_dpdk_packet_tx(struct vr_dpdk_lcore *lcore);
 int dpdk_packet_socket_init(void);
 void dpdk_packet_socket_close(void);
 int dpdk_packet_io(void);
@@ -465,7 +465,7 @@ vr_dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
     SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, q_next) {
         tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
     }
-    vr_dpdk_packet_tx();
+    vr_dpdk_packet_tx(lcore);
 }
 /* Send a burst of vr_packets to vRouter */
 void
