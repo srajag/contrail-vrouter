@@ -295,6 +295,7 @@ vr_dpdk_lcore_cmd_post(struct vr_dpdk_lcore *lcore, uint16_t cmd,
     rte_atomic32_set(&lcore->lcore_cmd_param, cmd_param);
     rte_atomic16_set(&lcore->lcore_cmd, cmd);
 
+    vr_dpdk_packet_wakeup(lcore);
     /* wake up the pkt0 thread */
     vr_dpdk_packet_tx(lcore);
 }
@@ -566,14 +567,13 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
 
 /* Init forwarding lcore */
 static int
-dpdk_lcore_init(void)
+dpdk_lcore_init(unsigned lcore_id)
 {
-    const unsigned lcore_id = rte_lcore_id();
     struct vr_dpdk_lcore *lcore;
 
     /* allocate lcore context */
     lcore = rte_zmalloc_socket("vr_dpdk_lcore", sizeof(struct vr_dpdk_lcore),
-        CACHE_LINE_SIZE, rte_socket_id());
+        CACHE_LINE_SIZE,  rte_lcore_to_socket_id(lcore_id));
     if (lcore == NULL) {
         RTE_LOG(CRIT, VROUTER, "Error allocating lcore %u context\n", lcore_id);
         return -ENOMEM;
@@ -592,12 +592,14 @@ dpdk_lcore_init(void)
 
 /* Exit forwarding lcore */
 static void
-dpdk_lcore_exit()
+dpdk_lcore_exit(unsigned lcore_id)
 {
-    const unsigned lcore_id = rte_lcore_id();
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-
     rcu_unregister_thread();
+
+    /* wait for interface operation to complete */
+    vr_dpdk_if_lock();
+    vr_dpdk_if_unlock();
 
     /* free lcore context */
     vr_dpdk.lcores[lcore_id] = NULL;
@@ -760,7 +762,7 @@ vr_dpdk_lcore_launch(__attribute__((unused)) void *dummy)
     unsigned packet_lcore_id = rte_get_next_lcore(netlink_lcore_id, 1, 1);
 
     /* init forwarding lcore */
-    if (dpdk_lcore_init() != 0)
+    if (dpdk_lcore_init(lcore_id) != 0)
         return -ENOMEM;
 
     /* set current lcore context */
@@ -777,7 +779,7 @@ vr_dpdk_lcore_launch(__attribute__((unused)) void *dummy)
         dpdk_lcore_fwd_loop(lcore);
 
     /* exit forwarding lcore */
-    dpdk_lcore_exit();
+    dpdk_lcore_exit(lcore_id);
 
     return 0;
 }

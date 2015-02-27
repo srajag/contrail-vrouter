@@ -1063,20 +1063,22 @@ vr_usocket_io(void *transport)
 
         rcu_thread_offline();
 
-        /* handle an IPC command */
+        /* TODO: handle an IPC command only for pkt0 thread
+         * and just check the stop flag for the rest
+         */
         if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
             break;
+//        if (unlikely(vr_dpdk_is_stop_flag_set()))
+//            break;
 
         ret = poll(usockp->usock_pfds, usockp->usock_max_cfds,
                 timeout);
+
         if (ret < 0) {
             usock_set_error(usockp, ret);
-            if (errno == EINTR) {
-                continue;
-            }
-
             /* all other errors are fatal */
-            goto return_from_io;
+            if (errno != EINTR)
+                goto return_from_io;
         }
 
         processed = 0;

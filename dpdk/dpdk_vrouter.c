@@ -263,7 +263,6 @@ dpdk_exit(void)
     if (pthread_mutex_destroy(&vr_dpdk.if_lock)) {
         RTE_LOG(ERR, VROUTER, "Error destroying interface lock\n");
     }
-    RTE_LOG(INFO, VROUTER, "Stopped.\n");
 }
 
 /* Timer handling loop */
@@ -300,7 +299,8 @@ dpdk_kni_loop(__attribute__((unused)) void *dummy)
 
 /* Set stop flag for all lcores */
 static void
-dpdk_stop_flag_set(void) {
+dpdk_stop_flag_set(void)
+{
     unsigned lcore_id;
     struct vr_dpdk_lcore *lcore;
 
@@ -522,5 +522,5 @@ main(int argc, char *argv[])
     vr_dpdk_host_exit();
     dpdk_exit();
 
-    return ret;
+    rte_exit(ret, "vRouter/DPDK is stopped.\n");
 }
