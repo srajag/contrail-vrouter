@@ -537,6 +537,9 @@ extern void vhost_remove_xconnect(void);
 static int
 dpdk_if_add(struct vr_interface *vif)
 {
+    if (vr_dpdk_is_stop_flag_set())
+        return -EINPROGRESS;
+
     if (vif_is_fabric(vif)) {
         return dpdk_fabric_if_add(vif);
     } else if (vif_is_virtual(vif)) {
@@ -564,6 +567,9 @@ dpdk_if_add(struct vr_interface *vif)
 static int
 dpdk_if_del(struct vr_interface *vif)
 {
+    if (vr_dpdk_is_stop_flag_set())
+        return -EINPROGRESS;
+
     if (vif_is_fabric(vif)) {
         return dpdk_fabric_if_del(vif);
     } else if (vif_is_virtual(vif)) {
