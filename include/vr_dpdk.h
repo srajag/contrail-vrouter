@@ -360,6 +360,8 @@ vr_dpdk_mbuf_reset(struct vr_packet *pkt)
  */
 /* pktmbuf constructor with vr_packet support */
 void vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigned i);
+/* Check if the stop flag is set */
+int vr_dpdk_is_stop_flag_set(void);
 
 /*
  * vr_dpdk_ethdev.c

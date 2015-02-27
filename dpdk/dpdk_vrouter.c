@@ -274,7 +274,7 @@ dpdk_timer_loop(__attribute__((unused)) void *dummy)
         rte_timer_manage();
 
         /* check for the global stop flag */
-        if (unlikely(rte_atomic16_read(&vr_dpdk.stop_flag)))
+        if (unlikely(vr_dpdk_is_stop_flag_set()))
             break;
 
         usleep(VR_DPDK_SLEEP_TIMER_US);
@@ -290,7 +290,7 @@ dpdk_kni_loop(__attribute__((unused)) void *dummy)
         vr_dpdk_knidev_all_handle();
 
         /* check for the global stop flag */
-        if (unlikely(rte_atomic16_read(&vr_dpdk.stop_flag)))
+        if (unlikely(vr_dpdk_is_stop_flag_set()))
             break;
 
         usleep(VR_DPDK_SLEEP_KNI_US);
@@ -305,7 +305,7 @@ dpdk_stop_flag_set(void) {
     struct vr_dpdk_lcore *lcore;
 
     /* check if the flag is already set */
-    if (unlikely(rte_atomic16_read(&vr_dpdk.stop_flag)))
+    if (unlikely(vr_dpdk_is_stop_flag_set()))
         return;
 
     RTE_LCORE_FOREACH(lcore_id) {
@@ -314,6 +314,16 @@ dpdk_stop_flag_set(void) {
     }
 
     rte_atomic16_inc(&vr_dpdk.stop_flag);
+}
+
+/* Check if the stop flag is set */
+int
+vr_dpdk_is_stop_flag_set(void)
+{
+    if (unlikely(rte_atomic16_read(&vr_dpdk.stop_flag)))
+        return -1;
+
+    return 0;
 }
 
 /* Custom handling of signals */
