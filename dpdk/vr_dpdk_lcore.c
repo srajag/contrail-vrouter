@@ -411,6 +411,9 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
     for (i = 0; i < nb_pkts; i++) {
         mbuf = pkts[i];
 #ifdef VR_DPDK_RX_PKT_DUMP
+#ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
+        if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
+#endif
         rte_pktmbuf_dump(stdout, mbuf, 0x60);
 #endif
         rte_prefetch0(vr_dpdk_mbuf_to_pkt(mbuf));
@@ -457,6 +460,9 @@ vr_dpdk_packets_vroute(struct vr_interface *vif, struct vr_packet *pkts[VR_DPDK_
     for (i = 0; i < nb_pkts; i++) {
         pkt = pkts[i];
 #ifdef VR_DPDK_RX_PKT_DUMP
+#ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
+        if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
+#endif
         rte_pktmbuf_dump(stdout, vr_dpdk_pkt_to_mbuf(pkt), 0x60);
 #endif
         rte_prefetch0(pkt);

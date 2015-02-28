@@ -741,6 +741,9 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     if (unlikely(vif->vif_type == VIF_TYPE_AGENT)) {
         rte_ring_enqueue_burst(vr_dpdk.packet_ring, (void *)&m, 1);
 #ifdef VR_DPDK_TX_PKT_DUMP
+#ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
+        if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
+#endif
         rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
         return 0;
@@ -780,6 +783,9 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 //    }
 
 #ifdef VR_DPDK_TX_PKT_DUMP
+#ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
+    if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
+#endif
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
@@ -820,6 +826,9 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     }
 
 #ifdef VR_DPDK_TX_PKT_DUMP
+#ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
+    if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
+#endif
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 

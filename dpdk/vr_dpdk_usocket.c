@@ -28,6 +28,8 @@
 #include "vr_message.h"
 #include "vr_dpdk.h"
 
+#include <rte_hexdump.h>
+
 #define INFINITE_TIMEOUT    -1
 
 extern void dpdk_burst_rx(unsigned int, struct rte_mbuf *[],
@@ -144,6 +146,8 @@ usock_bind_usockets(struct vr_usocket *parent, struct vr_usocket *child)
         if (!child_pair)
             return -ENOMEM;
 
+        RTE_LOG(DEBUG, USOCK, "%s: parent FD %d closing child FD %d\n",
+                    __func__, parent->usock_fd, child->usock_fd);
         close(child->usock_fd);
         child->usock_fd = child_pair->usock_fd;
         child = child_pair;
@@ -274,6 +278,7 @@ usock_close(struct vr_usocket *usockp)
         usock_close(usockp->usock_children[i]);
     }
 
+    RTE_LOG(DEBUG, USOCK, "%s: closing FD %d\n", __func__, usockp->usock_fd);
     close(usockp->usock_fd);
 
     if (!usockp->usock_mbuf_pool && usockp->usock_rx_buf) {
@@ -324,6 +329,14 @@ __usock_write(struct vr_usocket *usockp)
     len -= usockp->usock_write_offset;
 
 retry_write:
+#ifdef VR_DPDK_TX_PKT_DUMP
+    /* TODO: too much writes */
+    if (len != 8) {
+        RTE_LOG(DEBUG, USOCK, "%s: FD %d writing %d bytes\n",
+                    __func__, usockp->usock_fd, len);
+        rte_hexdump(stdout, "usock buffer", buf, len);
+    }
+#endif
     ret = write(usockp->usock_fd, buf, len);
     if (ret > 0) {
         usockp->usock_write_offset += ret;
@@ -413,6 +426,10 @@ usock_mbuf_write(struct vr_usocket *usockp, struct rte_mbuf *mbuf)
     mhdr.msg_controllen = 0;
     mhdr.msg_flags = 0;
 
+    RTE_LOG(DEBUG, USOCK, "%s: FD %d sending message\n", __func__, usockp->usock_fd);
+#ifdef VR_DPDK_TX_PKT_DUMP
+    rte_hexdump(stdout, "usock message", &mhdr, sizeof(mhdr));
+#endif
     return sendmsg(usockp->usock_fd, &mhdr, MSG_DONTWAIT);
 }
 
@@ -438,6 +455,7 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
 
         rcu_quiescent_state();
     } else {
+        RTE_LOG(ERR, VROUTER, "Error receiving from packet socket: no vif attached\n");
         rte_pktmbuf_free(usockp->usock_mbuf);
     }
 
@@ -511,12 +529,16 @@ usock_read_init(struct vr_usocket *usockp)
         break;
 
     case PACKET:
-        if (usockp->usock_mbuf)
+        if (usockp->usock_mbuf) {
+            RTE_LOG(ERR, VROUTER, "Error initing usock read: mbuf is already exist\n");
             return -EINVAL;
+        }
 
         usockp->usock_mbuf = rte_pktmbuf_alloc(usockp->usock_mbuf_pool);
-        if (!usockp->usock_mbuf)
+        if (!usockp->usock_mbuf) {
+            RTE_LOG(ERR, VROUTER, "Error initing usock read: cannot allocate mbuf\n");
             return -ENOMEM;
+        }
 
         usockp->usock_rx_buf = rte_pktmbuf_mtod(usockp->usock_mbuf,
                 char *);
@@ -551,6 +573,15 @@ __usock_read(struct vr_usocket *usockp)
 
 retry_read:
     ret = read(usockp->usock_fd, buf + offset, toread);
+#ifdef VR_DPDK_RX_PKT_DUMP
+    /* TODO: too many reads */
+    if (ret != 8) {
+        RTE_LOG(DEBUG, USOCK, "%s: FD %d read returned %d\n", __func__,
+                usockp->usock_fd, ret);
+        if (ret > 0)
+            rte_hexdump(stdout, "usock buffer", buf + offset, ret);
+    }
+#endif
     if (ret <= 0) {
         if (!ret)
             return -1;
@@ -711,10 +742,12 @@ usock_alloc(unsigned short proto, unsigned short type)
         usock_read_init(usockp);
     }
 
+    RTE_LOG(DEBUG, USOCK, "%s: FD %d F_GETFL\n", __func__, usockp->usock_fd);
     flags = fcntl(usockp->usock_fd, F_GETFL);
     if (flags == -1)
         goto error_exit;
 
+    RTE_LOG(DEBUG, USOCK, "%s: FD %d F_SETFL\n", __func__, usockp->usock_fd);
     error = fcntl(usockp->usock_fd, F_SETFL, flags | O_NONBLOCK);
     if (error == -1)
         goto error_exit;
@@ -879,6 +912,8 @@ vr_usocket_connect(struct vr_usocket *usockp)
     memset(sun.sun_path, 0, sizeof(sun.sun_path));
     strncpy(sun.sun_path, VR_PACKET_AGENT_UNIX_FILE, sizeof(sun.sun_path) - 1);
 
+    RTE_LOG(DEBUG, USOCK, "%s: FD %d retry connecting\n", __func__, usockp->usock_fd);
+    rte_hexdump(stdout, "usock address", &sun, sizeof(sun));
     return vr_dpdk_retry_connect(usockp->usock_fd, (struct sockaddr *)&sun,
                                         sizeof(sun));
 }
@@ -889,6 +924,8 @@ vr_usocket_accept(struct vr_usocket *usockp)
     int ret;
 
     ret = accept(usockp->usock_fd, NULL, NULL);
+    RTE_LOG(DEBUG, USOCK, "%s: FD %d accepted %d\n", __func__,
+                    usockp->usock_fd, ret);
     if (ret < 0) {
         usock_set_error(usockp, ret);
         return ret;
@@ -913,6 +950,7 @@ vr_usocket_bind(struct vr_usocket *usockp)
     bool server;
 
     optval = 1;
+    RTE_LOG(DEBUG, USOCK, "%s: FD %d setting option\n", __func__, usockp->usock_fd);
     if (setsockopt(usockp->usock_fd, SOL_SOCKET, SO_REUSEADDR, &optval,
                 sizeof(optval)))
         return -errno;
@@ -956,11 +994,14 @@ vr_usocket_bind(struct vr_usocket *usockp)
         return -EINVAL;
     }
 
+    RTE_LOG(DEBUG, USOCK, "%s: FD %d binding\n", __func__, usockp->usock_fd);
+    rte_hexdump(stdout, "usock address", addr, addrlen);
     error = bind(usockp->usock_fd, addr, addrlen);
     if (error < 0)
         return error;
 
     if (server) {
+        RTE_LOG(DEBUG, USOCK, "%s: FD %d listening\n", __func__, usockp->usock_fd);
         error = listen(usockp->usock_fd, 1);
         if (error < 0)
             return error;
