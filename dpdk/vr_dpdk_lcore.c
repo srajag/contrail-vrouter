@@ -287,24 +287,26 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     return 0;
 }
 
+/* Wait for a command to complete */
+static void
+dpdk_lcore_cmd_wait(struct vr_dpdk_lcore *lcore)
+{
+    while (rte_atomic16_read(&lcore->lcore_cmd) != VR_DPDK_LCORE_NO_CMD);
+}
+
 /* Post an lcore command */
 void
 vr_dpdk_lcore_cmd_post(struct vr_dpdk_lcore *lcore, uint16_t cmd,
     uint32_t cmd_param)
 {
+    /* wait for previous command to complete */
+    /* TODO: rte_atomic16_cmpset() to make it thread safe */
+    dpdk_lcore_cmd_wait(lcore);
+
     rte_atomic32_set(&lcore->lcore_cmd_param, cmd_param);
     rte_atomic16_set(&lcore->lcore_cmd, cmd);
 
     vr_dpdk_packet_wakeup(lcore);
-    /* wake up the pkt0 thread */
-    vr_dpdk_packet_tx(lcore);
-}
-
-/* Wait for the command completion */
-static void
-dpdk_lcore_cmd_wait(struct vr_dpdk_lcore *lcore)
-{
-    while (rte_atomic16_read(&lcore->lcore_cmd) != VR_DPDK_LCORE_NO_CMD);
 }
 
 /* Release RX and TX queues
@@ -636,6 +638,7 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
             /* remove the queue from the lcore */
             dpdk_lcore_rx_queue_remove(lcore, rx_queue);
         }
+        rte_atomic16_set(&lcore->lcore_cmd, VR_DPDK_LCORE_NO_CMD);
         break;
     case VR_DPDK_LCORE_TX_RM_CMD:
         vif_idx = cmd_param;
@@ -644,14 +647,13 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
             /* remove the queue from the lcore */
             dpdk_lcore_tx_queue_remove(lcore, tx_queue);
         }
+        rte_atomic16_set(&lcore->lcore_cmd, VR_DPDK_LCORE_NO_CMD);
         break;
     case VR_DPDK_LCORE_STOP_CMD:
         ret = -1;
+        /* do not reset stop command, so we can break nested loops */
         break;
     }
-
-    rte_atomic16_set(&lcore->lcore_cmd, VR_DPDK_LCORE_NO_CMD);
-    rte_wmb();
 
     return ret;
 }
@@ -746,10 +748,10 @@ dpdk_lcore_service_loop(struct vr_dpdk_lcore *lcore, unsigned netlink_lcore_id,
         if (netlink_lcore_id != packet_lcore_id)
             break;
 
-        usleep(VR_DPDK_SLEEP_SERVICE_US);
-        /* handle an IPC command */
-        if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
+        if (unlikely(vr_dpdk_is_stop_flag_set()))
             break;
+
+        usleep(VR_DPDK_SLEEP_SERVICE_US);
     } /* lcore loop */
 
     RTE_LOG(DEBUG, VROUTER, "Bye-bye from service lcore %u\n", rte_lcore_id());
