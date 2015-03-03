@@ -790,8 +790,15 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
-    if (likely(tx_queue->txq_ops.f_tx != NULL))
+    if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
+        if (lcore_id == vr_dpdk.packet_lcore_id)
+            tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+    } else {
+        RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
+                __func__, vif->vif_name, lcore_id);
+        rte_pktmbuf_free(m);
+    }
 
     return 0;
 }
@@ -833,8 +840,15 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
-    if (likely(tx_queue->txq_ops.f_tx != NULL))
+    if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
+        if (lcore_id == vr_dpdk.packet_lcore_id)
+            tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+    } else {
+        RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
+                __func__, vif->vif_name, lcore_id);
+        rte_pktmbuf_free(m);
+    }
 
     return 0;
 }

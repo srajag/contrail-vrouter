@@ -29,6 +29,7 @@
 #include "vr_dpdk.h"
 
 #include <rte_hexdump.h>
+#include <rte_timer.h>
 
 #define INFINITE_TIMEOUT    -1
 
@@ -1075,6 +1076,8 @@ vr_usocket_io(void *transport)
     struct pollfd *pfd;
     struct vr_usocket *usockp = (struct vr_usocket *)transport;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[rte_lcore_id()];
+    unsigned lcore_id = rte_lcore_id();
+    unsigned master_lcore_id = rte_get_master_lcore();
 
     if (!usockp)
         return -1;
@@ -1108,6 +1111,11 @@ vr_usocket_io(void *transport)
 
         ret = poll(usockp->usock_pfds, usockp->usock_max_cfds,
                 timeout);
+
+        /* manage timers on pkt0 lcore */
+        if (lcore_id == vr_dpdk.packet_lcore_id
+            && lcore_id != master_lcore_id)
+            rte_timer_manage();
 
         if (ret < 0) {
             usock_set_error(usockp, ret);

@@ -489,13 +489,8 @@ dpdk_work_timer(struct rte_timer *timer, void *arg)
 static void
 dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 {
-    uint64_t hz, ticks;
-
     struct rte_timer *timer;
     struct vr_timer *vtimer;
-
-    hz = rte_get_timer_hz();
-    ticks = hz / 10000;
 
     timer = dpdk_malloc(sizeof(struct rte_timer));
     if (!timer) {
@@ -512,11 +507,14 @@ dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
     vtimer->vt_timer = fn;
     vtimer->vt_vr_arg = arg;
     vtimer->vt_os_arg = timer;
-    vtimer->vt_msecs = ticks * 1000;
+    vtimer->vt_msecs = 1;
 
     rte_timer_init(timer);
 
-    if (rte_timer_reset(timer, ticks, SINGLE, rte_lcore_id(),
+    RTE_LOG(DEBUG, VROUTER, "%s: reset timer %p REINJECTING: lcore_id %u\n",
+            __func__, timer, vr_dpdk.packet_lcore_id);
+    /* schedule task to pkt0 lcore */
+    if (rte_timer_reset(timer, 0, SINGLE, vr_dpdk.packet_lcore_id,
         dpdk_work_timer, vtimer) == -1) {
         RTE_LOG(ERR, VROUTER, "Error resetting timer\n");
         rte_free(timer);
@@ -525,6 +523,8 @@ dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
         return;
     }
 
+    /* wake up pkt0 lcore */
+    vr_dpdk_packet_wakeup(vr_dpdk.lcores[vr_dpdk.packet_lcore_id]);
     return;
 }
 
