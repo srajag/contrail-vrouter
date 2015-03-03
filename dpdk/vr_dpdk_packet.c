@@ -37,6 +37,8 @@ dpdk_packet_io(void)
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[rte_lcore_id()];
 
 wait_for_connection:
+    RTE_LOG(DEBUG, VROUTER, "%s[%lx]: waiting for packet transport\n",
+                __func__, pthread_self());
     while (!vr_dpdk.packet_transport) {
         /* handle an IPC command */
         if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
@@ -44,6 +46,8 @@ wait_for_connection:
         usleep(VR_DPDK_SLEEP_SERVICE_US);
     }
 
+    RTE_LOG(DEBUG, VROUTER, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+                ((struct vr_usocket *)vr_dpdk.packet_transport)->usock_fd);
     ret = vr_usocket_io(vr_dpdk.packet_transport);
     if (ret < 0) {
         vr_dpdk.packet_transport = NULL;

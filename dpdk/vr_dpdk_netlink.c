@@ -199,6 +199,8 @@ vr_netlink_uvhost_vif_add(char *vif_name, unsigned int vif_idx,
 int
 dpdk_netlink_io(void)
 {
+    RTE_LOG(DEBUG, VROUTER, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+                ((struct vr_usocket *)vr_dpdk.netlink_sock)->usock_fd);
     return vr_usocket_io(vr_dpdk.netlink_sock);
 }
 
