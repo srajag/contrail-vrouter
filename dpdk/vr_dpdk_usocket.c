@@ -588,6 +588,8 @@ retry_read:
                 (errno == EWOULDBLOCK))
             return 0;
 
+        RTE_LOG(ERR, USOCK, "Error reading FD %d: %s (%d)\n",
+                usockp->usock_fd, strerror(errno), errno);
         return ret;
     }
 
