@@ -461,13 +461,14 @@ vr_dpdk_packets_vroute(struct vr_interface *vif, struct vr_packet *pkts[VR_DPDK_
 
     for (i = 0; i < nb_pkts; i++) {
         pkt = pkts[i];
+        rte_prefetch0(pkt);
+
 #ifdef VR_DPDK_RX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
         if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
 #endif
         rte_pktmbuf_dump(stdout, vr_dpdk_pkt_to_mbuf(pkt), 0x60);
 #endif
-        rte_prefetch0(pkt);
 
         /* send the packet to vRouter */
         vif->vif_rx(vif, pkt, VLAN_ID_INVALID);
@@ -518,6 +519,7 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
     int i;
     struct vr_dpdk_ring_to_push *rtp;
     uint16_t nb_rtp;
+    struct rte_ring *ring;
 
     /* TODO: skip RX queues with no packets to read
      * RX operation for KNIs is quite expensive. We used rx_queue_mask to
@@ -532,12 +534,13 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
     nb_rtp = lcore->lcore_nb_rings_to_push;
     while (nb_rtp > 0) {
         nb_rtp--;
-        if (unlikely(rtp->rtp_tx_ring == NULL)) {
+        ring = rtp->rtp_tx_ring;
+        if (unlikely(ring == NULL)) {
             rtp++;
             continue;
         }
 
-        nb_pkts = rte_ring_sc_dequeue_burst(rtp->rtp_tx_ring, (void **)pkts,
+        nb_pkts = rte_ring_sc_dequeue_burst(ring, (void **)pkts,
             VR_DPDK_MAX_BURST_SZ-1);
         if (likely(nb_pkts != 0)) {
             total_pkts += nb_pkts;
