@@ -78,6 +78,7 @@ dpdk_packet_socket_init(void)
 {
     unsigned lcore_id;
     struct vr_dpdk_lcore *lcorep;
+    void *event_sock = NULL;
 
     vr_dpdk.packet_transport = (void *)vr_usocket(PACKET, RAW);
     if (!vr_dpdk.packet_transport)
@@ -101,19 +102,22 @@ dpdk_packet_socket_init(void)
 
     RTE_LCORE_FOREACH_SLAVE(lcore_id) {
         lcorep = vr_dpdk.lcores[lcore_id];
-        lcorep->lcore_event_sock = (void *)vr_usocket(EVENT, RAW);
-        if (!lcorep->lcore_event_sock) {
+        event_sock = (void *)vr_usocket(EVENT, RAW);
+        if (!event_sock) {
             goto error;
         }
 
         if (vr_usocket_bind_usockets(vr_dpdk.packet_transport,
-                    lcorep->lcore_event_sock))
+                    event_sock))
             goto error;
+        lcorep->lcore_event_sock = event_sock;
     }
 
     return 0;
 
 error:
+    if (event_sock)
+        vr_usocket_close(event_sock);
     vr_usocket_close(vr_dpdk.packet_transport);
     vr_dpdk.packet_transport = NULL;
 
