@@ -330,12 +330,9 @@ __usock_write(struct vr_usocket *usockp)
 
 retry_write:
 #ifdef VR_DPDK_TX_PKT_DUMP
-    /* TODO: too much writes */
-    if (len != 8) {
-        RTE_LOG(DEBUG, USOCK, "%s: FD %d writing %d bytes\n",
-                    __func__, usockp->usock_fd, len);
-        rte_hexdump(stdout, "usock buffer", buf, len);
-    }
+    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d writing %d bytes\n",
+                __func__, pthread_self(), usockp->usock_fd, len);
+    rte_hexdump(stdout, "usock buffer", buf, len);
 #endif
     ret = write(usockp->usock_fd, buf, len);
     if (ret > 0) {
@@ -574,13 +571,10 @@ __usock_read(struct vr_usocket *usockp)
 retry_read:
     ret = read(usockp->usock_fd, buf + offset, toread);
 #ifdef VR_DPDK_RX_PKT_DUMP
-    /* TODO: too many reads */
-    if (ret != 8) {
-        RTE_LOG(DEBUG, USOCK, "%s: FD %d read returned %d\n", __func__,
-                usockp->usock_fd, ret);
-        if (ret > 0)
-            rte_hexdump(stdout, "usock buffer", buf + offset, ret);
-    }
+    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d read returned %d: %s (%d)\n", __func__,
+            pthread_self(), usockp->usock_fd, ret, strerror(errno), errno);
+    if (ret > 0)
+        rte_hexdump(stdout, "usock buffer", buf + offset, ret);
 #endif
     if (ret <= 0) {
         if (!ret)

@@ -474,7 +474,6 @@ vr_dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
     SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, q_next) {
         tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
     }
-    vr_dpdk_packet_wakeup(lcore);
 }
 /* Send a burst of vr_packets to vRouter */
 void

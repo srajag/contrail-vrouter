@@ -20,7 +20,7 @@ vr_dpdk_packet_wakeup(struct vr_dpdk_lcore *lcorep)
     int ret;
     uint64_t event = 1;
 
-    if (unlikely(lcorep->lcore_event_sock != NULL)) {
+    if (likely(lcorep->lcore_event_sock != NULL)) {
         ret = vr_usocket_write(lcorep->lcore_event_sock, (unsigned char *)&event,
                 sizeof(event));
         if (ret < 0) {
