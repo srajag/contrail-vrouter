@@ -37,6 +37,8 @@ vr_dpdk_phys_lcore_least_used_get(void)
     unsigned int num_queues;
 
     RTE_LCORE_FOREACH(lcore_id) {
+        if (lcore_id == vr_dpdk.packet_lcore_id)
+            continue;
         lcore = vr_dpdk.lcores[lcore_id];
         num_queues = lcore->lcore_nb_rx_queues + lcore->lcore_nb_rings_to_push;
 
