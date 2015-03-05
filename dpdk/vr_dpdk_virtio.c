@@ -124,10 +124,8 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id =
         vr_dpdk_phys_lcore_least_used_get();
     if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id ==
-        RTE_MAX_LCORE) {
-        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id =
-            vr_dpdk_lcore_least_used_get();
-    }
+        RTE_MAX_LCORE)
+        goto error;
 
     dpdk_ring_to_push_add(
         vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id,
@@ -153,6 +151,10 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     return rx_queue;
 
 error:
+    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring) {
+        rte_free(vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring);
+        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring = NULL;
+    }
     RTE_LOG(ERR, VROUTER, "\terror creating lcore %u RX ring for queue %u vif %u\n",
         lcore_id, queue_id, vif_idx);
     return NULL;

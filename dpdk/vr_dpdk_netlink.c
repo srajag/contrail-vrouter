@@ -157,6 +157,8 @@ vr_netlink_uvhost_vif_del(int vif_idx)
      */
     if (send(vr_nl_uvh_sock, (void *) &msg, sizeof(msg), 0) !=
              sizeof(msg)) {
+        RTE_LOG(ERR, VROUTER, "\terror deleting vif from user space vhost:"
+            " %s (%d)\n", strerror(errno), errno);
         return -1;
     }
 
@@ -189,7 +191,7 @@ vr_netlink_uvhost_vif_add(char *vif_name, unsigned int vif_idx,
     if (send(vr_nl_uvh_sock, (void *) &msg, sizeof(msg), 0) !=
              sizeof(msg)) {
         RTE_LOG(ERR, VROUTER, "\terror adding vif to user space vhost:"
-            " send error\n");
+            " %s (%d)\n", strerror(errno), errno);
         return -1;
     }
 
@@ -225,14 +227,13 @@ vr_nl_uvhost_connect(void)
     int s = 0, ret = -1, err;
     struct sockaddr_un nl_sun, uvh_sun;
 
-    RTE_LOG(INFO, VROUTER, "Starting NetLink...\n");
     s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (s == -1) {
-        RTE_LOG(ERR, VROUTER, "\terror connecting to NetLink: %s (%d)\n",
+        RTE_LOG(ERR, VROUTER, "\terror connecting to uvhost: %s (%d)\n",
                         strerror(errno), errno);
         goto error;
     }
-    RTE_LOG(INFO, VROUTER, "\tNetLink socket FD is %d\n", s);
+    RTE_LOG(INFO, VROUTER, "\tuvhost socket FD is %d\n", s);
 
     memset(&nl_sun, 0, sizeof(nl_sun));
     nl_sun.sun_family = AF_UNIX;
@@ -242,7 +243,7 @@ vr_nl_uvhost_connect(void)
     unlink(nl_sun.sun_path);
     ret = bind(s, (struct sockaddr *) &nl_sun, sizeof(nl_sun));
     if (ret == -1) {
-        RTE_LOG(ERR, VROUTER, "\terror binding NetLink FD %d to %s: %s (%d)\n",
+        RTE_LOG(ERR, VROUTER, "\terror binding uvhost FD %d to %s: %s (%d)\n",
                         s, nl_sun.sun_path, strerror(errno), errno);
         goto error;
     }
@@ -256,7 +257,7 @@ vr_nl_uvhost_connect(void)
     strncpy(uvh_sun.sun_path, VR_UVH_NL_SOCK, sizeof(uvh_sun.sun_path) - 1);
     ret = vr_dpdk_retry_connect(s, (struct sockaddr *) &uvh_sun, sizeof(uvh_sun));
     if (ret == -1) {
-        RTE_LOG(ERR, VROUTER, "\terror connecting NetLink socket FD %d to %s: %s (%d)\n",
+        RTE_LOG(ERR, VROUTER, "\terror connecting uvhost socket FD %d to %s: %s (%d)\n",
                         s, uvh_sun.sun_path, strerror(errno), errno);
         goto error;
     }
@@ -281,13 +282,15 @@ dpdk_netlink_init(void)
 {
     int ret;
 
+    RTE_LOG(INFO, VROUTER, "Starting NetLink...\n");
     ret = vr_message_transport_register(&dpdk_nl_transport);
     if (ret)
         return ret;
 
     vr_dpdk.netlink_sock = vr_usocket(NETLINK, TCP);
     if (!vr_dpdk.netlink_sock) {
-        RTE_LOG(ERR, VROUTER, "Failed to create the NETLINK server socket\n");
+        RTE_LOG(ERR, VROUTER, "\terror creating NetLink server socket: %s (%d)\n",
+                strerror(errno), errno);
         return -1;
     }
 
@@ -296,12 +299,12 @@ dpdk_netlink_init(void)
         vr_message_transport_unregister(&dpdk_nl_transport);
         vr_usocket_close(vr_dpdk.netlink_sock);
 
-        RTE_LOG(ERR, VROUTER, "Failed to create vhost connection\n");
+        RTE_LOG(ERR, VROUTER, "\terror creating uvhost connection\n");
         return -1;
     }
 
     if (rte_lcore_count() == VR_DPDK_MIN_LCORES) {
-        RTE_LOG(INFO, VROUTER, "Setting NetLink socket to non-blocking\n");
+        RTE_LOG(INFO, VROUTER, "\tsetting NetLink socket to non-blocking\n");
         vr_usocket_non_blocking(vr_dpdk.netlink_sock);
     }
 

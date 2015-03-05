@@ -361,7 +361,8 @@ vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
     }
 
     if (vr_uvhost_cl_msg_handlers[msg->request]) {
-        vr_uvhost_log("Calling handler for message %d\n", msg->request);
+        vr_uvhost_log("Calling handler for message %d client %s\n",
+                                    msg->request, vru_cl->vruc_path);
         return vr_uvhost_cl_msg_handlers[msg->request](vru_cl);
     } else {
         vr_uvhost_log("No handler defined for message %d\n", msg->request);
@@ -468,6 +469,8 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
                    vru_cl->vruc_num_fds_sent = (cmsg->cmsg_len - CMSG_LEN(0))/
                                                    sizeof(int);
                    if (vru_cl->vruc_num_fds_sent > VHOST_MEMORY_MAX_NREGIONS) {
+                        vr_uvhost_log("Too many FDs sent: %d\n",
+                                        vru_cl->vruc_num_fds_sent);
                        vru_cl->vruc_num_fds_sent = VHOST_MEMORY_MAX_NREGIONS;
                    }
 
@@ -505,7 +508,7 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
             }
 
             vr_uvhost_log(
-                "Read returned %d, %d %d %d in vhost server for client %s\n",
+                "Error: read returned %d, %d %d %d in vhost server for client %s\n",
                 ret, errno, read_len,
                 vru_cl->vruc_msg_bytes_read, vru_cl->vruc_path);
             return -1;
@@ -666,14 +669,16 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
         return -1;
     }
 
-    vr_uvhost_log("Adding vif %s...\n", msg->vrnu_vif_name);
+    vr_uvhost_log("Adding vif %d virtual device %s\n", msg->vrnu_vif_idx,
+                        msg->vrnu_vif_name);
     s = socket(AF_UNIX, SOCK_STREAM, 0);
     if (s == -1) {
         vr_uvhost_log("\terror creating socket: %s (%d)\n",
                         strerror(errno), errno);
         goto error;
     }
-    vr_uvhost_log("\tvif %s socket FD is %d\n", msg->vrnu_vif_name, s);
+    vr_uvhost_log("\tvirtual device %s socket FD is %d\n",
+                            msg->vrnu_vif_name, s);
 
     memset(&sun, 0, sizeof(sun));
     strncpy(sun.sun_path, VR_UVH_VIF_PREFIX, sizeof(sun.sun_path) - 1);

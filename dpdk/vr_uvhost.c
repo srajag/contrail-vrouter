@@ -80,7 +80,7 @@ vr_uvhost_start(void *arg)
 
     vr_uvhost_client_init();
 
-    vr_uvhost_log("Starting user space vhost server...\n");
+    vr_uvhost_log("Starting uvhost server...\n");
     s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (s == -1) {
         vr_uvhost_log("\terror creating server socket: %s (%d)\n",
