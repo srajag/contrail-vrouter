@@ -25,6 +25,8 @@
 #include "vr_dpdk_virtio.h"
 #include "vr_dpdk_usocket.h"
 
+#include <rte_hexdump.h>
+
 typedef int (*vr_uvh_msg_handler_fn)(vr_uvh_client_t *vru_cl);
 
 /*
@@ -502,6 +504,17 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
     if (read_len) {
         ret = read(fd, (((char *)&vru_cl->vruc_msg) + vru_cl->vruc_msg_bytes_read),
                    read_len);
+#ifdef VR_DPDK_RX_PKT_DUMP
+        if (ret > 0) {
+            RTE_LOG(DEBUG, UVHOST, "%s[%lx]: FD %d read %d bytes\n", __func__,
+                pthread_self(), fd, ret);
+            rte_hexdump(stdout, "uvhost message dump:",
+                (((char *)&vru_cl->vruc_msg) + vru_cl->vruc_msg_bytes_read), ret);
+        } else if (ret < 0) {
+            RTE_LOG(DEBUG, UVHOST, "%s[%lx]: FD %d read returned error %d: %s (%d)\n", __func__,
+                pthread_self(), fd, ret, strerror(errno), errno);
+        }
+#endif
         if (ret < 0) {
             if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
                 return 0;

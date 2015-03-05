@@ -33,12 +33,14 @@
 
 #define RTE_LOGTYPE_VROUTER         RTE_LOGTYPE_USER1
 #define RTE_LOGTYPE_USOCK           RTE_LOGTYPE_USER2
+#define RTE_LOGTYPE_UVHOST          RTE_LOGTYPE_USER3
 #undef RTE_LOG_LEVEL
 #define RTE_LOG_LEVEL               RTE_LOG_DEBUG
 #define VR_DPDK_RX_PKT_DUMP
 #define VR_DPDK_TX_PKT_DUMP
 #define VR_DPDK_PKT_DUMP_VIF_FILTER(vif) ((vif)->vif_type == VIF_TYPE_AGENT \
-                                            || (vif)->vif_type == VIF_TYPE_VIRTUAL)
+                                        || (vif)->vif_type == VIF_TYPE_VIRTUAL)
+
 /*
  * Debug options:
  *
@@ -48,7 +50,7 @@
 #define VR_DPDK_RX_PKT_DUMP
 #define VR_DPDK_TX_PKT_DUMP
 #define VR_DPDK_PKT_DUMP_VIF_FILTER(vif) (vif->vif_type == VIF_TYPE_AGENT \
-                                            || vif->vif_type == VIF_TYPE_VIRTUAL)
+                                        || vif->vif_type == VIF_TYPE_VIRTUAL)
  */
 
 /* Default lcore mask. Used only when sched_getaffinity() is failed */

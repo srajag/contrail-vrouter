@@ -280,6 +280,8 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     uint32_t pkt_len;
 
     if (vq->vdv_ready_state == VQ_NOT_READY) {
+        DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p is not ready\n",
+                __func__, vq);
         return 0;
     }
 
@@ -290,6 +292,8 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
      */
     num_pkts = vq_hard_avail_idx - vq->vdv_soft_avail_idx;
     if (num_pkts == 0) {
+        DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p has no packets\n",
+                    __func__, vq);
         return 0;
     }
 
@@ -297,7 +301,8 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         num_pkts = max_pkts;
     }
 
-    RTE_LOG(DEBUG, VROUTER, "%s: num_pkts=%u\n", __func__, num_pkts);
+    DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p num_pkts=%u\n",
+            __func__, vq, num_pkts);
     for (i = 0; i < num_pkts; i++) {
         next_avail_idx = (vq->vdv_soft_avail_idx + i) &
                              (vq->vdv_vvs.num - 1);
@@ -316,10 +321,14 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
             /*
              * TODO - make sure desc->next is sane
              */
+            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u F_NEXT\n",
+                __func__, vq, i);
             desc = &vq->vdv_desc[desc->next];
             pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
             pkt_len = desc->len;
         } else {
+            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u no F_NEXT\n",
+                __func__, vq, i);
             pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
             if (pkt_addr) {
                 pkt_addr += sizeof(struct virtio_net_hdr);
@@ -328,10 +337,14 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         }
 
         if (pkt_addr) {
+            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u addr %p\n",
+                __func__, vq, i, pkt_addr);
             mbuf = rte_pktmbuf_alloc(vr_dpdk_virtio_get_mempool());
+            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u mbuf %p\n",
+                __func__, vq, i, mbuf);
             if (mbuf != NULL) {
                 mbuf->pkt.data_len = pkt_len;
-                mbuf->pkt.pkt_len = mbuf->pkt.data_len;
+                mbuf->pkt.pkt_len = pkt_len;
 
                 rte_memcpy(mbuf->pkt.data, pkt_addr, pkt_len);
                 pkts[pkts_sent] = mbuf;
@@ -348,6 +361,8 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     vq_hard_used_idx = (*((volatile uint16_t *)&vq->vdv_used->idx));
     *((volatile uint16_t *) &vq->vdv_used->idx) = vq_hard_used_idx + num_pkts;
 
+    DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkts_sent %u\n",
+            __func__, vq, pkts_sent);
     return pkts_sent;
 }
 
@@ -772,6 +787,8 @@ vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
     vq = (vr_dpdk_virtioq_t *) rx_queue->q_queue_h;
     vq_pring = vq->vdv_pring;
 
+    RTE_LOG(DEBUG, VROUTER, "%s: enqueue %u pakets to ring %p\n",
+                __func__, npkts, vq_pring);
     rte_ring_sp_enqueue_bulk(vq_pring, (void **) pkt_arr, npkts);
 
     return;

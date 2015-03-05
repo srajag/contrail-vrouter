@@ -347,7 +347,7 @@ retry_write:
 #ifdef VR_DPDK_TX_PKT_DUMP
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d writing %d bytes\n",
                 __func__, pthread_self(), usockp->usock_fd, len);
-    rte_hexdump(stdout, "usock buffer", buf, len);
+    rte_hexdump(stdout, "usock buffer dump:", buf, len);
 #endif
     ret = write(usockp->usock_fd, buf, len);
     if (ret > 0) {
@@ -444,7 +444,7 @@ usock_mbuf_write(struct vr_usocket *usockp, struct rte_mbuf *mbuf)
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d sending message\n", __func__,
             pthread_self(), usockp->usock_fd);
 #ifdef VR_DPDK_TX_PKT_DUMP
-    rte_hexdump(stdout, "usock message", &mhdr, sizeof(mhdr));
+    rte_hexdump(stdout, "usock message dump:", &mhdr, sizeof(mhdr));
 #endif
     return sendmsg(usockp->usock_fd, &mhdr, MSG_DONTWAIT);
 }
@@ -591,10 +591,14 @@ __usock_read(struct vr_usocket *usockp)
 retry_read:
     ret = read(usockp->usock_fd, buf + offset, toread);
 #ifdef VR_DPDK_RX_PKT_DUMP
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d read returned %d: %s (%d)\n", __func__,
+    if (ret > 0) {
+        RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d read %d bytes\n", __func__,
+            pthread_self(), usockp->usock_fd, ret);
+        rte_hexdump(stdout, "usock buffer dump:", buf + offset, ret);
+    } else if (ret < 0) {
+        RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d read returned error %d: %s (%d)\n", __func__,
             pthread_self(), usockp->usock_fd, ret, strerror(errno), errno);
-    if (ret > 0)
-        rte_hexdump(stdout, "usock buffer", buf + offset, ret);
+    }
 #endif
     if (ret <= 0) {
         if (!ret)
@@ -952,7 +956,7 @@ vr_usocket_connect(struct vr_usocket *usockp)
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d retry connecting\n", __func__,
             pthread_self(), usockp->usock_fd);
-    rte_hexdump(stdout, "usock address", &sun, sizeof(sun));
+    rte_hexdump(stdout, "usock address dump:", &sun, sizeof(sun));
     return vr_dpdk_retry_connect(usockp->usock_fd, (struct sockaddr *)&sun,
                                         sizeof(sun));
 }
@@ -1038,7 +1042,7 @@ vr_usocket_bind(struct vr_usocket *usockp)
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d binding\n", __func__, pthread_self(),
             usockp->usock_fd);
-    rte_hexdump(stdout, "usock address", addr, addrlen);
+    rte_hexdump(stdout, "usock address dump:", addr, addrlen);
     error = bind(usockp->usock_fd, addr, addrlen);
     if (error < 0)
         return error;
