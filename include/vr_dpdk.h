@@ -411,6 +411,26 @@ struct vr_packet * vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *v
 /* Retry socket connection */
 int vr_dpdk_retry_connect(int sockfd, const struct sockaddr *addr,
                             socklen_t alen);
+/* Generates unique log message */
+int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
+                    const char *format, ...);
+#define DPDK_ULOG(l, t, h, ...)                         \
+    (void)(((RTE_LOG_ ## l <= RTE_LOG_LEVEL) &&         \
+    (RTE_LOG_ ## l <= rte_logs.level) &&                \
+    (RTE_LOGTYPE_ ## t & rte_logs.type)) ?              \
+    vr_dpdk_ulog(RTE_LOG_ ## l,                         \
+        RTE_LOGTYPE_ ## t, h, # t ": " __VA_ARGS__) : 0)
+
+#if RTE_LOG_LEVEL == RTE_LOG_DEBUG
+#define DPDK_DEBUG_VAR(v) v
+#define DPDK_UDEBUG(t, h, ...)                          \
+    (void)(((RTE_LOGTYPE_ ## t & rte_logs.type)) ?      \
+    vr_dpdk_ulog(RTE_LOG_DEBUG,                         \
+        RTE_LOGTYPE_ ## t, h, # t ": " __VA_ARGS__) : 0)
+#else
+#define DPDK_DEBUG_VAR(v)
+#define DPDK_UDEBUG(t, h, ...)
+#endif
 
 /*
  * vr_dpdk_interface.c

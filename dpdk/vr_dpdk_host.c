@@ -1182,3 +1182,62 @@ vr_dpdk_retry_connect(int sockfd, const struct sockaddr *addr,
 
     return -1;
 }
+
+/* Returns a string hash */
+static inline uint32_t
+dpdk_strhash(const char *k, uint32_t initval)
+{
+    uint32_t a, b, c;
+
+    a = b = RTE_JHASH_GOLDEN_RATIO;
+    c = initval;
+
+    do {
+        if (*k) {
+            a += k[0];
+            k++;
+        }
+        if (*k) {
+            b += k[0];
+            k++;
+        }
+        if (*k) {
+            c += k[0];
+            k++;
+        }
+        __rte_jhash_mix(a, b, c);
+    } while (*k);
+
+    return c;
+}
+
+/* Generates unique log message */
+int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
+                    const char *format, ...)
+{
+    va_list ap;
+    int ret;
+    uint32_t hash;
+    char buf[256];
+
+    /* fallback to rte_log */
+    if (last_hash == NULL) {
+        va_start(ap, format);
+        ret = rte_log(level, logtype, "%s", buf);
+        va_end(ap);
+    } else {
+        /* calculate message hash */
+        va_start(ap, format);
+        vsnprintf(buf, sizeof(buf) - 1, format, ap);
+        va_end(ap);
+        buf[sizeof(buf) - 1] = '\0';
+        hash = dpdk_strhash(buf, level + logtype);
+
+        if (hash != *last_hash) {
+            *last_hash = hash;
+            ret = rte_log(level, logtype, "%s", buf);
+        }
+    }
+
+    return ret;
+}
