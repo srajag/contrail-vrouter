@@ -15,6 +15,7 @@
  */
 #define _GNU_SOURCE
 #include <sched.h>
+#include <unistd.h>
 
 #include <getopt.h>
 #include <signal.h>
@@ -134,11 +135,8 @@ dpdk_core_mask_get(void) {
     cpu_set_t cs;
     uint64_t cpu_core_mask = 0;
     int i;
+    long system_cpus_count, core_mask_count;
 
-    /*
-     * If it is impossible to get the cpu_set_t structure, return
-     * VR_DPDK_DEF_LCORE_MASK as a default value.
-     */
     if (sched_getaffinity(0, sizeof(cs), &cs) < 0)
         return VR_DPDK_DEF_LCORE_MASK;
 
@@ -155,7 +153,20 @@ dpdk_core_mask_get(void) {
             cpu_core_mask |= (uint64_t)1 << i;
     }
 
-    if(!cpu_core_mask)
+    if (!cpu_core_mask)
+        return VR_DPDK_DEF_LCORE_MASK;
+
+    /*
+     * Do not allow to run vRouter on all the cores available, as some have
+     * to be left for virtual machines.
+     */
+    system_cpus_count = sysconf(_SC_NPROCESSORS_CONF);
+    if (system_cpus_count == -1)
+        return VR_DPDK_DEF_LCORE_MASK;
+
+    core_mask_count
+        = __builtin_popcountll((unsigned long long)cpu_core_mask);
+    if (core_mask_count == system_cpus_count)
         return VR_DPDK_DEF_LCORE_MASK;
 
     return cpu_core_mask;
