@@ -626,12 +626,12 @@ dpdk_hw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
      * and proper l2/l3 lens to be set.
      */
     iph->ip_csum = 0;
-    m->pkt.vlan_macip.f.l2_len = offset - rte_pktmbuf_headroom(m);
-    m->pkt.vlan_macip.f.l3_len = iph_len;
+    m->outer_l3_len = iph_len;
+    m->outer_l2_len = offset - rte_pktmbuf_headroom(m);
 
-    RTE_LOG(DEBUG, VROUTER, "%s: Inner offset: l2_len = %d, l3_len = %d\n", __func__,
-        (int)m->pkt.vlan_macip.f.l2_len,
-        (int)m->pkt.vlan_macip.f.l3_len);
+    RTE_LOG(DEBUG, VROUTER, "%s: Outer packet: l2_len = %d, l3_len = %d\n", __func__,
+        (int)m->outer_l2_len,
+        (int)m->outer_l3_len);
 
     /* calculate TCP/UDP checksum */
     if (likely(iph->ip_proto == VR_IP_PROTO_UDP)) {
@@ -727,10 +727,10 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         vif->vif_name);
 
     /* reset mbuf data pointer and length */
-    m->pkt.data = pkt_data(pkt);
-    m->pkt.data_len = pkt_head_len(pkt);
-    /* TODO: use pkt_len instead? */
-    m->pkt.pkt_len = pkt_head_len(pkt);
+    m->data_off = pkt_head_space(pkt);
+    m->data_len = pkt_head_len(pkt);
+    /* TODO: we do not support mbuf chains */
+    m->pkt_len = pkt_head_len(pkt);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
@@ -829,10 +829,10 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
         vif->vif_name);
 
     /* reset mbuf data pointer and length */
-    m->pkt.data = pkt_data(pkt);
-    m->pkt.data_len = pkt_head_len(pkt);
-    /* TODO: use pkt_len instead? */
-    m->pkt.pkt_len = pkt_head_len(pkt);
+    m->data_off = pkt_head_space(pkt);
+    m->data_len = pkt_head_len(pkt);
+    /* TODO: we do not support mbuf chains */
+    m->pkt_len = pkt_head_len(pkt);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];

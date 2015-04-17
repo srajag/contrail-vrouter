@@ -355,10 +355,10 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
             if (!mbuf)
                 break;
 
-            mbuf->pkt.data_len = pkt_len;
-            mbuf->pkt.pkt_len = pkt_len;
+            mbuf->data_len = pkt_len;
+            mbuf->pkt_len = pkt_len;
 
-            rte_memcpy(mbuf->pkt.data, pkt_addr, pkt_len);
+            rte_memcpy(rte_pktmbuf_mtod(mbuf, void *), pkt_addr, pkt_len);
 
             /* gather mbuf from several vring buffers (fixes FreeBSD) */
             while (desc->flags & VRING_DESC_F_NEXT) {
@@ -505,7 +505,7 @@ dpdk_virtio_to_vm_flush(void *arg)
                             rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]);
         }
 
-        rte_memcpy(buf_addr, vq->vdv_tx_mbuf[i]->pkt.data,
+        rte_memcpy(buf_addr, rte_pktmbuf_mtod(vq->vdv_tx_mbuf[i], void *),
                    rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]));
 
         vq->vdv_used->ring[next_avail_idx].len =

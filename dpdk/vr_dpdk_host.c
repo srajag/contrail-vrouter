@@ -181,23 +181,26 @@ dpdk_preset(struct vr_packet *pkt)
  */
 
 static inline void
-dpdk_pktmbuf_copy_data(struct rte_mbuf *dst, struct rte_mbuf *src)
+dpdk_pktmbuf_data_copy(struct rte_mbuf *dst, struct rte_mbuf *src)
 {
+    dst->data_off = src->data_off;
+    dst->port = src->port;
     dst->ol_flags = src->ol_flags;
+    dst->packet_type = src->packet_type;
+    dst->data_len = src->data_len;
+    dst->pkt_len = src->pkt_len;
+    dst->vlan_tci = src->vlan_tci;
+    dst->hash = src->hash;
+    dst->seqn = src->seqn;
+    dst->userdata = src->userdata;
+    dst->tx_offload = src->tx_offload;
 
-    dst->pkt.next = NULL;
-    dst->pkt.data_len = src->pkt.data_len;
-    dst->pkt.nb_segs = 1;
-    dst->pkt.in_port = src->pkt.in_port;
-    dst->pkt.pkt_len = src->pkt.data_len;
-    dst->pkt.vlan_macip = src->pkt.vlan_macip;
-    dst->pkt.hash = src->pkt.hash;
-
-    __rte_mbuf_sanity_check(dst, RTE_MBUF_PKT, 1);
-    __rte_mbuf_sanity_check(src, RTE_MBUF_PKT, 0);
+    __rte_mbuf_sanity_check(dst, 1);
+    __rte_mbuf_sanity_check(src, 0);
 
     /* copy data */
-    rte_memcpy(dst->pkt.data, src->pkt.data, src->pkt.data_len);
+    rte_memcpy(rte_pktmbuf_mtod(dst, void *),
+            rte_pktmbuf_mtod(src, void *), src->data_len);
 }
 
 /**
@@ -229,21 +232,21 @@ dpdk_pktmbuf_copy(struct rte_mbuf *md,
         return (NULL);
 
     mi = mc;
-    prev = &mi->pkt.next;
-    pktlen = md->pkt.pkt_len;
+    prev = &mi->next;
+    pktlen = md->pkt_len;
     nseg = 0;
 
     do {
         nseg++;
-        dpdk_pktmbuf_copy_data(mi, md);
+        dpdk_pktmbuf_data_copy(mi, md);
         *prev = mi;
-        prev = &mi->pkt.next;
-    } while ((md = md->pkt.next) != NULL &&
+        prev = &mi->next;
+    } while ((md = md->next) != NULL &&
         (mi = rte_pktmbuf_alloc(mp)) != NULL);
 
     *prev = NULL;
-    mc->pkt.nb_segs = nseg;
-    mc->pkt.pkt_len = pktlen;
+    mc->nb_segs = nseg;
+    mc->pkt_len = pktlen;
 
     /* Allocation of new indirect segment failed */
     if (unlikely (mi == NULL)) {
@@ -251,7 +254,7 @@ dpdk_pktmbuf_copy(struct rte_mbuf *md,
         return (NULL);
     }
 
-    __rte_mbuf_sanity_check(mc, RTE_MBUF_PKT, 1);
+    __rte_mbuf_sanity_check(mc, 1);
     return (mc);
 }
 
@@ -330,7 +333,7 @@ dpdk_pktmbuf_copy_bits(const struct rte_mbuf *mbuf, int offset,
         /* get next mbuf */
         to += copy;
         len -= copy;
-        mbuf = mbuf->pkt.next;
+        mbuf = mbuf->next;
     } while (unlikely(len > 0 && NULL != mbuf));
 
     if (likely(0 == len))
@@ -383,7 +386,8 @@ dpdk_pset_data(struct vr_packet *pkt, unsigned short offset)
     struct rte_mbuf *m;
 
     m = vr_dpdk_pkt_to_mbuf(pkt);
-    m->pkt.data = pkt->vp_head + offset;
+    m->buf_addr = pkt->vp_head;
+    m->data_off = offset;
 
     return;
 }
@@ -658,7 +662,7 @@ dpdk_pheader_pointer(struct vr_packet *pkt, unsigned short hdr_len, void *buf)
 
         /* iterate thru buffers chain */
         while (hdr_len) {
-            m = m->pkt.next;
+            m = m->next;
             if (!m)
                 return (NULL);
             if (hdr_len > rte_pktmbuf_data_len(m))
@@ -683,9 +687,10 @@ dpdk_pcow(struct vr_packet *pkt, unsigned short head_room)
     struct rte_mbuf *mbuf = vr_dpdk_pkt_to_mbuf(pkt);
 
     /* Store the right values to mbuf */
-    mbuf->pkt.data = pkt_data(pkt);
-    mbuf->pkt.pkt_len = pkt_len(pkt);
-    mbuf->pkt.data_len = pkt_head_len(pkt);
+    // TODO: 
+//    mbuf->pkt.data = pkt_data(pkt);
+//    mbuf->pkt_len = pkt_len(pkt);
+//    mbuf->data_len = pkt_head_len(pkt);
 
     if (head_room > rte_pktmbuf_headroom(mbuf)) {
         return -ENOMEM;

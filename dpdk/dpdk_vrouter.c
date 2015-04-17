@@ -219,19 +219,11 @@ dpdk_init(void)
         return ret;
     }
 
-    /* TODO: for DPDK 1.8+ */
-    /* rte_kni_init(max_kni_ifaces); */
+    rte_kni_init(VR_DPDK_MAX_KNI_INTERFACES);
 
     ret = dpdk_mempools_create();
     if (ret < 0)
         return ret;
-
-    /* Scan PCI bus for recognised devices */
-    ret = rte_eal_pci_probe();
-    if (ret < 0) {
-        RTE_LOG(CRIT, VROUTER, "Error probing PCI: %s (%d)\n", rte_strerror(-ret), -ret);
-        return ret;
-    }
 
     /* Get number of ports found in scan */
     nb_sys_ports = rte_eth_dev_count();

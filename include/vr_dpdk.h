@@ -35,7 +35,7 @@
 #define RTE_LOGTYPE_USOCK           RTE_LOGTYPE_USER2
 #define RTE_LOGTYPE_UVHOST          RTE_LOGTYPE_USER3
 #undef RTE_LOG_LEVEL
-#define RTE_LOG_LEVEL               RTE_LOG_INFO
+#define RTE_LOG_LEVEL               RTE_LOG_DEBUG
 
 /*
  * Debug options:
@@ -74,6 +74,9 @@
 #define VR_DPDK_MAX_NB_TX_QUEUES    5
 /* Maximum number of hardware RX queues to use for RSS (limited by the number of lcores) */
 #define VR_DPDK_MAX_NB_RSS_QUEUES   4
+/* Maximum RETA table size */
+#define VR_DPDK_MAX_RETA_SIZE       ETH_RSS_RETA_SIZE_128
+#define VR_DPDK_MAX_RETA_ENTRIES    (VR_DPDK_MAX_RETA_SIZE/RTE_RETA_GROUP_SIZE)
 /* Number of hardware RX ring descriptors */
 #define VR_DPDK_NB_RXD              256
 /* Number of hardware TX ring descriptors */
@@ -137,6 +140,8 @@
 #define VR_DPDK_INVALID_QUEUE_ID    0xFFFF
 /* Socket connection retry timeout in seconds (use power of 2) */
 #define VR_DPDK_RETRY_CONNECT_SECS  64
+/* Maximum number of KNI devices (vhost0 + monitoring) */
+#define VR_DPDK_MAX_KNI_INTERFACES  5
 
 /*
  * VRouter/DPDK Data Structures
@@ -258,6 +263,9 @@ struct vr_dpdk_ethdev {
     uint16_t ethdev_nb_tx_queues;
     /* Number of HW RX queues used for RSS (limited by the nb of lcores) */
     uint16_t ethdev_nb_rss_queues;
+    /* Actual size of ethdev RETA */
+    uint16_t ethdev_reta_size;
+    /* DPDK port ID */
     uint8_t ethdev_port_id;
     /* Hardware RX queue states */
     uint8_t ethdev_queue_states[VR_DPDK_MAX_NB_RX_QUEUES];
@@ -315,19 +323,19 @@ extern struct vr_dpdk_global vr_dpdk;
  * We use the tailroom to store vr_packet structure:
  *     struct rte_mbuf + headroom + data + tailroom + struct vr_packet
  *
- * rte_mbuf: *buf_addr(buf_len) + headroom + *pkt.data(data_len) + tailroom
+ * rte_mbuf: *buf_addr(buf_len) + headroom + data_off(data_len) + tailroom
  *
  * rte_mbuf->buf_addr = rte_mbuf + sizeof(rte_mbuf)
  * rte_mbuf->buf_len = elt_size - sizeof(rte_mbuf) - sizeof(vr_packet)
- * rte_mbuf->pkt.data = rte_mbuf->buf_addr + RTE_PKTMBUF_HEADROOM
+ * rte_mbuf->data_off = RTE_PKTMBUF_HEADROOM
  *
  *
  * vr_packet: *vp_head + headroom + vp_data(vp_len) + vp_tail + tailroom
  *                + vp_end
  *
  * vr_packet->vp_head = rte_mbuf->buf_addr (set in mbuf constructor)
- * vr_packet->vp_data = rte_mbuf->pkt.data - rte_mbuf->buf_addr
- * vr_packet->vp_len  = rte_mbuf->pkt.data_len
+ * vr_packet->vp_data = rte_mbuf->data_off
+ * vr_packet->vp_len  = rte_mbuf->data_len
  * vr_packet->vp_tail = vr_packet->vp_data + vr_packet->vp_len
  * vr_packet->vp_end  = rte_mbuf->buf_len (set in mbuf constructor)
  */
@@ -354,7 +362,7 @@ vr_dpdk_mbuf_reset(struct vr_packet *pkt)
     struct rte_mbuf *mbuf = vr_dpdk_pkt_to_mbuf(pkt);
 
     pkt->vp_head = mbuf->buf_addr;
-    pkt->vp_tail = rte_pktmbuf_headroom(mbuf) + mbuf->pkt.data_len;
+    pkt->vp_tail = rte_pktmbuf_headroom(mbuf) + mbuf->data_len;
     pkt->vp_end = mbuf->buf_len;
     pkt->vp_len = pkt->vp_tail - pkt->vp_data;
 

@@ -436,7 +436,7 @@ usock_mbuf_write(struct vr_usocket *usockp, struct rte_mbuf *mbuf)
     for (i = 0; (m && (i < PKT0_MAX_IOV_LEN)); i++) {
         iov->iov_base = rte_pktmbuf_mtod(m, unsigned char *);
         iov->iov_len = rte_pktmbuf_data_len(m);
-        m = m->pkt.next;
+        m = m->next;
         iov++;
     }
 
@@ -462,7 +462,6 @@ usock_mbuf_write(struct vr_usocket *usockp, struct rte_mbuf *mbuf)
 static void
 vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
 {
-    struct rte_pktmbuf *pmbuf;
     struct vr_packet *pkt;
     const unsigned lcore_id = rte_lcore_id();
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
@@ -470,10 +469,9 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
     if (usockp->usock_vif) {
-        pmbuf = &usockp->usock_mbuf->pkt;
-        pmbuf->data = usockp->usock_rx_buf;
-        pmbuf->data_len = usockp->usock_read_len;
-        pmbuf->pkt_len = usockp->usock_read_len;
+        /* buf_addr and data_off do not change */
+        usockp->usock_mbuf->data_len = usockp->usock_read_len;
+        usockp->usock_mbuf->pkt_len = usockp->usock_read_len;
         /* convert mbuf to vr_packet */
         pkt = vr_dpdk_packet_get(usockp->usock_mbuf, usockp->usock_vif);
         /* send the packet to vRouter */
@@ -570,10 +568,10 @@ usock_read_init(struct vr_usocket *usockp)
             return -ENOMEM;
         }
 
-        usockp->usock_rx_buf = rte_pktmbuf_mtod(usockp->usock_mbuf,
-                char *);
-        usockp->usock_buf_len = PKT0_MBUF_PACKET_SIZE;
-        usockp->usock_read_len = PKT0_MBUF_PACKET_SIZE;
+        usockp->usock_rx_buf = rte_pktmbuf_mtod(usockp->usock_mbuf, char *);
+        usockp->usock_buf_len = usockp->usock_mbuf->buf_len
+                                - rte_pktmbuf_headroom(usockp->usock_mbuf);
+        usockp->usock_read_len = usockp->usock_buf_len;
         usockp->usock_state = READING_DATA;
         break;
 

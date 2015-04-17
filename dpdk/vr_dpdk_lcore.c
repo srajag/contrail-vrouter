@@ -582,7 +582,7 @@ dpdk_lcore_init(unsigned lcore_id)
 
     /* allocate lcore context */
     lcore = rte_zmalloc_socket("vr_dpdk_lcore", sizeof(struct vr_dpdk_lcore),
-        CACHE_LINE_SIZE,  rte_lcore_to_socket_id(lcore_id));
+        RTE_CACHE_LINE_SIZE,  rte_lcore_to_socket_id(lcore_id));
     if (lcore == NULL) {
         RTE_LOG(CRIT, VROUTER, "Error allocating lcore %u context\n", lcore_id);
         return -ENOMEM;
