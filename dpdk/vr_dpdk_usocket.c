@@ -1159,9 +1159,8 @@ vr_usocket_io(void *transport)
     int timeout;
     struct pollfd *pfd;
     struct vr_usocket *usockp = (struct vr_usocket *)transport;
-    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[rte_lcore_id()];
     unsigned lcore_id = rte_lcore_id();
-    unsigned master_lcore_id = rte_get_master_lcore();
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
 
     if (!usockp)
         return -1;
@@ -1189,7 +1188,7 @@ vr_usocket_io(void *transport)
         /* Handle an IPC command only for pkt0 thread
          * and just check the stop flag for the rest
          */
-        if (lcore_id == vr_dpdk.packet_lcore_id) {
+        if (lcore_id == VR_DPDK_PACKET_LCORE_ID) {
             if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
                 break;
         } else {
@@ -1201,8 +1200,7 @@ vr_usocket_io(void *transport)
                 timeout);
 
         /* manage timers on pkt0 lcore */
-        if (lcore_id == vr_dpdk.packet_lcore_id
-            && lcore_id != master_lcore_id)
+        if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
             rte_timer_manage();
 
         if (ret < 0) {

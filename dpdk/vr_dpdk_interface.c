@@ -519,7 +519,7 @@ dpdk_agent_if_add(struct vr_interface *vif)
     vr_usocket_attach_vif(vr_dpdk.packet_transport, vif);
 
     /* schedule packet device with no hardware queues */
-    return vr_dpdk_lcore_if_schedule(vif, vr_dpdk.packet_lcore_id, 0, NULL, 0, NULL);
+    return vr_dpdk_lcore_if_schedule(vif, VR_DPDK_PACKET_LCORE_ID, 0, NULL, 0, NULL);
 }
 
 /* Delete agent interface */
@@ -802,7 +802,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
-        if (lcore_id == vr_dpdk.packet_lcore_id)
+        if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
             tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
     } else {
         RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",

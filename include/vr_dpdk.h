@@ -36,6 +36,9 @@
 #define RTE_LOGTYPE_UVHOST          RTE_LOGTYPE_USER3
 #undef RTE_LOG_LEVEL
 #define RTE_LOG_LEVEL               RTE_LOG_DEBUG
+#define VR_DPDK_NETLINK_DEBUG
+#define VR_DPDK_NETLINK_PKT_DUMP
+#define VR_DPDK_USOCK_DUMP
 
 /*
  * Debug options:
@@ -52,10 +55,6 @@
 
 /* Default lcore mask. Used only when sched_getaffinity() is failed */
 #define VR_DPDK_DEF_LCORE_MASK      0xf
-/* Number of service lcores: NetLink (master) and packet */
-#define VR_DPDK_NB_SERVICE_LCORES   2
-/* Minimum number of lcores */
-#define VR_DPDK_MIN_LCORES          (VR_DPDK_NB_SERVICE_LCORES + 1)
 /* Memory to allocate at startup in MB */
 #define VR_DPDK_MAX_MEM             "512"
 /* Number of memory channels to use */
@@ -113,7 +112,7 @@
 /* How many objects (mbufs) to keep in per-lcore RSS mempool cache */
 #define VR_DPDK_RSS_MEMPOOL_CACHE_SZ    (VR_DPDK_MAX_BURST_SZ*8)
 /* Number of VM mempools */
-#define VR_DPDK_MAX_VM_MEMPOOLS     (VR_DPDK_MAX_NB_RX_QUEUES*2 - VR_DPDK_MIN_LCORES)
+#define VR_DPDK_MAX_VM_MEMPOOLS     (VR_DPDK_MAX_NB_RX_QUEUES*2)
 /* Number of mbufs in VM mempool */
 #define VR_DPDK_VM_MEMPOOL_SZ       1024
 /* How many objects (mbufs) to keep in per-lcore VM mempool cache */
@@ -142,6 +141,20 @@
 #define VR_DPDK_RETRY_CONNECT_SECS  64
 /* Maximum number of KNI devices (vhost0 + monitoring) */
 #define VR_DPDK_MAX_KNI_INTERFACES  5
+
+/*
+ * DPDK LCore IDs
+ */
+enum {
+    VR_DPDK_NETLINK_LCORE_ID,
+    VR_DPDK_KNI_LCORE_ID,
+    VR_DPDK_TIMER_LCORE_ID,
+    VR_DPDK_UVHOST_LCORE_ID,
+    /* packet lcore has TX queues, so it should be at the end of the list */
+    VR_DPDK_PACKET_LCORE_ID,
+    /* the actual number of forwarding lcores depends on affinity mask */
+    VR_DPDK_FWD_LCORE_ID
+};
 
 /*
  * VRouter/DPDK Data Structures
@@ -294,7 +307,6 @@ struct vr_dpdk_global {
     /* Packet socket */
     struct rte_ring *packet_ring;
     void *packet_transport;
-    unsigned packet_lcore_id;
     /* KNI thread ID */
     pthread_t kni_thread;
     /* Timer thread ID */
@@ -376,6 +388,8 @@ vr_dpdk_mbuf_reset(struct vr_packet *pkt)
 void vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigned i);
 /* Check if the stop flag is set */
 int vr_dpdk_is_stop_flag_set(void);
+/* Called by user space vhost server at exit */
+void vr_dpdk_exit_trigger(void);
 
 /*
  * vr_dpdk_ethdev.c

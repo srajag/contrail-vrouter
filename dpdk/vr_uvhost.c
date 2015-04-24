@@ -22,13 +22,8 @@
 #include "vr_uvhost_client.h"
 #include "vr_dpdk_usocket.h"
 
-/*
- * Prototypes
- */
-static void *vr_uvhost_start(void *arg);
-
 /* Global variables */
-static vr_uvh_exit_callback_t vr_uvhost_exit_fn;
+vr_uvh_exit_callback_t vr_uvhost_exit_fn;
 
 /*
  * vr_uvhost_init - initializes the user space vhost server and waits
@@ -71,7 +66,7 @@ vr_uvhost_exit(void)
  *
  * Returns NULL if an error occurs. Otherwise, it runs forever.
  */
-static void *
+void *
 vr_uvhost_start(void *arg)
 {
     int s = 0, ret, err;

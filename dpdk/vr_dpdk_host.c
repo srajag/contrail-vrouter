@@ -520,9 +520,9 @@ dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
     rte_timer_init(timer);
 
     RTE_LOG(DEBUG, VROUTER, "%s[%u]: reset timer %p REINJECTING: lcore_id %u\n",
-            __func__, rte_lcore_id(), timer, vr_dpdk.packet_lcore_id);
+            __func__, rte_lcore_id(), timer, VR_DPDK_PACKET_LCORE_ID);
     /* schedule task to pkt0 lcore */
-    if (rte_timer_reset(timer, 0, SINGLE, vr_dpdk.packet_lcore_id,
+    if (rte_timer_reset(timer, 0, SINGLE, VR_DPDK_PACKET_LCORE_ID,
         dpdk_work_timer, vtimer) == -1) {
         RTE_LOG(ERR, VROUTER, "Error resetting timer\n");
         rte_free(timer);
