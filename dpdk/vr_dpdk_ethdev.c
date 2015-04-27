@@ -30,8 +30,8 @@ static struct rte_eth_conf ethdev_conf = {
         .mq_mode            = ETH_MQ_RX_RSS,
         .max_rx_pkt_len     = ETHER_MAX_LEN, /* Only used if jumbo_frame enabled */
         .header_split       = 0, /* Disable Header Split */
-        .hw_ip_checksum     = 1, /* Enable IP/UDP/TCP checksum offload */
-        .hw_vlan_filter     = 0, /* Disabel VLAN filter */
+        .hw_ip_checksum     = 0, /* Disable IP/UDP/TCP checksum offload */
+        .hw_vlan_filter     = 0, /* Disable VLAN filter */
         .hw_vlan_strip      = 0, /* Disable VLAN strip */
         .hw_vlan_extend     = 0, /* Disable Extended VLAN */
         .jumbo_frame        = 0, /* Disable Jumbo Frame Receipt */
@@ -108,6 +108,7 @@ static const struct rte_eth_txconf tx_queue_conf = {
         | ETH_TXQ_FLAGS_NOVLANOFFL
         | ETH_TXQ_FLAGS_NOXSUMSCTP
         | ETH_TXQ_FLAGS_NOXSUMTCP
+        | ETH_TXQ_FLAGS_NOXSUMUDP
 };
 
 /* Add hardware filter */
