@@ -36,7 +36,7 @@ vr_dpdk_phys_lcore_least_used_get(void)
 {
     unsigned lcore_id;
     struct vr_dpdk_lcore *lcore;
-    unsigned least_used_id = RTE_MAX_LCORE;
+    unsigned least_used_id = VR_MAX_CPUS;
     uint16_t least_used_nb_queues = 2 * VR_MAX_INTERFACES;
     unsigned int num_queues;
 
@@ -63,13 +63,13 @@ vr_dpdk_phys_lcore_least_used_get(void)
     return least_used_id;
 }
 
-/* Returns the least used lcore or RTE_MAX_LCORE */
+/* Returns the least used lcore or VR_MAX_CPUS */
 unsigned
 vr_dpdk_lcore_least_used_get(void)
 {
     unsigned lcore_id;
     struct vr_dpdk_lcore *lcore;
-    unsigned least_used_id = RTE_MAX_LCORE;
+    unsigned least_used_id = VR_MAX_CPUS;
     uint16_t least_used_nb_queues = 2 * VR_MAX_INTERFACES;
     unsigned int num_queues;
 
@@ -169,7 +169,7 @@ vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
     struct vr_dpdk_queue *rx_queue;
     unsigned least_used_id = vr_dpdk_lcore_least_used_get();
 
-    if (least_used_id == RTE_MAX_LCORE) {
+    if (least_used_id == VR_MAX_CPUS) {
         RTE_LOG(ERR, VROUTER, "\terror getting the least used lcore ID\n");
         return -EFAULT;
     }
@@ -209,7 +209,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     struct vr_dpdk_queue *tx_queue;
     struct vr_dpdk_lcore *lcore;
 
-    if (least_used_id == RTE_MAX_LCORE) {
+    if (least_used_id == VR_MAX_CPUS) {
         RTE_LOG(ERR, VROUTER, "\terror getting the least used lcore ID\n");
         return -EFAULT;
     }

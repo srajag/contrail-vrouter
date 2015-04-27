@@ -35,10 +35,7 @@
 #define RTE_LOGTYPE_USOCK           RTE_LOGTYPE_USER2
 #define RTE_LOGTYPE_UVHOST          RTE_LOGTYPE_USER3
 #undef RTE_LOG_LEVEL
-#define RTE_LOG_LEVEL               RTE_LOG_DEBUG
-#define VR_DPDK_NETLINK_DEBUG
-#define VR_DPDK_NETLINK_PKT_DUMP
-#define VR_DPDK_USOCK_DUMP
+#define RTE_LOG_LEVEL               RTE_LOG_INFO
 
 /*
  * Debug options:
@@ -84,7 +81,7 @@
 #define VR_DPDK_MPLS_OFFSET         ((VR_ETHER_HLEN             \
                                     + sizeof(struct vr_ip)      \
                                     + sizeof(struct vr_udp))/2)
-/* Maximum number of rings per lcore (maximum is VR_MAX_INTERFACES*RTE_MAX_LCORE) */
+/* Maximum number of rings per lcore (maximum is VR_MAX_INTERFACES*VR_MAX_CPUS) */
 #define VR_DPDK_MAX_RINGS           (VR_MAX_INTERFACES*2)
 /* Max size of a single packet */
 #define VR_DPDK_MAX_PACKET_SZ       2048
@@ -298,7 +295,7 @@ struct vr_dpdk_global {
     /* Number of forwarding lcores */
     unsigned nb_fwd_lcores;
     /* Table of pointers to forwarding lcore */
-    struct vr_dpdk_lcore *lcores[RTE_MAX_LCORE];
+    struct vr_dpdk_lcore *lcores[VR_MAX_CPUS];
     /* Global stop flag */
     rte_atomic16_t stop_flag;
     /* NetLink socket handler */
@@ -504,7 +501,7 @@ void vr_dpdk_lcore_if_unschedule(struct vr_interface *vif);
 /* Schedule an MPLS label queue */
 int vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
     unsigned mpls_label);
-/* Returns the least used lcore or RTE_MAX_LCORE */
+/* Returns the least used lcore or VR_MAX_CPUS */
 unsigned vr_dpdk_lcore_least_used_get(void);
 /* Returns the least used lcore among the ones that handle physical intf TX */
 unsigned int vr_dpdk_phys_lcore_least_used_get(void);

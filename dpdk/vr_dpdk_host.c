@@ -37,8 +37,9 @@
 #include "vr_hash.h"
 #include "vr_fragment.h"
 
-/* Max number of CPU */
-unsigned int vr_num_cpus = RTE_MAX_LCORE;
+/* Max number of CPUs. We adjust it later in vr_dpdk_host_init() */
+unsigned int vr_num_cpus = VR_MAX_CPUS;
+
 /* Global init flag */
 static bool vr_host_inited = false;
 
@@ -1143,9 +1144,20 @@ int
 vr_dpdk_host_init(void)
 {
     int ret;
+    unsigned lcore_id;
 
     if (vr_host_inited)
         return 0;
+
+    /*
+     * Set number of CPUs. Note it is not just number of lcores, so we
+     * cannot just use rte_lcore_count() here.
+     */
+    vr_num_cpus = 0;
+    RTE_LCORE_FOREACH(lcore_id) {
+        vr_num_cpus = RTE_MAX(vr_num_cpus, lcore_id);
+    }
+    vr_num_cpus++;
 
     if (!vrouter_host) {
         vrouter_host = vrouter_get_host();
