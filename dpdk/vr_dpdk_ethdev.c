@@ -84,7 +84,8 @@ static const struct rte_eth_rxconf rx_queue_conf = {
         .hthresh = 8,   /* Ring host threshold */
         .wthresh = 4,   /* Ring writeback threshold */
     },
-    .rx_free_thresh = 0,    /* Immediately free RX descriptors */
+    /* Do not immediately free RX descriptors */
+    .rx_free_thresh = VR_DPDK_ETH_RX_BURST_SZ,
 };
 
 /*
