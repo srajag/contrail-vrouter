@@ -102,7 +102,7 @@ dpdk_mempools_create(void)
     for (i = 0; i < VR_DPDK_MAX_VM_MEMPOOLS; i++) {
         ret = snprintf(mempool_name, sizeof(mempool_name), "vr_mempool_%d", i);
         if (ret >= sizeof(mempool_name)) {
-            RTE_LOG(INFO, VROUTER, "Error creating mempool %d name\n", i);
+            RTE_LOG(INFO, VROUTER, "Error creating VM mempool %d name\n", i);
             return -ENOMEM;
         }
         vr_dpdk.free_mempools[i] = rte_mempool_create(mempool_name,
@@ -111,13 +111,13 @@ dpdk_mempools_create(void)
                 rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
                 rte_socket_id(), 0);
         if (vr_dpdk.free_mempools[i] == NULL) {
-            RTE_LOG(CRIT, VROUTER, "Error creating mempool %d: %s (%d)\n",
+            RTE_LOG(CRIT, VROUTER, "Error creating VM mempool %d: %s (%d)\n",
                 i, rte_strerror(rte_errno), rte_errno);
             return -rte_errno;
         }
         vr_dpdk.nb_free_mempools++;
     }
-    RTE_LOG(INFO, VROUTER, "Allocated %" PRIu16 " mempool(s)\n",
+    RTE_LOG(INFO, VROUTER, "Allocated %" PRIu16 " VM mempool(s)\n",
         vr_dpdk.nb_free_mempools);
 
     return 0;
@@ -176,11 +176,11 @@ dpdk_core_mask_get(void)
     return cpu_core_mask;
 }
 
-/* Stringify core mask, i.e. 0xf -> 0,1,2,3 */
+/* Stringify core mask, i.e. 0xf -> 5@0,6@1,7@2,8@3 */
 static char *
 dpdk_core_mask_stringify(uint64_t core_mask)
 {
-    int ret, lcore_id = 0;
+    int ret, lcore_id = 0, core_id = 0;
     static char core_mask_string[256];
     char *p = core_mask_string;
     bool first_lcore = true;
@@ -194,14 +194,15 @@ dpdk_core_mask_stringify(uint64_t core_mask)
 
             ret = snprintf(p,
             sizeof(core_mask_string) - (p - core_mask_string),
-                    "%d@%d", lcore_id + VR_DPDK_FWD_LCORE_ID, lcore_id);
+                    "%d@%d", lcore_id + VR_DPDK_FWD_LCORE_ID, core_id);
             p += ret;
 
             if (p - core_mask_string >= sizeof(core_mask_string))
                 return NULL;
+            lcore_id++;
         }
         core_mask >>= 1;
-        lcore_id++;
+        core_id++;
     }
     *p = '\0';
     return core_mask_string;
@@ -382,17 +383,11 @@ dpdk_signals_init(void)
         return -1;
     }
 
-    /* ignore sigpipes emanating from sockets that are closed */
-    act.sa_handler = SIG_IGN;
-    if (sigaction(SIGPIPE, &act, NULL) != 0) {
-        RTE_LOG(CRIT, VROUTER, "Error ignoring SIGPIPE\n");
-        return -1;
-    }
-
+    /* block (ignore) sigpipes for this and all the child threads */
     sigemptyset(&set);
     sigaddset(&set, SIGPIPE);
     if (pthread_sigmask(SIG_BLOCK, &set, NULL) != 0) {
-        RTE_LOG(CRIT, VROUTER, "Error setting sinal mask\n");
+        RTE_LOG(CRIT, VROUTER, "Error setting signal mask\n");
         return -1;
     }
 

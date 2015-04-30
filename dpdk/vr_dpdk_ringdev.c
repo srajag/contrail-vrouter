@@ -65,6 +65,9 @@ dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
     rtp->rtp_tx_queue = tx_queue;
     rte_wmb();
     lcore->lcore_nb_rings_to_push++;
+    RTE_LOG(INFO, VROUTER, "\tlcore %u now has %"PRIu16
+        " ring(s) to push/route\n",
+        lcore_id, lcore->lcore_nb_rings_to_push);
     RTE_VERIFY(lcore->lcore_nb_rings_to_push < VR_DPDK_MAX_RINGS);
 }
 

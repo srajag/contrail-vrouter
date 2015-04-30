@@ -282,7 +282,7 @@ static int
 dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
 {
     vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
-    uint16_t vq_hard_avail_idx/*, vq_hard_used_idx*/, i;
+    uint16_t vq_hard_avail_idx, i;
     uint16_t num_pkts, next_desc_idx, next_avail_idx, pkts_sent = 0;
     struct vring_desc *desc;
     char *pkt_addr, *tail_addr;
