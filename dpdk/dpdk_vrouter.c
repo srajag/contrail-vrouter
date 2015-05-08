@@ -42,7 +42,8 @@ static char *dpdk_argv[] = {
     "-m", VR_DPDK_MAX_MEM,
     /* the argument will be updated in dpdk_init() */
     "--lcores", NULL,
-    "-n", VR_DPDK_MAX_MEMCHANNELS
+    "-n", VR_DPDK_MAX_MEMCHANNELS,
+    "--vdev", "eth_bond0,mode=4,socket_id=0,slave=0000:04:00.0,slave=0000:04:00.1,xmit_policy=l34"
 };
 static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv);
 
@@ -141,8 +142,10 @@ dpdk_core_mask_get(void)
     int i;
     long system_cpus_count, core_mask_count;
 
-    if (sched_getaffinity(0, sizeof(cs), &cs) < 0)
+    if (sched_getaffinity(0, sizeof(cs), &cs) < 0) {
+        printf("Error getting affinity. Falling back do the default core mask.\n");
         return VR_DPDK_DEF_LCORE_MASK;
+    }
 
     /*
      * Go through all the CPUs in the cpu_set_t structure to check
@@ -157,22 +160,28 @@ dpdk_core_mask_get(void)
             cpu_core_mask |= (uint64_t)1 << i;
     }
 
-    if (!cpu_core_mask)
+    if (!cpu_core_mask) {
+        printf("Error: core mask is zero. Falling back do the default core mask.\n");
         return VR_DPDK_DEF_LCORE_MASK;
+    }
 
     /*
      * Do not allow to run vRouter on all the cores available, as some have
      * to be spared for virtual machines.
      */
     system_cpus_count = sysconf(_SC_NPROCESSORS_CONF);
-    if (system_cpus_count == -1)
+    if (system_cpus_count == -1) {
+        printf("Error getting number of processors. Falling back do the default core mask.\n");
         return cpu_core_mask;
+    }
 
     core_mask_count
         = __builtin_popcountll((unsigned long long)cpu_core_mask);
 
-    if (core_mask_count == system_cpus_count)
+    if (core_mask_count == system_cpus_count) {
+        printf("Using default core mask.\n");
         return VR_DPDK_DEF_LCORE_MASK;
+    }
 
     return cpu_core_mask;
 }
@@ -271,6 +280,8 @@ dpdk_init(void)
         fprintf(stderr, "Error initializing EAL\n");
         return ret;
     }
+    /* disable unwanted logtypes for debug purposes */
+    rte_set_log_type(VR_DPDK_LOGTYPE_DISABLE, 0);
 
     rte_kni_init(VR_DPDK_MAX_KNI_INTERFACES);
 

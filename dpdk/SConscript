@@ -21,16 +21,16 @@ env.Append(LIBPATH = ['#third_party/dpdk/build/lib'])
 env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
 
 # Add all dpdk libraries
-env.Append(LIBS = ['rte_kvargs', 'rte_pmd_ixgbe', 'rte_kni',
-    'rte_hash', 'rte_mempool', 'rte_ring', 'rte_mbuf', 'rte_eal', 'rte_malloc',
-    'rte_port', 'rte_timer', 'ethdev'])
+env.Append(LIBS = ['rte_kni', 'rte_hash', 'rte_mempool', 'rte_ring',
+    'rte_mbuf', 'rte_eal', 'rte_malloc', 'rte_port', 'rte_timer',
+    'ethdev'])
 
 # Add libraries required by dpdk
 env.Append(LIBS = ['rt', 'dl', 'pthread'])
 env.Append(LIBS = ['urcu-qsbr'])
 
 env.Append(LINKCOM =
-    ' -Wl,--whole-archive -lrte_pmd_e1000 -lrte_pmd_ixgbe -Wl,--no-whole-archive')
+    ' -Wl,--whole-archive -lrte_cmdline -lrte_kvargs -lrte_pmd_bond -lrte_pmd_e1000 -lrte_pmd_ixgbe -Wl,--no-whole-archive')
 
 dpdk_dir ='#third_party/dpdk/'
 make_dir = Dir(dpdk_dir).srcnode().abspath
