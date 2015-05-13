@@ -527,6 +527,12 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
                 pci_addr->devid, pci_addr->function,
                 MAC_VALUE(mac_addr.addr_bytes));
         }
+        /* In LACP mode all the bond members are in the promisc mode
+         * (see bond_mode_8023ad_activate_slave()
+         * But we need to put bond interface in promisc to get the
+         * broadcasts. Seems to be a bug in bond_ethdev_rx_burst_8023ad()
+         */
+        rte_eth_promiscuous_enable(ethdev->ethdev_port_id);
     }
 }
 
