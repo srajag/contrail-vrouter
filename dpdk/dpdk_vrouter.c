@@ -31,6 +31,7 @@
 #include "vr_dpdk_virtio.h"
 
 static int no_daemon_set;
+static int vdev_set;
 extern char *ContrailBuildInfo;
 
 /* Global vRouter/DPDK structure */
@@ -43,9 +44,14 @@ static char *dpdk_argv[] = {
     /* the argument will be updated in dpdk_init() */
     "--lcores", NULL,
     "-n", VR_DPDK_MAX_MEMCHANNELS,
-    "--vdev", "eth_bond0,mode=4,socket_id=0,slave=0000:04:00.0,slave=0000:04:00.1,xmit_policy=l34"
+    /* up to five optional arguments */
+    NULL, NULL,
+    NULL, NULL,
+    NULL, NULL,
+    NULL, NULL,
+    NULL, NULL
 };
-static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv);
+static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv) - 5;
 
 /* Pktmbuf constructor with vr_packet support */
 void
@@ -406,21 +412,6 @@ dpdk_signals_init(void)
     return 0;
 }
 
-enum vr_opt_index {
-    DAEMON_OPT_INDEX,
-    VLAN_OPT_INDEX,
-    MAX_OPT_INDEX
-};
-
-static struct option long_options[] = {
-    [DAEMON_OPT_INDEX]              =   {"no-daemon",           no_argument,
-                                                    &no_daemon_set,         1},
-    [VLAN_OPT_INDEX]              =     {"vlan",                required_argument,
-                                                    NULL,                 'v'},
-    [MAX_OPT_INDEX]                 =   {NULL,                  0,
-                                                    NULL,                   0},
-};
-
 /*
  * vr_dpdk_exit_trigger - function that is called by user space vhost server
  * to cause all DPDK threads to exit.
@@ -435,20 +426,96 @@ vr_dpdk_exit_trigger(void)
     return;
 }
 
+enum vr_opt_index {
+    NO_DAEMON_OPT_INDEX,
+    HELP_OPT_INDEX,
+    VERSION_OPT_INDEX,
+    VLAN_OPT_INDEX,
+    VDEV_OPT_INDEX,
+    MAX_OPT_INDEX
+};
+
+static struct option long_options[] = {
+    [NO_DAEMON_OPT_INDEX]           =   {"no-daemon",           no_argument,
+                                                    &no_daemon_set,         1},
+    [HELP_OPT_INDEX]                =   {"help",                no_argument,
+                                                    NULL,                   0},
+    [VERSION_OPT_INDEX]             =   {"version",             no_argument,
+                                                    NULL,                   0},
+    [VLAN_OPT_INDEX]              =     {"vlan",                required_argument,
+                                                    NULL,                 'v'},
+    [VDEV_OPT_INDEX]                =   {"vdev",                required_argument,
+                                                    &vdev_set,              1},
+    [MAX_OPT_INDEX]                 =   {NULL,                  0,
+                                                    NULL,                   0},
+};
+
+static void
+Usage(void)
+{
+    printf("Usage:   contrail-vrouter-dpdk [--no-daemon] [--help] [--version]\n");
+    printf("             [--vdev <config>]\n");
+    printf("\n");
+    printf("--no-daemon  Do not demonize the vRouter\n");
+    printf("--help       Prints this help message\n");
+    printf("--version    Prints build information\n");
+    printf("\n");
+    printf("--vdev <config>  Virtual device configuration\n");
+
+    exit(1);
+}
+
+static void
+version_print(void)
+{
+    printf("Build information: %s\n", ContrailBuildInfo);
+}
+
+static void
+parse_long_opts(int opt_flow_index, char *opt_arg)
+{
+    int i;
+
+    errno = 0;
+    switch (opt_flow_index) {
+    case NO_DAEMON_OPT_INDEX:
+        break;
+
+    case VERSION_OPT_INDEX:
+        version_print();
+        exit(0);
+        break;
+
+    case VDEV_OPT_INDEX:
+        /* find a pair of free arguments */
+        for (i = 0; i < sizeof(dpdk_argv)/sizeof(*dpdk_argv) - 1; i++) {
+            if (dpdk_argv[i] == NULL && dpdk_argv[i + 1] == NULL) {
+                dpdk_argv[i] = "--vdev";
+                dpdk_argv[i + 1] = opt_arg;
+                dpdk_argc++;
+                printf("Virtual device configuration: %s\n", opt_arg);
+                break;
+            }
+        }
+        break;
+
+    case HELP_OPT_INDEX:
+    default:
+        Usage();
+    }
+}
+
 int
 main(int argc, char *argv[])
 {
     int ret, opt, option_index;
     vr_dpdk.vlan_tag = VLAN_ID_INVALID;
 
-    fprintf(stdout, "Starting vRouter/DPDK...\nBuild information: %s\n",
-                ContrailBuildInfo);
-    fflush(stdout);
-
     while ((opt = getopt_long(argc, argv, "", long_options, &option_index))
             >= 0) {
         switch (opt) {
         case 0:
+            parse_long_opts(option_index, optarg);
             break;
 
         /* If VLAN tag is set, vRouter will expect tagged packets. The tag
@@ -464,17 +531,24 @@ main(int argc, char *argv[])
         case '?':
         default:
             fprintf(stderr, "Invalid option %s\n", argv[optind - 1]);
-            exit(-EINVAL);
+            Usage();
             break;
         }
     }
-    /* for other getopts in dpdk */
+    /* for other getopts in DPDK */
     optind = 0;
 
     if (!no_daemon_set) {
-        if (daemon(0, 0) < 0)
-            return -1;
+        if (daemon(0, 0) < 0) {
+            fprintf(stderr, "Error daemonizing vRouter: %s (%d)\n",
+                strerror(errno), errno);
+            return 1;
+        }
     }
+
+    printf("Starting vRouter/DPDK...\n");
+    version_print();
+    fflush(stdout);
 
     /* init DPDK first since vRouter uses DPDK mallocs and logs */
     ret = dpdk_init();
