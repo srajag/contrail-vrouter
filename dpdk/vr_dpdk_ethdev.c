@@ -517,16 +517,19 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
 
         memset(&mac_addr, 0, sizeof(bond_mac));
         rte_eth_macaddr_get(port_id, &bond_mac);
+        RTE_LOG(INFO, VROUTER, "\tbond eth device %" PRIu8
+            " configured MAC " MAC_FORMAT "\n",
+            port_id, MAC_VALUE(bond_mac.addr_bytes));
         /* log out and configure bond members */
         for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
             slave_port_id = ethdev->ethdev_slaves[i];
             memset(&mac_addr, 0, sizeof(mac_addr));
             rte_eth_macaddr_get(slave_port_id, &mac_addr);
             pci_addr = &rte_eth_devices[slave_port_id].pci_dev->addr;
-            RTE_LOG(INFO, VROUTER, "\tbond member %d eth device %" PRIu8
+            RTE_LOG(INFO, VROUTER, "\tbond member eth device %" PRIu8
                 " PCI "PCI_PRI_FMT
                 " MAC " MAC_FORMAT "\n",
-                i, slave_port_id, pci_addr->domain, pci_addr->bus,
+                slave_port_id, pci_addr->domain, pci_addr->bus,
                 pci_addr->devid, pci_addr->function,
                 MAC_VALUE(mac_addr.addr_bytes));
 
@@ -535,11 +538,11 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
                 && rte_eth_dev_mac_addr_add(slave_port_id, &lacp_mac, 0) == 0) {
                 /* disable the promisc mode enabled by default */
                 rte_eth_promiscuous_disable(ethdev->ethdev_port_id);
-                RTE_LOG(INFO, VROUTER, "\tbond member %d promisc mode disabled\n",
-                    i);
+                RTE_LOG(INFO, VROUTER, "\tbond member eth device %"PRIu8
+                    " promisc mode disabled\n", slave_port_id);
             } else {
-                RTE_LOG(INFO, VROUTER, "\tbond member %d: unable to add MAC addresses\n",
-                    i);
+                RTE_LOG(INFO, VROUTER, "\tbond member eth device %"PRIu8
+                    ": unable to add MAC addresses\n", slave_port_id);
             }
         }
         /* In LACP mode all the bond members are in the promisc mode

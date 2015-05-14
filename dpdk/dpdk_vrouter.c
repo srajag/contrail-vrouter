@@ -40,9 +40,9 @@ struct vr_dpdk_global vr_dpdk;
 static char *dpdk_argv[] = {
     "dpdk",
     "-m", VR_DPDK_MAX_MEM,
+    "-n", VR_DPDK_MAX_MEMCHANNELS,
     /* the argument will be updated in dpdk_init() */
     "--lcores", NULL,
-    "-n", VR_DPDK_MAX_MEMCHANNELS,
     /* up to five optional arguments */
     NULL, NULL,
     NULL, NULL,
@@ -50,7 +50,7 @@ static char *dpdk_argv[] = {
     NULL, NULL,
     NULL, NULL
 };
-static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv) - 5;
+static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv) - 5*2;
 
 /* Pktmbuf constructor with vr_packet support */
 void
@@ -253,11 +253,18 @@ dpdk_argv_update(void)
 
     /* find and update the argument */
     for (i = 0; i < dpdk_argc; i++) {
-        if (dpdk_argv[i] == NULL)
+        if (dpdk_argv[i] == NULL) {
             dpdk_argv[i] = lcores_string;
+            break;
+        }
     }
 
-    printf("LCores configuration: %s\n", lcores_string);
+    /* print out configuration */
+    if (vr_dpdk.vlan_tag != VLAN_ID_INVALID)
+        printf("Using VLAN TCI: %"PRIu16"\n", vr_dpdk.vlan_tag);
+    printf("EAL arguments:\n");
+    for (i = 1; i < dpdk_argc - 1; i += 2)
+        printf("\t%s \"%s\"\n", dpdk_argv[i], dpdk_argv[i + 1]);
 
     return 0;
 }
@@ -493,9 +500,6 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
         vr_dpdk.vlan_tag = (uint16_t)strtol(optarg, NULL, 0);
         if (!vr_dpdk.vlan_tag) {
             vr_dpdk.vlan_tag = VLAN_ID_INVALID;
-        } else {
-            printf("VLAN tag control information: %"PRIu16"\n",
-                                                    vr_dpdk.vlan_tag);
         }
         break;
 
@@ -506,8 +510,7 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
             if (dpdk_argv[i] == NULL && dpdk_argv[i + 1] == NULL) {
                 dpdk_argv[i] = "--vdev";
                 dpdk_argv[i + 1] = opt_arg;
-                dpdk_argc++;
-                printf("Virtual device configuration: %s\n", opt_arg);
+                dpdk_argc += 2;
                 break;
             }
         }
