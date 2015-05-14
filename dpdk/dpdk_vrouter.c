@@ -31,7 +31,6 @@
 #include "vr_dpdk_virtio.h"
 
 static int no_daemon_set;
-static int vdev_set;
 extern char *ContrailBuildInfo;
 
 /* Global vRouter/DPDK structure */
@@ -443,9 +442,9 @@ static struct option long_options[] = {
     [VERSION_OPT_INDEX]             =   {"version",             no_argument,
                                                     NULL,                   0},
     [VLAN_OPT_INDEX]              =     {"vlan",                required_argument,
-                                                    NULL,                 'v'},
+                                                    NULL,                   0},
     [VDEV_OPT_INDEX]                =   {"vdev",                required_argument,
-                                                    &vdev_set,              1},
+                                                    NULL,                   0},
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
                                                     NULL,                   0},
 };
@@ -454,12 +453,13 @@ static void
 Usage(void)
 {
     printf("Usage:   contrail-vrouter-dpdk [--no-daemon] [--help] [--version]\n");
-    printf("             [--vdev <config>]\n");
+    printf("             [--vlan <tci>] [--vdev <config>]\n");
     printf("\n");
     printf("--no-daemon  Do not demonize the vRouter\n");
     printf("--help       Prints this help message\n");
     printf("--version    Prints build information\n");
     printf("\n");
+    printf("--vlan <tci>     VLAN tag control information\n");
     printf("--vdev <config>  Virtual device configuration\n");
 
     exit(1);
@@ -485,6 +485,20 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
         version_print();
         exit(0);
         break;
+
+    /* If VLAN tag is set, vRouter will expect tagged packets. The tag
+     * will be stripped in dpdk_vroute() and injected in dpdk_if_tx().
+     */
+    case VLAN_OPT_INDEX:
+        vr_dpdk.vlan_tag = (uint16_t)strtol(optarg, NULL, 0);
+        if (!vr_dpdk.vlan_tag) {
+            vr_dpdk.vlan_tag = VLAN_ID_INVALID;
+        } else {
+            printf("VLAN tag control information: %"PRIu16"\n",
+                                                    vr_dpdk.vlan_tag);
+        }
+        break;
+
 
     case VDEV_OPT_INDEX:
         /* find a pair of free arguments */
@@ -517,16 +531,6 @@ main(int argc, char *argv[])
         case 0:
             parse_long_opts(option_index, optarg);
             break;
-
-        /* If VLAN tag is set, vRouter will expect tagged packets. The tag
-         * will be stripped in dpdk_vroute() and injected in dpdk_if_tx().
-         */
-        case 'v':
-            vr_dpdk.vlan_tag = (uint16_t)atoi(optarg);
-            if (!vr_dpdk.vlan_tag)
-                vr_dpdk.vlan_tag = VLAN_ID_INVALID;
-            break;
-
 
         case '?':
         default:

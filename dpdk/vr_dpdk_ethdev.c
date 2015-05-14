@@ -504,17 +504,20 @@ static void
 dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
 {
     int i, slave_port_id;
+    int port_id = ethdev->ethdev_port_id;
     struct rte_pci_addr *pci_addr;
-    struct ether_addr mac_addr;
+    struct ether_addr bond_mac, mac_addr;
+    struct ether_addr lacp_mac = { .addr_bytes = {0x01, 0x80, 0xc2, 0, 0, 0x02} };
 
-
-    if (rte_eth_bond_mode_get(ethdev->ethdev_port_id) == -1) {
+    if (rte_eth_bond_mode_get(port_id) == -1) {
         ethdev->ethdev_nb_slaves = -1;
     } else {
-        ethdev->ethdev_nb_slaves = rte_eth_bond_slaves_get(ethdev->ethdev_port_id,
+        ethdev->ethdev_nb_slaves = rte_eth_bond_slaves_get(port_id,
             ethdev->ethdev_slaves, sizeof(ethdev->ethdev_slaves));
 
-        /* log out bond members */
+        memset(&mac_addr, 0, sizeof(bond_mac));
+        rte_eth_macaddr_get(port_id, &bond_mac);
+        /* log out and configure bond members */
         for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
             slave_port_id = ethdev->ethdev_slaves[i];
             memset(&mac_addr, 0, sizeof(mac_addr));
@@ -526,13 +529,25 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
                 i, slave_port_id, pci_addr->domain, pci_addr->bus,
                 pci_addr->devid, pci_addr->function,
                 MAC_VALUE(mac_addr.addr_bytes));
+
+            /* try to add bond mac and LACP multicast MACs */
+            if (rte_eth_dev_mac_addr_add(slave_port_id, &bond_mac, 0) == 0
+                && rte_eth_dev_mac_addr_add(slave_port_id, &lacp_mac, 0) == 0) {
+                /* disable the promisc mode enabled by default */
+                rte_eth_promiscuous_disable(ethdev->ethdev_port_id);
+                RTE_LOG(INFO, VROUTER, "\tbond member %d promisc mode disabled\n",
+                    i);
+            } else {
+                RTE_LOG(INFO, VROUTER, "\tbond member %d: unable to add MAC addresses\n",
+                    i);
+            }
         }
         /* In LACP mode all the bond members are in the promisc mode
-         * (see bond_mode_8023ad_activate_slave()
-         * But we need to put bond interface in promisc to get the
-         * broadcasts. Seems to be a bug in bond_ethdev_rx_burst_8023ad()
+         * by default (see bond_mode_8023ad_activate_slave()
+         * But we need also to put the bond interface in promisc to get
+         * the broadcasts. Seems to be a bug in bond_ethdev_rx_burst_8023ad()?
          */
-        rte_eth_promiscuous_enable(ethdev->ethdev_port_id);
+        rte_eth_promiscuous_enable(port_id);
     }
 }
 
