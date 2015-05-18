@@ -284,29 +284,29 @@ dpdk_vhost_if_add(struct vr_interface *vif)
     uint8_t port_id, slave_port_id = VR_DPDK_INVALID_PORT_ID;
     int ret;
     struct ether_addr mac_addr;
-    struct rte_pci_addr pci_address;
     struct vr_dpdk_ethdev *ethdev;
 
     if (vif->vif_flags & VIF_FLAG_PMD) {
         port_id = vif->vif_os_idx;
     }
     else {
-        memset(&pci_address, 0, sizeof(pci_address));
-        dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
-        port_id = dpdk_find_port_id_by_pci_addr(&pci_address);
-        if (port_id == VR_DPDK_INVALID_PORT_ID) {
+        /* The Agent passes xconnect fabric interface in cross_connect_idx,
+         * but dp-core does not copy it into vr_interface. Instead
+         * it looks for an interface with os_idx == cross_connect_idx
+         * and sets vif->vif_bridge if there is such an interface.
+         */
+        ethdev = (struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os);
+        if (ethdev == NULL) {
             RTE_LOG(ERR, VROUTER, "Error adding vif %u KNI device %s:"
-                " no port ID found for PCI " PCI_PRI_FMT "\n",
-                    vif->vif_idx, vif->vif_name,
-                    pci_address.domain, pci_address.bus,
-                    pci_address.devid, pci_address.function);
+                " bridge vif %u ethdev is not initialized\n",
+                    vif->vif_idx, vif->vif_name, vif->vif_bridge->vif_idx);
             return -ENOENT;
         }
+        port_id = ethdev->ethdev_port_id;
         /*
          * KNI does not support bond interfaces and generate random MACs,
          * so we try to get a bond member instead.
          */
-        ethdev = &vr_dpdk.ethdevs[port_id];
         if (ethdev->ethdev_nb_slaves > 0)
             slave_port_id = ethdev->ethdev_slaves[0];
     }
