@@ -84,7 +84,7 @@ static const struct rte_eth_rxconf rx_queue_conf = {
         .wthresh = 4,   /* Ring writeback threshold */
     },
     /* Do not immediately free RX descriptors */
-    .rx_free_thresh = VR_DPDK_ETH_RX_BURST_SZ,
+    .rx_free_thresh = VR_DPDK_RX_BURST_SZ,
 };
 
 /*
@@ -208,7 +208,6 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     /* init queue */
     rx_queue->rxq_ops = rte_port_ethdev_reader_ops;
     rx_queue->q_queue_h = NULL;
-    rx_queue->rxq_burst_size = VR_DPDK_ETH_RX_BURST_SZ;
     rx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* create the queue */
@@ -294,7 +293,7 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     struct rte_port_ethdev_writer_params writer_params = {
         .port_id = port_id,
         .queue_id = tx_queue_id,
-        .tx_burst_sz = VR_DPDK_ETH_TX_BURST_SZ,
+        .tx_burst_sz = VR_DPDK_TX_BURST_SZ,
     };
     tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params, socket_id);
     if (tx_queue->q_queue_h == NULL) {

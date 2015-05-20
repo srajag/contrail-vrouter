@@ -141,7 +141,6 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_last_used_idx = 0;
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
     rx_queue->q_queue_h = (void *) &vr_dpdk_virtio_rxqs[vif_idx][queue_id];
-    rx_queue->rxq_burst_size = VR_DPDK_VIRTIO_RX_BURST_SZ;
     rx_queue->q_vif = vif;
 
     /* store queue params */

@@ -517,7 +517,7 @@ dpdk_lcore_fwd_rx(struct vr_dpdk_lcore *lcore)
     SLIST_FOREACH(rx_queue, &lcore->lcore_rx_head, q_next) {
         /* burst RX */
         nb_pkts = rx_queue->rxq_ops.f_rx(rx_queue->q_queue_h, pkts,
-                rx_queue->rxq_burst_size);
+                VR_DPDK_RX_BURST_SZ);
         if (likely(nb_pkts > 0)) {
             total_pkts += nb_pkts;
             /* transmit packets to vrouter */

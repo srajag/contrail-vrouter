@@ -489,13 +489,13 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
 {
     int i;
     unsigned nb_pkts;
-    struct rte_mbuf *mbuf_arr[VR_DPDK_RING_RX_BURST_SZ];
+    struct rte_mbuf *mbuf_arr[VR_DPDK_RX_BURST_SZ];
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: draining pkt0 ring...\n", __func__,
             pthread_self());
     do {
         nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,
-            (void **)&mbuf_arr, VR_DPDK_RING_RX_BURST_SZ);
+            (void **)&mbuf_arr, VR_DPDK_RX_BURST_SZ);
         for (i = 0; i < nb_pkts; i++) {
             usock_mbuf_write(usockp->usock_parent, mbuf_arr[i]);
             rte_pktmbuf_free(mbuf_arr[i]);

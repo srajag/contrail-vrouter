@@ -101,12 +101,8 @@
                                     + sizeof(struct vr_packet))
 /* How many packets to read/write from/to queue in one go */
 #define VR_DPDK_MAX_BURST_SZ        RTE_PORT_IN_BURST_SIZE_MAX
-#define VR_DPDK_ETH_RX_BURST_SZ     32
-#define VR_DPDK_ETH_TX_BURST_SZ     32
-#define VR_DPDK_KNI_RX_BURST_SZ     32
-#define VR_DPDK_KNI_TX_BURST_SZ     32
-#define VR_DPDK_RING_RX_BURST_SZ    32
-#define VR_DPDK_RING_TX_BURST_SZ    32
+#define VR_DPDK_RX_BURST_SZ         32
+#define VR_DPDK_TX_BURST_SZ         32
 /* Number of mbufs in TX ring */
 #define VR_DPDK_TX_RING_SZ          (VR_DPDK_MAX_BURST_SZ*2)
 /* Number of mbufs in virtio mempool */
@@ -202,8 +198,6 @@ struct vr_dpdk_queue {
     void *q_queue_h;
     /* Pointer to vRouter interface */
     struct vr_interface *q_vif;
-    /* RX burst size */
-    uint16_t rxq_burst_size;
 };
 
 /* We store the queue params in the separate structure to increase CPU
