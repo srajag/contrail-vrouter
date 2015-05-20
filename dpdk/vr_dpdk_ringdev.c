@@ -172,7 +172,7 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     /* create the queue */
     struct rte_port_ring_writer_params writer_params = {
         .ring = tx_ring,
-        .tx_burst_sz = VR_DPDK_RING_TX_BURST_SZ,
+        .tx_burst_sz = VR_DPDK_TX_BURST_SZ,
     };
     tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params,
                                                         socket_id);

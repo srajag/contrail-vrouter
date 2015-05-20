@@ -503,7 +503,7 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
 {
     int i;
     unsigned nb_pkts;
-    struct rte_mbuf *mbuf_arr[VR_DPDK_RING_RX_BURST_SZ];
+    struct rte_mbuf *mbuf_arr[VR_DPDK_RX_BURST_SZ];
     const unsigned lcore_id = rte_lcore_id();
     struct vr_interface_stats *vr_stats;
 
@@ -512,7 +512,7 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
     vr_stats = vif_get_stats(usockp->usock_parent->usock_vif, lcore_id);
     do {
         nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,
-            (void **)&mbuf_arr, VR_DPDK_RING_RX_BURST_SZ);
+            (void **)&mbuf_arr, VR_DPDK_RX_BURST_SZ);
         for (i = 0; i < nb_pkts; i++) {
             /**
              * Packets is written to the agent's socket here. On success,

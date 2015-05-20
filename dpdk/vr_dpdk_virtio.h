@@ -11,11 +11,11 @@
 /*
  * Burst size for packets from a VM
  */
-#define VR_DPDK_VIRTIO_RX_BURST_SZ VR_DPDK_RING_RX_BURST_SZ
+#define VR_DPDK_VIRTIO_RX_BURST_SZ VR_DPDK_RX_BURST_SZ
 /*
  * Burst size for packets to a VM
  */
-#define VR_DPDK_VIRTIO_TX_BURST_SZ VR_DPDK_RING_TX_BURST_SZ
+#define VR_DPDK_VIRTIO_TX_BURST_SZ VR_DPDK_TX_BURST_SZ
 
 /*
  * Size of ring to send packets from virtio RX queue to lcore for forwarding

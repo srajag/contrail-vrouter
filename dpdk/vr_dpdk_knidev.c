@@ -137,7 +137,7 @@ dpdk_knidev_reader_stats_read(void *port,
 struct dpdk_knidev_writer {
     struct rte_port_out_stats stats;
 
-    struct rte_mbuf *tx_buf[2 * RTE_PORT_IN_BURST_SIZE_MAX];
+    struct rte_mbuf *tx_buf[2 * VR_DPDK_MAX_BURST_SZ];
     uint32_t tx_burst_sz;
     uint16_t tx_buf_count;
     uint64_t bsz_mask;
@@ -161,7 +161,7 @@ dpdk_knidev_writer_create(void *params, int socket_id)
     /* Check input parameters */
     if ((conf == NULL) ||
         (conf->tx_burst_sz == 0) ||
-        (conf->tx_burst_sz > RTE_PORT_IN_BURST_SIZE_MAX) ||
+        (conf->tx_burst_sz > VR_DPDK_MAX_BURST_SZ) ||
         (!rte_is_power_of_2(conf->tx_burst_sz))) {
         RTE_LOG(ERR, PORT, "%s: Invalid input parameters\n", __func__);
         return NULL;
@@ -314,7 +314,6 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     /* init queue */
     rx_queue->rxq_ops = dpdk_knidev_reader_ops;
     rx_queue->q_queue_h = NULL;
-    rx_queue->rxq_burst_size = VR_DPDK_KNI_RX_BURST_SZ;
     rx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* create the queue */
@@ -391,7 +390,7 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     /* create the queue */
     struct dpdk_knidev_writer_params writer_params = {
         .kni = vif->vif_os,
-        .tx_burst_sz = VR_DPDK_KNI_TX_BURST_SZ,
+        .tx_burst_sz = VR_DPDK_TX_BURST_SZ,
     };
     tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params, socket_id);
     if (tx_queue->q_queue_h == NULL) {
