@@ -1072,10 +1072,11 @@ vhost_remove_xconnect(void)
 {
     int i;
     struct vr_interface *vif;
+    struct vrouter *router = vrouter_get(0);
 
-    for (i = 0; i < VR_MAX_INTERFACES; i++) {
-        vif = vr_dpdk.vhosts[i];
-        if (vif != NULL) {
+    for (i = 0; i < router->vr_max_interfaces; i++) {
+        vif = __vrouter_get_interface(router, i);
+        if (vif && (vif_is_vhost(vif))) {
             vif_remove_xconnect(vif);
             if (vif->vif_bridge != NULL)
                 vif_remove_xconnect(vif->vif_bridge);

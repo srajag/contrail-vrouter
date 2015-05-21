@@ -345,7 +345,7 @@ dpdk_exit(void)
 
     vr_dpdk_if_lock();
     RTE_LOG(INFO, VROUTER, "Releasing KNI devices...\n");
-    for (i = 0; i < VR_MAX_INTERFACES; i++) {
+    for (i = 0; i < VR_DPDK_MAX_KNI_INTERFACES; i++) {
         if (vr_dpdk.knis[i] != NULL) {
             rte_kni_release(vr_dpdk.knis[i]);
             vr_dpdk.knis[i] = NULL;

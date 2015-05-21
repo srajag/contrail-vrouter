@@ -477,6 +477,7 @@ dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
 int
 vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
 {
+    int i;
     struct rte_eth_dev_info dev_info;
     struct rte_kni_conf kni_conf;
     struct rte_kni *kni;
@@ -512,6 +513,14 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     /* store pointer to KNI for further use */
     vif->vif_os = kni;
 
+    /* add interface to the table of KNIs */
+    for (i = 0; i < VR_DPDK_MAX_KNI_INTERFACES; i++) {
+        if (vr_dpdk.knis[i] == NULL) {
+            vr_dpdk.knis[i] = vif->vif_os;
+            break;
+        }
+    }
+
     return 0;
 }
 
@@ -519,10 +528,20 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
 int
 vr_dpdk_knidev_release(struct vr_interface *vif)
 {
+    int i;
     struct rte_kni *kni = vif->vif_os;
 
     vif->vif_os = NULL;
+
+    /* delete the interface from the table of KNIs */
+    for (i = 0; i < VR_DPDK_MAX_KNI_INTERFACES; i++) {
+        if (vr_dpdk.knis[i] == kni) {
+            vr_dpdk.knis[i] = NULL;
+            break;
+        }
+    }
     rte_wmb();
+
     return rte_kni_release(kni);
 }
 
@@ -530,12 +549,11 @@ vr_dpdk_knidev_release(struct vr_interface *vif)
 void
 vr_dpdk_knidev_all_handle(void)
 {
-    struct vrouter *router = vrouter_get(0);
     int i;
 
     vr_dpdk_if_lock();
-    for (i = 0; i < router->vr_max_interfaces; i++) {
-        if (vr_dpdk.knis[i])
+    for (i = 0; i < VR_DPDK_MAX_KNI_INTERFACES; i++) {
+        if (vr_dpdk.knis[i] != NULL)
             rte_kni_handle_request(vr_dpdk.knis[i]);
     }
     vr_dpdk_if_unlock();

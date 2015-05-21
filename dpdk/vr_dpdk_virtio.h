@@ -35,18 +35,22 @@ typedef struct vr_dpdk_virtioq {
     struct vring_avail  *vdv_avail;     /**< Virtqueue available ring. */
     struct vring_used   *vdv_used;      /**< Virtqueue used ring. */
     uint32_t            vdv_size;       /**< Size of descriptor ring. */
+    uint32_t vdv_tx_mbuf_count;
 
     volatile vq_ready_state_t vdv_ready_state;
-    int vdv_enabled_state;
     unsigned int vdv_vif_idx;
-    int vdv_zero_copy;
-    unsigned int vdv_base_idx;
-    uint16_t vdv_last_used_idx;
-    struct rte_mbuf *vdv_tx_mbuf[2 * VR_DPDK_VIRTIO_TX_BURST_SZ];
-    uint32_t vdv_tx_mbuf_count;
     struct rte_ring *vdv_pring;
-    unsigned vdv_pring_dst_lcore_id;
     int vdv_callfd;
+    uint16_t vdv_last_used_idx;
+
+    /* Big and less frequently used fields */
+    struct rte_mbuf *vdv_tx_mbuf[2 * VR_DPDK_VIRTIO_TX_BURST_SZ];
+    unsigned int vdv_base_idx;
+    unsigned vdv_pring_dst_lcore_id;
+    /* TODO: not used
+    int vdv_enabled_state;
+    int vdv_zero_copy;
+     */
     DPDK_DEBUG_VAR(uint32_t vdv_hash);
 } vr_dpdk_virtioq_t;
 

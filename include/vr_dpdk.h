@@ -81,6 +81,8 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
 #define VR_DPDK_MAX_NB_TX_QUEUES    5
 /* Maximum number of hardware RX queues to use for RSS (limited by the number of lcores) */
 #define VR_DPDK_MAX_NB_RSS_QUEUES   4
+/* Maximum number of bond members per ethernet device */
+#define VR_DPDK_BOND_MAX_SLAVES     6
 /* Maximum RETA table size */
 #define VR_DPDK_MAX_RETA_SIZE       ETH_RSS_RETA_SIZE_128
 #define VR_DPDK_MAX_RETA_ENTRIES    (VR_DPDK_MAX_RETA_SIZE/RTE_RETA_GROUP_SIZE)
@@ -247,38 +249,43 @@ enum vr_dpdk_lcore_cmd {
 };
 
 struct vr_dpdk_lcore {
+    /**********************************************************************/
+    /* Frequently used fields */
     /* RX queues head */
     struct vr_dpdk_q_slist lcore_rx_head;
-    /* Table of RX queues */
-    struct vr_dpdk_queue lcore_rx_queues[VR_MAX_INTERFACES];
     /* TX queues head */
     struct vr_dpdk_q_slist lcore_tx_head;
-    /* Table of TX queues */
-    struct vr_dpdk_queue lcore_tx_queues[VR_MAX_INTERFACES];
     /* Number of rings to push for the lcore */
     volatile uint16_t lcore_nb_rings_to_push;
-    /* List of rings to push */
-    struct vr_dpdk_ring_to_push lcore_rings_to_push[VR_DPDK_MAX_RINGS];
     /* Number of bond queues to TX */
     volatile uint16_t lcore_nb_bonds_to_tx;
-    /* List of bond queue params to TX LACP packets periodically */
-    struct vr_dpdk_queue_params *lcore_bonds_to_tx[VR_DPDK_MAX_BONDS];
-    /* Table of RX queue params */
-    struct vr_dpdk_queue_params lcore_rx_queue_params[VR_MAX_INTERFACES];
-    /* Table of TX queue params */
-    struct vr_dpdk_queue_params lcore_tx_queue_params[VR_MAX_INTERFACES];
-    /* Event socket */
-    void *lcore_event_sock;
+    /* Number of RX queues assigned to the lcore (for the scheduler) */
+    uint16_t lcore_nb_rx_queues;
+    /* Lcore command */
+    rte_atomic16_t lcore_cmd;
+    /* Lcore command param */
+    rte_atomic32_t lcore_cmd_param;
     /* Event FD to wake up UVHost
      * TODO: refactor to use either event_sock or event FD
      */
     int lcore_event_fd;
-    /* Lcore command param */
-    rte_atomic32_t lcore_cmd_param;
-    /* Lcore command */
-    rte_atomic16_t lcore_cmd;
-    /* Number of RX queues assigned to the lcore (for the scheduler) */
-    uint16_t lcore_nb_rx_queues;
+    /* Event socket */
+    void *lcore_event_sock;
+
+    /**********************************************************************/
+    /* Big and less frequently used fields */
+    /* Table of RX queues */
+    struct vr_dpdk_queue lcore_rx_queues[VR_MAX_INTERFACES];
+    /* Table of TX queues */
+    struct vr_dpdk_queue lcore_tx_queues[VR_MAX_INTERFACES] __rte_cache_aligned;
+    /* List of rings to push */
+    struct vr_dpdk_ring_to_push lcore_rings_to_push[VR_DPDK_MAX_RINGS] __rte_cache_aligned;
+    /* List of bond queue params to TX LACP packets periodically */
+    struct vr_dpdk_queue_params *lcore_bonds_to_tx[VR_DPDK_MAX_BONDS] __rte_cache_aligned;
+    /* Table of RX queue params */
+    struct vr_dpdk_queue_params lcore_rx_queue_params[VR_MAX_INTERFACES] __rte_cache_aligned;
+    /* Table of TX queue params */
+    struct vr_dpdk_queue_params lcore_tx_queue_params[VR_MAX_INTERFACES] __rte_cache_aligned;
 };
 
 /* Hardware RX queue state */
@@ -307,57 +314,56 @@ struct vr_dpdk_ethdev {
     uint16_t ethdev_reta_size;
     /* DPDK port ID */
     uint8_t ethdev_port_id;
+    /* The device is a bond if the number of slaves is > 0 */
+    int8_t ethdev_nb_slaves;
+    /* List of slaves port IDs */
+    uint8_t ethdev_slaves[VR_DPDK_BOND_MAX_SLAVES];
     /* Hardware RX queue states */
     uint8_t ethdev_queue_states[VR_DPDK_MAX_NB_RX_QUEUES];
-    /* List of slaves ports */
-    uint8_t ethdev_slaves[RTE_MAX_ETHPORTS];
-    /* The device is a bond if the number of slaves is > 0 */
-    int ethdev_nb_slaves;
     /* Pointers to memory pools */
     struct rte_mempool *ethdev_mempools[VR_DPDK_MAX_NB_RX_QUEUES];
 };
 
 struct vr_dpdk_global {
+    /**********************************************************************/
+    /* Frequently used fields */
+    /* Pointer to main (RSS) memory pool */
+    struct rte_mempool *rss_mempool;
     /* Pointer to virtio memory pool */
     struct rte_mempool *virtio_mempool;
-    /* Pointer to RSS memory pool */
-    struct rte_mempool *rss_mempool;
-    /* Number of free memory pools */
-    uint16_t nb_free_mempools;
-    /* List of free memory pools */
-    struct rte_mempool *free_mempools[VR_DPDK_MAX_VM_MEMPOOLS];
-    /* Number of forwarding lcores */
-    unsigned nb_fwd_lcores;
-    /* Table of pointers to forwarding lcore */
-    struct vr_dpdk_lcore *lcores[VR_MAX_CPUS];
+    /* Packet socket ring */
+    struct rte_ring *packet_ring;
     /* Global stop flag */
     rte_atomic16_t stop_flag;
     /* VLAN tag */
     uint16_t vlan_tag;
+    /* Table of pointers to forwarding lcore
+     * Must be at the end of the cache line 1 */
+    struct vr_dpdk_lcore *lcores[VR_MAX_CPUS];
+
+    /**********************************************************************/
+    /* Big and less frequently used fields */
+    /* Number of forwarding lcores */
+    unsigned nb_fwd_lcores;
+    /* Number of free memory pools */
+    uint16_t nb_free_mempools;
     /* NetLink socket handler */
     void *netlink_sock;
     void *flow_table;
     /* Packet socket */
-    struct rte_ring *packet_ring;
     void *packet_transport;
-    /* KNI thread ID */
-    pthread_t kni_thread;
-    /* Timer thread ID */
-    pthread_t timer_thread;
-    /* User space vhost thread */
-    pthread_t uvh_thread;
-    /* Table of KNIs */
-    struct rte_kni *knis[VR_MAX_INTERFACES];
-    /* Table of vHosts */
-    struct vr_interface *vhosts[VR_MAX_INTERFACES];
-    /* Table of ethdevs */
-    struct vr_dpdk_ethdev ethdevs[RTE_MAX_ETHPORTS];
-    /* Table of monitoring redirections (for tcpdump) */
-    uint16_t monitorings[VR_MAX_INTERFACES];
     /* Interface configuration mutex
      * ATM we use it just to synchronize access between the NetLink interface
      * and kernel KNI events. The datapath is not affected. */
     pthread_mutex_t if_lock;
+    /* List of free memory pools */
+    struct rte_mempool *free_mempools[VR_DPDK_MAX_VM_MEMPOOLS] __rte_cache_aligned;
+    /* List of KNI interfaces to handle KNI requests */
+    struct rte_kni *knis[VR_DPDK_MAX_KNI_INTERFACES] __rte_cache_aligned;
+    /* Table of monitoring redirections (for vifdump) */
+    uint16_t monitorings[VR_MAX_INTERFACES] __rte_cache_aligned;
+    /* Table of ethdevs */
+    struct vr_dpdk_ethdev ethdevs[RTE_MAX_ETHPORTS] __rte_cache_aligned;
 };
 
 extern struct vr_dpdk_global vr_dpdk;
