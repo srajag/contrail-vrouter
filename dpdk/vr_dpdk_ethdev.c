@@ -307,8 +307,8 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     tx_queue_params->qp_ethdev.queue_id = tx_queue_id;
     tx_queue_params->qp_ethdev.port_id = port_id;
 
-    /* add queue params to the list of bonds to TX */
-    if (ethdev->ethdev_nb_slaves > 0) {
+    /* for the queue 0 add queue params to the list of bonds to TX */
+    if (ethdev->ethdev_nb_slaves > 0 && tx_queue_id == 0) {
         /* make sure queue params has been stored */
         rte_wmb();
         lcore->lcore_bonds_to_tx[lcore->lcore_nb_bonds_to_tx++] = tx_queue_params;
