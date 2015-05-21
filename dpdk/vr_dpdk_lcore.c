@@ -783,17 +783,19 @@ dpdk_lcore_fwd_loop(void)
             vr_dpdk_lcore_flush(lcore);
 
             /* check if we need to TX bond queues */
+            if (unlikely(lcore->lcore_nb_bonds_to_tx > 0)) {
 #if VR_DPDK_USE_TIMER
-            /* we already got the CPU cycles */
-            cur_bond_cycles = cur_cycles;
+                /* we already got the CPU cycles */
+                cur_bond_cycles = cur_cycles;
 #else
-            cur_bond_cycles = rte_get_timer_cycles();
+                cur_bond_cycles = rte_get_timer_cycles();
 #endif
-            diff_cycles = cur_bond_cycles - last_bond_tx_cycles;
-            if (unlikely(bond_tx_cycles < diff_cycles)) {
-                last_bond_tx_cycles = cur_bond_cycles;
+                diff_cycles = cur_bond_cycles - last_bond_tx_cycles;
+                if (unlikely(bond_tx_cycles < diff_cycles)) {
+                    last_bond_tx_cycles = cur_bond_cycles;
 
-                dpdk_lcore_bond_tx(lcore);
+                    dpdk_lcore_bond_tx(lcore);
+                }
             }
 
             if (unlikely(lcore->lcore_nb_rx_queues == 0)) {
