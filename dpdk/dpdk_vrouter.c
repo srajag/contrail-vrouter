@@ -516,7 +516,7 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
      */
     case VLAN_OPT_INDEX:
         vr_dpdk.vlan_tag = (uint16_t)strtol(optarg, NULL, 0);
-        if (!vr_dpdk.vlan_tag) {
+        if (errno != 0) {
             vr_dpdk.vlan_tag = VLAN_ID_INVALID;
         }
         break;
