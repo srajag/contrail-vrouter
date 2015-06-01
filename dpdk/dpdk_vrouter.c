@@ -67,6 +67,10 @@ vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigne
     m->buf_len -= sizeof(struct vr_packet);
     RTE_VERIFY(0 < m->buf_len);
 
+    /* start of buffer is just after vr_packet structure */
+    m->buf_addr += sizeof(struct vr_packet);
+    m->buf_physaddr += sizeof(struct vr_packet);
+
     /* basic vr_packet initialization */
     pkt = vr_dpdk_mbuf_to_pkt(m);
     pkt->vp_head = (unsigned char *)m->buf_addr;

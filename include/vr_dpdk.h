@@ -444,12 +444,12 @@ dpdk_port_in_stats_update(struct vr_dpdk_queue *rxq,
 /*
  * rte_mbuf <=> vr_packet conversion
  *
- * We use the tailroom to store vr_packet structure:
- *     struct rte_mbuf + headroom + data + tailroom + struct vr_packet
+ * The vr_packet structure is right after the rte_mbuf:
+ *     struct rte_mbuf + struct vr_packet + headroom + data + tailroom
  *
  * rte_mbuf: *buf_addr(buf_len) + headroom + data_off(data_len) + tailroom
  *
- * rte_mbuf->buf_addr = rte_mbuf + sizeof(rte_mbuf)
+ * rte_mbuf->buf_addr = rte_mbuf + sizeof(rte_mbuf) + sizeof(vr_packet)
  * rte_mbuf->buf_len = elt_size - sizeof(rte_mbuf) - sizeof(vr_packet)
  * rte_mbuf->data_off = RTE_PKTMBUF_HEADROOM
  *
@@ -466,12 +466,12 @@ dpdk_port_in_stats_update(struct vr_dpdk_queue *rxq,
 static inline struct rte_mbuf *
 vr_dpdk_pkt_to_mbuf(struct vr_packet *pkt)
 {
-    return (struct rte_mbuf *)((uintptr_t)pkt->vp_head - sizeof(struct rte_mbuf));
+    return (struct rte_mbuf *)((uintptr_t)pkt - sizeof(struct rte_mbuf));
 }
 static inline struct vr_packet *
 vr_dpdk_mbuf_to_pkt(struct rte_mbuf *mbuf)
 {
-    return (struct vr_packet *)((uintptr_t)mbuf->buf_addr + mbuf->buf_len);
+    return (struct vr_packet *)((uintptr_t)mbuf + sizeof(struct rte_mbuf));
 }
 
 /*
