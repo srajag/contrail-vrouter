@@ -321,6 +321,8 @@ linux_xmit(struct vr_interface *vif, struct sk_buff *skb,
             skb->ip_summed == CHECKSUM_NONE)
         skb->ip_summed = CHECKSUM_UNNECESSARY;
 
+    /* This 'if' is duplicate of what is in linux_xmit_segment that calls this
+     * function. */
     if ((type == VP_TYPE_IPOIP) &&
             (skb->len > skb->dev->mtu + skb->dev->hard_header_len))
         return linux_inet_fragment(vif, skb, type);
@@ -449,6 +451,9 @@ linux_xmit_segments(struct vr_interface *vif, struct sk_buff *segs,
     do {
         nskb = segs->next;
         segs->next = NULL;
+        /* TODO(md): Dependency cyle - this function is called by
+         * linux_xmit_segment()->linux_xmit()->linux_inet_fragment()->this,
+         * which then calls linux_xmit_segment() - BUG PRONE AND DANGEROUS! */
         if ((err = linux_xmit_segment(vif, segs, type)))
             break;
         segs = nskb;

@@ -104,6 +104,17 @@ dpdk_mempools_create(void)
         return -rte_errno;
     }
 
+    /* Create the mbuf pool used for IP fragmentation */
+    vr_dpdk.fragmentation_mempool = rte_mempool_create("fragmentation_mempool",
+            VR_DPDK_RSS_MEMPOOL_SZ, VR_DPDK_MBUF_SZ,
+            VR_DPDK_RSS_MEMPOOL_CACHE_SZ, 0, NULL, NULL, rte_pktmbuf_init,
+            NULL, rte_socket_id(), 0);
+    if (vr_dpdk.fragmentation_mempool == NULL) {
+        RTE_LOG(CRIT, VROUTER, "Error creating IP fragmentation mempool: %s (%d)\n",
+            rte_strerror(rte_errno), rte_errno);
+        return -rte_errno;
+    }
+
     int ret, i;
     char mempool_name[RTE_MEMPOOL_NAMESIZE];
 

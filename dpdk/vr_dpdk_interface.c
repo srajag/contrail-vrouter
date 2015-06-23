@@ -819,6 +819,37 @@ dpdk_sw_checksum(struct vr_packet *pkt)
     }
 }
 
+static int
+dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
+                     struct rte_mbuf **mbuf_out, const unsigned short out_num,
+                     const unsigned lcore_id)
+{
+    int number_of_packets;
+    uint16_t mtu_size, outer_header_len;
+    struct rte_mempool *pool_direct, *pool_indirect;
+    struct rte_mbuf *m;
+    int i;
+
+    outer_header_len = 1;//ETH_HLEN + sizeof(struct vr_ip) /* + UDP/GRE */;
+
+    /* Get into the inner IP header */
+    char *inner_header_ptr = rte_pktmbuf_adj(mbuf_in, outer_header_len);
+
+    /* Fragment the packet */
+    pool_direct = vr_dpdk.virtio_mempool;
+    pool_indirect = vr_dpdk.fragmentation_mempool;
+
+    number_of_packets = rte_ipv4_fragment_packet(mbuf_in, mbuf_out, out_num,
+            mtu_size, pool_direct, pool_indirect);
+
+    /* Adjust outer IP header for each fragmented packets */
+    for (i = 0; i < number_of_packets; ++i) {
+        char *outer_header_ptr = rte_pktmbuf_prepend(m, outer_header_len);
+    }
+
+    return number_of_packets;
+}
+
 /* TX packet callback */
 static int
 dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
@@ -868,6 +899,9 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         vr_dpdk_packet_wakeup();
         return 0;
     }
+
+    /* TODO(md): Implement IP fragmentation here. */
+    //rte_ipv4_fragment_packet();
 
     /*
      * With DPDK pktmbufs we don't know if the checksum is incomplete,
