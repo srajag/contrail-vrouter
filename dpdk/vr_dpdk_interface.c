@@ -836,8 +836,8 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
     char *inner_header_ptr = rte_pktmbuf_adj(mbuf_in, outer_header_len);
 
     /* Fragment the packet */
-    pool_direct = vr_dpdk.virtio_mempool;
-    pool_indirect = vr_dpdk.fragmentation_mempool;
+    pool_direct = vr_dpdk.frag_direct_mempool;
+    pool_indirect = vr_dpdk.frag_indirect_mempool;
 
     number_of_packets = rte_ipv4_fragment_packet(mbuf_in, mbuf_out, out_num,
             mtu_size, pool_direct, pool_indirect);
