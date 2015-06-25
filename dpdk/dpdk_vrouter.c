@@ -117,6 +117,7 @@ dpdk_mempools_create(void)
     }
 
     /* Create the mbuf pool used for IP fragmentation (indirect mbufs) */
+    /* TODO(md): Adjust pool/element size, number and cache */
     vr_dpdk.frag_indirect_mempool = rte_mempool_create("frag_indirect_mempool",
             VR_DPDK_FRAG_INDIRECT_MEMPOOL_SZ, VR_DPDK_MBUF_SZ,
             VR_DPDK_FRAG_INDIRECT_MEMPOOL_CACHE_SZ, 0, NULL, NULL,

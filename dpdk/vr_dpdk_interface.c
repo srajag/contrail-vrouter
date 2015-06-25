@@ -21,6 +21,7 @@
 
 #include <rte_errno.h>
 #include <rte_ethdev.h>
+#include <rte_ip_frag.h>
 #include <rte_ip.h>
 
 /*
@@ -822,30 +823,45 @@ dpdk_sw_checksum(struct vr_packet *pkt)
 static int
 dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
                      struct rte_mbuf **mbuf_out, const unsigned short out_num,
-                     const unsigned lcore_id)
+                     const unsigned short mtu_size, const unsigned lcore_id)
 {
     int number_of_packets;
-    uint16_t mtu_size, outer_header_len;
+    uint16_t outer_header_len;
     struct rte_mempool *pool_direct, *pool_indirect;
     struct rte_mbuf *m;
     int i;
+    unsigned char *original_header_ptr;
 
-    outer_header_len = 1;//ETH_HLEN + sizeof(struct vr_ip) /* + UDP/GRE */;
+    outer_header_len = pkt_get_inner_network_header_off(pkt) -
+            pkt_head_space(pkt);
+    original_header_ptr = pkt_data(pkt);
 
     /* Get into the inner IP header */
+    rte_pktmbuf_dump(stdout, mbuf_in, 100);
     char *inner_header_ptr = rte_pktmbuf_adj(mbuf_in, outer_header_len);
 
     /* Fragment the packet */
     pool_direct = vr_dpdk.frag_direct_mempool;
     pool_indirect = vr_dpdk.frag_indirect_mempool;
 
+    rte_pktmbuf_dump(stdout, mbuf_in, 100);
+    /* Fragment with the size of MTU - outer_header_length to leave a space for
+     * the header prepended later */
     number_of_packets = rte_ipv4_fragment_packet(mbuf_in, mbuf_out, out_num,
-            mtu_size, pool_direct, pool_indirect);
+            mtu_size - outer_header_len, pool_direct, pool_indirect);
 
     /* Adjust outer IP header for each fragmented packets */
     for (i = 0; i < number_of_packets; ++i) {
+        m = mbuf_out[i];
         char *outer_header_ptr = rte_pktmbuf_prepend(m, outer_header_len);
+
+        rte_memcpy(outer_header_ptr, original_header_ptr, outer_header_len);
+        rte_pktmbuf_dump(stdout, m, 100);
+        /* Copy IP id from inner packet, calculate IP checksums? */
+
     }
+
+    rte_pktmbuf_free(mbuf_in);
 
     return number_of_packets;
 }
@@ -961,15 +977,30 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
-    if (likely(tx_queue->txq_ops.f_tx != NULL)) {
-        tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
-        if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
-            tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+    struct rte_mbuf *mbufs_out[2];
+    int num_of_frags = 1, i;
+
+    fprintf(stdout, "DEBUG: pkt is overlay %d\n", vr_pkt_type_is_overlay(pkt->vp_type));
+    if (vr_pkt_type_is_overlay(pkt->vp_type) && vif->vif_mtu < pkt_len(pkt)) {
+        fprintf(stdout, "DEBUG: pkt_len(%u)\n", pkt_len(pkt));
+        num_of_frags = dpdk_fragment_packet(pkt, m, mbufs_out, 2, vif->vif_mtu,
+                lcore_id);
     } else {
-        RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
-                __func__, vif->vif_name, lcore_id);
-        vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
-        return -1;
+        mbufs_out[0] = m;
+    }
+
+    for (i = 0; i < num_of_frags; ++i) {
+        m = mbufs_out[i];
+        if (likely(tx_queue->txq_ops.f_tx != NULL)) {
+            tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
+            if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
+                tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+        } else {
+            RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
+                    __func__, vif->vif_name, lcore_id);
+            vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
+            return -1;
+        }
     }
 
     return 0;

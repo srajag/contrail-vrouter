@@ -77,7 +77,7 @@ DPDK_LIBS = [
 ]
 
 # Flags
-env.Append(CCFLAGS = '-Wall')
+env.Append(CCFLAGS = '-Wall -gdwarf-3')
 env.Append(CCFLAGS = '-msse4.2')
 
 # Include/lLib paths
