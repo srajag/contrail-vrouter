@@ -844,11 +844,10 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
     pool_direct = vr_dpdk.frag_direct_mempool;
     pool_indirect = vr_dpdk.frag_indirect_mempool;
 
-    rte_pktmbuf_dump(stdout, mbuf_in, 100);
     /* Fragment with the size of MTU - outer_header_length to leave a space for
      * the header prepended later */
     number_of_packets = rte_ipv4_fragment_packet(mbuf_in, mbuf_out, out_num,
-            mtu_size - outer_header_len, pool_direct, pool_indirect);
+            mtu_size - outer_header_len - 20, pool_direct, pool_indirect);
 
     /* Adjust outer IP header for each fragmented packets */
     for (i = 0; i < number_of_packets; ++i) {
@@ -856,9 +855,12 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
         char *outer_header_ptr = rte_pktmbuf_prepend(m, outer_header_len);
 
         rte_memcpy(outer_header_ptr, original_header_ptr, outer_header_len);
-        rte_pktmbuf_dump(stdout, m, 100);
-        /* Copy IP id from inner packet, calculate IP checksums? */
 
+        /* Copy IP id from inner packet, calculate IP checksums? */
+        struct vr_ip *outer_ip = (struct vr_ip *)(outer_header_ptr +
+                VR_ETHER_HLEN);
+        outer_ip->ip_len = htons(m->pkt_len - VR_ETHER_HLEN);
+        rte_pktmbuf_dump(stdout, m, 100);
     }
 
     rte_pktmbuf_free(mbuf_in);
