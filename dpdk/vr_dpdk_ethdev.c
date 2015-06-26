@@ -104,12 +104,7 @@ static const struct rte_eth_txconf tx_queue_conf = {
     },
     .tx_free_thresh = 0,    /* Use PMD default values */
     .tx_rs_thresh = 0,      /* Use PMD default values */
-    .txq_flags =            /* Set flags for the Tx queue */
-        ETH_TXQ_FLAGS_NOMULTSEGS
-        | ETH_TXQ_FLAGS_NOREFCOUNT
-        | ETH_TXQ_FLAGS_NOVLANOFFL
-        | ETH_TXQ_FLAGS_NOXSUMSCTP
-        | ETH_TXQ_FLAGS_NOXSUMTCP
+    .txq_flags = 0          /* Set flags for the Tx queue */
 };
 
 /* Add hardware filter */
