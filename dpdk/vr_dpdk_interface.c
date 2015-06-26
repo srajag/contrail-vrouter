@@ -105,7 +105,7 @@ dpdk_pci_to_dbdf(struct rte_pci_addr *address)
 
 /* mirrors the function used in bonding */
 static inline uint8_t
-dpdk_find_port_id_by_pci_addr(struct rte_pci_addr *addr)
+dpdk_find_port_id_by_pci_addr(const struct rte_pci_addr *addr)
 {
     uint8_t i;
     struct rte_pci_addr *eth_pci_addr;
@@ -837,7 +837,7 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
     original_header_ptr = pkt_data(pkt);
 
     /* Get into the inner IP header */
-    rte_pktmbuf_dump(stdout, mbuf_in, 100);
+    rte_pktmbuf_dump(stdout, mbuf_in, 150);
     char *inner_header_ptr = rte_pktmbuf_adj(mbuf_in, outer_header_len);
 
     /* Fragment the packet */
@@ -847,7 +847,7 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
     /* Fragment with the size of MTU - outer_header_length to leave a space for
      * the header prepended later */
     number_of_packets = rte_ipv4_fragment_packet(mbuf_in, mbuf_out, out_num,
-            mtu_size - outer_header_len - 20, pool_direct, pool_indirect);
+            mtu_size - outer_header_len, pool_direct, pool_indirect);
 
     /* Adjust outer IP header for each fragmented packets */
     for (i = 0; i < number_of_packets; ++i) {
@@ -860,7 +860,9 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
         struct vr_ip *outer_ip = (struct vr_ip *)(outer_header_ptr +
                 VR_ETHER_HLEN);
         outer_ip->ip_len = htons(m->pkt_len - VR_ETHER_HLEN);
-        rte_pktmbuf_dump(stdout, m, 100);
+        outer_ip->ip_csum = 0;
+        outer_ip->ip_csum = vr_ip_csum(outer_ip);
+        rte_pktmbuf_dump(stdout, m, 150);
     }
 
     rte_pktmbuf_free(mbuf_in);
@@ -982,11 +984,12 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct rte_mbuf *mbufs_out[2];
     int num_of_frags = 1, i;
 
-    fprintf(stdout, "DEBUG: pkt is overlay %d\n", vr_pkt_type_is_overlay(pkt->vp_type));
-    if (vr_pkt_type_is_overlay(pkt->vp_type) && vif->vif_mtu < pkt_len(pkt)) {
-        fprintf(stdout, "DEBUG: pkt_len(%u)\n", pkt_len(pkt));
-        num_of_frags = dpdk_fragment_packet(pkt, m, mbufs_out, 2, vif->vif_mtu,
+    //fprintf(stdout, "DEBUG: pkt is overlay %d\n", vr_pkt_type_is_overlay(pkt->vp_type));
+    if (vr_pkt_type_is_overlay(pkt->vp_type) && vif->vif_mtu < m->pkt_len) {
+        fprintf(stdout, "DEBUG: pkt_len(%u/%u)\n", pkt_len(pkt), m->pkt_len);
+        num_of_frags = dpdk_fragment_packet(pkt, m, mbufs_out, 2, 1400, //vif->vif_mtu,
                 lcore_id);
+        fprintf(stdout, "DEBUG: num_of_frags %d\n", num_of_frags);
     } else {
         mbufs_out[0] = m;
     }
@@ -994,6 +997,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     for (i = 0; i < num_of_frags; ++i) {
         m = mbufs_out[i];
         if (likely(tx_queue->txq_ops.f_tx != NULL)) {
+            //rte_pktmbuf_dump(stdout, m, 150);
             tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
             if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
                 tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
