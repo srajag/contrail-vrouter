@@ -968,14 +968,6 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         else
             dpdk_sw_checksum(pkt);
     } else if (likely(vr_pkt_type_is_overlay(pkt->vp_type))) {
-        /* Do IP fragmentation if necessary */
-        //if (vif->vif_mtu < m->pkt_len) {
-        //    num_of_frags = dpdk_fragment_packet(pkt, m, mbufs_out,
-        //            MAX_IP_FRAGMENTS, vif->vif_mtu, lcore_id);
-        //} else {
-        //    mbufs_out[0] = m;
-        //}
-
         /* If NIC supports checksum offload.
          * Inner checksum is already done. Compute outer IPv4 checksum,
          * set UDP length, and zero UDP checksum.
@@ -1016,10 +1008,9 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
-
     if (vr_pkt_type_is_overlay(pkt->vp_type) && vif->vif_mtu < m->pkt_len) {
         num_of_frags = dpdk_fragment_packet(pkt, m, mbufs_out, 2, vif->vif_mtu,
-                lcore_id);
+                !(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD), lcore_id);
     }
  
     if (num_of_frags > 1) {
