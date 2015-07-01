@@ -120,7 +120,7 @@ dpdk_mempools_create(void)
     /* TODO(md): Adjust pool/element size, number and cache */
     vr_dpdk.frag_indirect_mempool = rte_mempool_create("frag_indirect_mempool",
             VR_DPDK_FRAG_INDIRECT_MEMPOOL_SZ, VR_DPDK_MBUF_SZ,
-            VR_DPDK_FRAG_INDIRECT_MEMPOOL_CACHE_SZ, 0, NULL, NULL,
+            VR_DPDK_FRAG_INDIRECT_MEMPOOL_CACHE_SZ, sizeof(struct rte_pktmbuf_pool_private), NULL, NULL,
             rte_pktmbuf_init, NULL, rte_socket_id(), 0);
     if (vr_dpdk.frag_indirect_mempool == NULL) {
         RTE_LOG(CRIT, VROUTER, "Error creating FRAG_INDIRECT mempool: %s (%d)\n",
