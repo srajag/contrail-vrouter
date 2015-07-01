@@ -747,11 +747,10 @@ dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
 }
 
 static inline void
-dpdk_ipv4_outer_tunnel_hw_checksum(struct vr_packet *pkt)
+dpdk_ipv4_outer_tunnel_hw_checksum(struct rte_mbuf *m)
 {
-    struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
-    unsigned offset = pkt->vp_data + sizeof(struct ether_hdr);
-    struct vr_ip *iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
+    unsigned offset = m->data_off + sizeof(struct ether_hdr);
+    struct vr_ip *iph = (struct vr_ip *)((char *)m->buf_addr + offset);
     unsigned iph_len = iph->ip_hl * 4;
     struct vr_udp *udph;
 
@@ -761,8 +760,8 @@ dpdk_ipv4_outer_tunnel_hw_checksum(struct vr_packet *pkt)
     m->l2_len = offset - rte_pktmbuf_headroom(m);
 
     if (iph->ip_proto == VR_IP_PROTO_UDP) {
-        udph = (struct vr_udp *)pkt_data_at_offset(pkt, offset + iph_len);
-        udph->udp_length = htons(pkt_len(pkt));
+        udph = (struct vr_udp *)((char *)m->buf_addr + offset + iph_len);
+        udph->udp_length = htons(rte_pktmbuf_pkt_len(m));
         udph->udp_csum = 0;
     }
 }
@@ -823,7 +822,8 @@ dpdk_sw_checksum(struct vr_packet *pkt)
 static int
 dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
                      struct rte_mbuf **mbuf_out, const unsigned short out_num,
-                     const unsigned short mtu_size, const unsigned lcore_id)
+                     const unsigned short mtu_size, bool do_outer_ip_csum,
+                     const unsigned lcore_id)
 {
     int number_of_packets;
     uint16_t outer_header_len;
@@ -838,7 +838,7 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
     original_header_ptr = pkt_data(pkt);
 
     /* Get into the inner IP header */
-    char *inner_header_ptr = rte_pktmbuf_adj(mbuf_in, outer_header_len);
+    rte_pktmbuf_adj(mbuf_in, outer_header_len);
 
     /* Fragment the packet */
     pool_direct = vr_dpdk.frag_direct_mempool;
@@ -872,9 +872,20 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
         outer_ip->ip_len = htons(m->pkt_len - VR_ETHER_HLEN);
         m->l2_len = mbuf_in->l2_len;
         m->l3_len = mbuf_in->l3_len;
+
         /* Copy inner IP id to outer. Currently, the Agent diagnostics depends
          * on that. */
         outer_ip->ip_id = inner_ip->ip_id; 
+
+        /* If it is necessary to calculate (in software) IP header checksum.
+         * TODO: This would not be needed if:
+         * 1. We would support mbuf chains. The functions that calculate the
+         * checksums, which uses vr_pkt struct could be used after fragmentation
+         * 2. We would rewrite the checksumming functions to use mbufs and not
+         * the vr_pkt struct, and use them after fragmentation. */
+        if (do_outer_ip_csum) {
+            outer_ip->ip_csum = vr_ip_csum(outer_ip);
+        }        
     }
 
     rte_pktmbuf_free(mbuf_in);
@@ -901,7 +912,6 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     int ret;
     struct rte_mbuf *mbufs_out[MAX_IP_FRAGMENTS];
     int num_of_frags = 1;
-    int i;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
@@ -972,7 +982,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
          */
         if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
             /* TODO: vlan support */
-            dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
+            dpdk_ipv4_outer_tunnel_hw_checksum(m);
         } else {
             /* TODO: vlan support */
             dpdk_ipv4_outer_tunnel_sw_checksum(pkt);
@@ -1007,44 +1017,11 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 #endif
 
 
-    //fprintf(stdout, "DEBUG: pkt is overlay %d\n", vr_pkt_type_is_overlay(pkt->vp_type));
     if (vr_pkt_type_is_overlay(pkt->vp_type) && vif->vif_mtu < m->pkt_len) {
-        fprintf(stdout, "DEBUG: pkt_len(%u/%u)\n", pkt_len(pkt), m->pkt_len);
         num_of_frags = dpdk_fragment_packet(pkt, m, mbufs_out, 2, vif->vif_mtu,
                 lcore_id);
-        fprintf(stdout, "DEBUG: num_of_frags %d\n", num_of_frags);
-
-/*
-        if (likely(tx_queue->txq_ops.f_tx_bulk != NULL)) {
-            //rte_pktmbuf_dump(stdout, m, 150);
-            tx_queue->txq_ops.f_tx_bulk(tx_queue->q_queue_h, mbufs_out, 0x3);
-            if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
-                tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
-        } else {
-            RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
-                    __func__, vif->vif_name, lcore_id);
-            vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
-            return -1;
-        }*/
-    } else {
-        mbufs_out[0] = m;
     }
-
-//    for (i = 0; i < num_of_frags; ++i) {
-//        m = mbufs_out[i];
-//        if (likely(tx_queue->txq_ops.f_tx != NULL)) {
-//            //rte_pktmbuf_dump(stdout, m, 150);
-//            tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
-//            if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
-//                tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
-//        } else {
-//            RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
-//                    __func__, vif->vif_name, lcore_id);
-//            vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
-//            return -1;
-//        }
-//    }
-
+ 
     if (num_of_frags > 1) {
         unsigned mask = (1 << num_of_frags) - 1;
 
@@ -1062,7 +1039,6 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         }
     } else {
         if (likely(tx_queue->txq_ops.f_tx != NULL)) {
-            //rte_pktmbuf_dump(stdout, m, 150);
             tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
             if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
                 tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
