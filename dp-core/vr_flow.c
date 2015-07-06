@@ -1232,11 +1232,11 @@ vr_flow_req_is_invalid(struct vrouter *router, vr_flow_req *req,
 
     if (fe) {
         if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
-            if (memcmp(req->fr_flow_ip, fe->fe_key.flow_ip, 
+            if (memcmp(req->fr_flow_ip, fe->fe_key.flow_ip,
                        2 * VR_IP_ADDR_SIZE(fe->fe_type)) ||
                     (unsigned short)req->fr_flow_sport != fe->fe_key.flow_sport ||
                     (unsigned short)req->fr_flow_dport != fe->fe_key.flow_dport||
-                    (unsigned short)req->fr_flow_nh_id != fe->fe_key.flow_nh_id ||
+                    //(unsigned short)req->fr_flow_nh_id != fe->fe_key.flow_nh_id ||
                     (unsigned char)req->fr_flow_proto != fe->fe_key.flow_proto) {
                 return -EBADF;
             }
@@ -1423,6 +1423,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
 
     fe->fe_ecmp_nh_index = req->fr_ecmp_nh_index;
     fe->fe_src_nh_index = req->fr_src_nh_index;
+    fe->fe_key.flow_nh_id = req->fr_flow_nh_id;
 
     if ((req->fr_action == VR_FLOW_ACTION_HOLD) &&
             (fe->fe_action != VR_FLOW_ACTION_HOLD)) {
@@ -1434,7 +1435,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     if (fe->fe_action == VR_FLOW_ACTION_DROP)
         fe->fe_drop_reason = (uint8_t)req->fr_drop_reason;
 
-    fe->fe_flags = req->fr_flags; 
+    fe->fe_flags = req->fr_flags;
     if (new_flow && (fe->fe_flags & VR_RFLOW_VALID)) {
         rfe = vr_get_flow_entry(router, fe->fe_rflow);
         if (rfe) {

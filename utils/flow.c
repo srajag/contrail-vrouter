@@ -49,9 +49,9 @@
 #define MEM_DEV                 "/dev/flow"
 int mem_fd;
 
-static int dvrf_set, mir_set, help_set;
+static int dvrf_set, mir_set, help_set, knh_set, snh_set, vrf_set, ecmp_set;
 static unsigned short dvrf;
-static int flow_index, list, flow_cmd, mirror = -1;
+static int flow_index, list, flow_cmd, mirror = -1, snh, knh, vrf, ecmp = -1;
 static int rate;
 static int stats;
 
@@ -702,13 +702,15 @@ flow_validate(int flow_index, char action)
     flow_req.fr_index = flow_index;
     flow_req.fr_family = VR_FLOW_FAMILY(fe->fe_type);
     flow_req.fr_flags = VR_FLOW_FLAG_ACTIVE;
+    flow_req.fr_flow_ip = malloc(2 * VR_IP_ADDR_SIZE(fe->fe_type));
     memcpy(flow_req.fr_flow_ip, fe->fe_key.flow_ip,
               2 * VR_IP_ADDR_SIZE(fe->fe_type));
     flow_req.fr_flow_ip_size = 2 * VR_IP_ADDR_SIZE(fe->fe_type);
     flow_req.fr_flow_proto = fe->fe_key.flow_proto;
     flow_req.fr_flow_sport = fe->fe_key.flow_sport;
     flow_req.fr_flow_dport = fe->fe_key.flow_dport;
-    flow_req.fr_flow_nh_id = fe->fe_key.flow_nh_id;
+    flow_req.fr_flow_vrf = vrf; //default 0
+    flow_req.fr_ecmp_nh_index = ecmp; //default -1
 
     switch (action) {
     case 'd':
@@ -734,6 +736,17 @@ flow_validate(int flow_index, char action)
     } else
         flow_req.fr_flags &= ~VR_FLOW_FLAG_MIRROR;
 
+    /**
+     * TODO: this should be under `case 'f'`?
+     */
+    if (knh > 0 && snh > 0) {
+        flow_req.fr_flow_nh_id = knh;
+        flow_req.fr_src_nh_index = snh;
+    } else {
+        flow_req.fr_flow_nh_id = fe->fe_key.flow_nh_id;
+        flow_req.fr_src_nh_index = fe->fe_src_nh_index;
+    }
+
 
     make_flow_req(&flow_req);
     return;
@@ -745,6 +758,10 @@ Usage(void)
     printf("Usage:flow [-f flow_index]\n");
     printf("           [-d flow_index]\n");
     printf("           [-i flow_index]\n");
+    printf("           [--knh Key Nexthop]\n");
+    printf("           [--snh RPF Nexthop]\n");
+    printf("           [--vrf VRF ID]\n");
+    printf("           [--ecmp ECMP NH index]\n");
     printf("           [--mirror=mirror table index]\n");
     printf("           [-l]\n");
     printf("           [-r]\n");
@@ -767,14 +784,22 @@ enum opt_flow_index {
     DVRF_OPT_INDEX,
     MIRROR_OPT_INDEX,
     HELP_OPT_INDEX,
+    KEYNH_OPT_INDEX,
+    SRCNH_OPT_INDEX,
+    VRF_OPT_INDEX,
+    ECMP_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
 static struct option long_options[] = {
-    [DVRF_OPT_INDEX]    = {"dvrf",   required_argument, &dvrf_set, 1},
-    [MIRROR_OPT_INDEX]  = {"mirror", required_argument, &mir_set,  1},
-    [HELP_OPT_INDEX]    = {"help",   no_argument,       &help_set, 1},
-    [MAX_OPT_INDEX]     = { NULL,    0,                 0,         0}
+    [DVRF_OPT_INDEX]   = {"dvrf",   required_argument, &dvrf_set, 1},
+    [MIRROR_OPT_INDEX] = {"mirror", required_argument, &mir_set,  1},
+    [HELP_OPT_INDEX]   = {"help",   no_argument,       &help_set, 1},
+    [KEYNH_OPT_INDEX]  = {"knh",    required_argument, &knh_set,  1},
+    [SRCNH_OPT_INDEX]  = {"snh",    required_argument, &snh_set,  1},
+    [VRF_OPT_INDEX]    = {"vrf",    required_argument, &vrf_set,  1},
+    [ECMP_OPT_INDEX]   = {"ecmp",   required_argument, &ecmp_set, 1},
+    [MAX_OPT_INDEX]    = { NULL,    0,                 0,         0}
 };
 
 static void
@@ -799,6 +824,30 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
 
     case MIRROR_OPT_INDEX:
         mirror = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    case KEYNH_OPT_INDEX:
+        knh = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    case SRCNH_OPT_INDEX:
+        snh = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    case VRF_OPT_INDEX:
+        vrf = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    case ECMP_OPT_INDEX:
+        ecmp = strtoul(opt_arg, NULL, 0);
         if (errno)
             Usage();
         break;
