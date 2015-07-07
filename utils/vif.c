@@ -375,9 +375,7 @@ vr_interface_req_process(void *s)
         vr_ifindex = req->vifr_idx;
     }
 
-    if (vr_op != SANDESH_OP_DUMP)
-        response_pending = false;
-
+    response_pending = false;
     return;
 }
 
@@ -528,8 +526,6 @@ vr_intf_send_msg(void *request, char *request_string)
             if (resp->nl_op == SANDESH_REQUEST) {
                 sandesh_decode(resp->nl_data, resp->nl_len,
                                vr_find_sandesh_info, &ret);
-            } else if (resp->nl_type == NL_MSG_TYPE_DONE) {
-                response_pending = false;
             }
         }
 

@@ -56,10 +56,7 @@ vr_mpls_req_process(void *s_req)
    if (mpls_op == SANDESH_OP_DUMP)
        dump_marker = req->mr_label;
 
-   if (mpls_op != SANDESH_OP_DUMP)
-       response_pending = false;
-
-   return;
+   response_pending = false;
 }
 
 void
@@ -146,8 +143,6 @@ op_retry:
             if (resp->nl_op == SANDESH_REQUEST) {
                 sandesh_decode(resp->nl_data, resp->nl_len,
                                vr_find_sandesh_info, &ret);
-            } else if (resp->nl_type == NL_MSG_TYPE_DONE) {
-                response_pending = false;
             }
         }
 
