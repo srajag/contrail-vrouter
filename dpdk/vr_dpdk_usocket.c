@@ -1203,10 +1203,10 @@ vr_usocket_io(void *transport)
             return -1;
         }
 
-        /* Handle an IPC command only for packet lcore
-         * and just check the stop flag for the rest
+        /* Handle an IPC commands for PACKET_LCORE_ID up
+         * and just check the stop flag for the rest.
          */
-        if (lcore_id == VR_DPDK_PACKET_LCORE_ID) {
+        if (lcore_id >= VR_DPDK_PACKET_LCORE_ID) {
             if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
                 break;
         } else {

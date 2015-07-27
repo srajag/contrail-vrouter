@@ -400,7 +400,7 @@ dpdk_stop_flag_set(void)
     if (unlikely(vr_dpdk_is_stop_flag_set()))
         return;
 
-    vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_STOP_CMD, 0, 0);
+    vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_STOP_CMD, 0);
     rte_atomic16_inc(&vr_dpdk.stop_flag);
 
     /* wakeup UVHost server to shutdown */

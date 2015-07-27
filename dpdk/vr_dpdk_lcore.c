@@ -39,7 +39,7 @@ vr_dpdk_lcore_least_used_get(void)
     uint16_t least_used_nb_queues = 2 * VR_MAX_INTERFACES;
     unsigned int num_queues;
 
-    /* never use master (NetLink) lcore */
+    /* never use master lcore */
     RTE_LCORE_FOREACH_SLAVE(lcore_id) {
         if (lcore_id < VR_DPDK_FWD_LCORE_ID)
             continue;
@@ -185,15 +185,15 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     queue_id = 0;
     /* for all lcores */
     do {
-        /* TX queues are just for packet lcore and forwarding lcores */
+        /* PACKET_LCORE_ID and up have TX queues */
         if (lcore_id >= VR_DPDK_PACKET_LCORE_ID) {
             /*
-             * Do not schedule hardware TX queue on packet lcore if there
-             * are no enough lcores for all the forwarding lcores.
+             * do not schedule hardware TX queue on service lcores if
+             * there are no enough queues for all the forwarding lcores
              */
-            if (((lcore_id != VR_DPDK_PACKET_LCORE_ID) ||
-                    (nb_tx_queues > vr_dpdk.nb_fwd_lcores)) &&
-                (queue_id < nb_tx_queues)) {
+            if (((lcore_id >= VR_DPDK_FWD_LCORE_ID)
+                    || (nb_tx_queues > vr_dpdk.nb_fwd_lcores))
+                && (queue_id < nb_tx_queues)) {
                 /* there is a hardware queue available */
                 RTE_LOG(INFO, VROUTER, "    lcore %u TX to HW queue %" PRIu16 "\n",
                     lcore_id, queue_id);
@@ -215,7 +215,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
             dpdk_lcore_queue_add(lcore_id, &lcore->lcore_tx_head, tx_queue);
         }
 
-        /* skip master (NetLink) lcore and wrap */
+        /* skip master lcore and wrap */
         lcore_id = rte_get_next_lcore(lcore_id, 1, 1);
     } while (lcore_id != least_used_id);
 
@@ -247,7 +247,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
             }
         }
 
-        /* skip master (NetLink) lcore and wrap */
+        /* skip master lcore and wrap */
         lcore_id = rte_get_next_lcore(lcore_id, 1, 1);
     } while (lcore_id != least_used_id);
 
@@ -260,7 +260,7 @@ vr_dpdk_lcore_cmd_wait(unsigned lcore_id)
 {
     struct vr_dpdk_lcore *lcore;
 
-    /* only packet and forwarding lcores handle commands */
+    /* only PACKET_LCORE_ID and up handle commands */
     if (lcore_id < VR_DPDK_PACKET_LCORE_ID)
         return;
 
@@ -282,12 +282,11 @@ dpdk_lcore_cmd_wait_all(void)
 
 /* Post an lcore command to a specific lcore */
 void
-vr_dpdk_lcore_cmd_post(unsigned lcore_id, uint16_t cmd, uint64_t cmd_arg1,
-    uint64_t cmd_arg2)
+vr_dpdk_lcore_cmd_post(unsigned lcore_id, uint16_t cmd, uint64_t cmd_arg)
 {
     struct vr_dpdk_lcore *lcore;
 
-    /* only packet and forwarding lcores handle commands */
+    /* only PACKET_LCORE_ID and up handle commands */
     if (lcore_id < VR_DPDK_PACKET_LCORE_ID)
         return;
 
@@ -296,25 +295,29 @@ vr_dpdk_lcore_cmd_post(unsigned lcore_id, uint16_t cmd, uint64_t cmd_arg1,
     /* set the command is being published */
     while (rte_atomic16_cmpset(&lcore->lcore_cmd,
                 VR_DPDK_LCORE_NO_CMD, VR_DPDK_LCORE_IN_PROGRESS_CMD) == 0);
-    lcore->lcore_cmd_arg1 = cmd_arg1;
-    lcore->lcore_cmd_arg2 = cmd_arg2;
+    lcore->lcore_cmd_arg = cmd_arg;
     /* publish the command */
     while (rte_atomic16_cmpset(&lcore->lcore_cmd,
                 VR_DPDK_LCORE_IN_PROGRESS_CMD, cmd) == 0);
 
-    /* we need to wake up the packet lcore so it could handle the command */
-    if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
+    /* handle the command if it was posted to this lcore */
+    if (lcore_id == rte_lcore_id())
+        vr_dpdk_lcore_cmd_handle(lcore);
+    /* we need to wake up service lcores so they could handle the command */
+    else if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
         vr_dpdk_packet_wakeup();
+    else if (lcore_id == VR_DPDK_NETLINK_LCORE_ID)
+        vr_dpdk_netlink_wakeup();
 }
 
 /* Post an lcore command to all the lcores */
 void
-vr_dpdk_lcore_cmd_post_all(uint16_t cmd, uint64_t cmd_arg1, uint64_t cmd_arg2)
+vr_dpdk_lcore_cmd_post_all(uint16_t cmd, uint64_t cmd_arg)
 {
     unsigned lcore_id;
 
     RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-        vr_dpdk_lcore_cmd_post(lcore_id, cmd, cmd_arg1, cmd_arg2);
+        vr_dpdk_lcore_cmd_post(lcore_id, cmd, cmd_arg);
     }
 }
 
@@ -330,7 +333,7 @@ dpdk_lcore_rxtx_release_all(struct vr_interface *vif)
     struct vr_dpdk_queue_params *tx_queue_params;
 
     RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-        /* only packet and forwarding lcores handle RX/TX queues */
+        /* only PACKET_LCORE_ID and up handle RX/TX queues */
         if (lcore_id < VR_DPDK_PACKET_LCORE_ID)
             continue;
 
@@ -357,10 +360,10 @@ vr_dpdk_lcore_if_unschedule(struct vr_interface *vif)
 {
     /* Remove RX queues first */
     vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_RX_RM_CMD,
-                        (uint32_t)vif->vif_idx, 0);
+                        (uint32_t)vif->vif_idx);
     /* Flush and remove TX queues */
     vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_TX_RM_CMD,
-                        (uint32_t)vif->vif_idx, 0);
+                        (uint32_t)vif->vif_idx);
     dpdk_lcore_cmd_wait_all();
 
     /* release RX and TX queues */
@@ -760,8 +763,7 @@ int
 vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
 {
     uint16_t cmd = lcore->lcore_cmd;
-    uint64_t cmd_arg1 = lcore->lcore_cmd_arg1;
-    uint64_t cmd_arg2 = lcore->lcore_cmd_arg2;
+    uint64_t cmd_arg = lcore->lcore_cmd_arg;
     int ret = 0;
     unsigned vif_idx;
     struct vr_dpdk_queue *rx_queue;
@@ -773,7 +775,7 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
 
     switch (cmd) {
     case VR_DPDK_LCORE_RX_RM_CMD:
-        vif_idx = (unsigned)cmd_arg1;
+        vif_idx = (unsigned)cmd_arg;
         rx_queue = &lcore->lcore_rx_queues[vif_idx];
         if (rx_queue->q_queue_h) {
             /* remove the queue from the lcore */
@@ -782,7 +784,7 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
         lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
         break;
     case VR_DPDK_LCORE_TX_RM_CMD:
-        vif_idx = (unsigned)cmd_arg1;
+        vif_idx = (unsigned)cmd_arg;
         tx_queue = &lcore->lcore_tx_queues[vif_idx];
         if (tx_queue->q_queue_h) {
             /* remove the queue from the lcore */
@@ -791,12 +793,7 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
         lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
         break;
     case VR_DPDK_LCORE_RCU_CMD:
-        vr_dpdk_packet_rcu_cb((struct rcu_head *)cmd_arg1);
-        lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
-        break;
-    case VR_DPDK_LCORE_WORK_CMD:
-        /* do the work */
-        vr_dpdk_packet_work_cb((void (*)(void *))cmd_arg1, (void *)cmd_arg2);
+        vr_dpdk_packet_rcu_cb((struct rcu_head *)cmd_arg);
         lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
         break;
     case VR_DPDK_LCORE_STOP_CMD:

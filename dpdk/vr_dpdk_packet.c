@@ -26,16 +26,6 @@ vr_dpdk_packet_wakeup(void)
     }
 }
 
-/* Work callback called on packet lcore */
-void
-vr_dpdk_packet_work_cb(void (*fn)(void *), void *arg)
-{
-    rcu_read_lock();
-    fn(arg);
-    rcu_read_unlock();
-    /* nothing to free since we pass two arguments */
-}
-
 /* RCU callback called on packet lcore */
 void
 vr_dpdk_packet_rcu_cb(struct rcu_head *rh)
@@ -128,12 +118,16 @@ dpdk_packet_socket_init(void)
 
     /* create and bind event usock to wake up the packet lcore */
     event_sock = (void *)vr_usocket(EVENT, RAW);
-    if (!event_sock)
+    if (!event_sock) {
+        RTE_LOG(ERR, VROUTER, "    error creating packet event\n");
         goto error;
+    }
 
     if (vr_usocket_bind_usockets(vr_dpdk.packet_transport,
-                event_sock))
+                event_sock)) {
+        RTE_LOG(ERR, VROUTER, "    error binding packet event\n");
         goto error;
+    }
     vr_dpdk.packet_event_sock = event_sock;
 
     return 0;
