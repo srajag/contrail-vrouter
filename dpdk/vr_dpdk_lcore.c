@@ -292,10 +292,8 @@ vr_dpdk_lcore_cmd_post(unsigned lcore_id, uint16_t cmd, uint64_t cmd_arg1,
         return;
 
     lcore = vr_dpdk.lcores[lcore_id];
-    /* wait for previous command to complete */
-    vr_dpdk_lcore_cmd_wait(lcore_id);
 
-    /* the command is being published */
+    /* set the command is being published */
     while (rte_atomic16_cmpset(&lcore->lcore_cmd,
                 VR_DPDK_LCORE_NO_CMD, VR_DPDK_LCORE_IN_PROGRESS_CMD) == 0);
     lcore->lcore_cmd_arg1 = cmd_arg1;

@@ -1225,9 +1225,6 @@ vr_usocket_io(void *transport)
         }
 
         rcu_thread_online();
-        /* manage timers on packet lcore */
-        if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
-            rte_timer_manage();
 
         processed = 0;
         pfd = usockp->usock_pfds;

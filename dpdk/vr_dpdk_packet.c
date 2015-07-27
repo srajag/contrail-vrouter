@@ -59,6 +59,9 @@ wait_for_connection:
     RTE_LOG(DEBUG, VROUTER, "%s[%lx]: waiting for packet transport\n",
                 __func__, pthread_self());
 
+    /* Set the thread offline while busy waiting for the
+     * transport socket to apperar.
+     */
     rcu_thread_offline();
     while (!vr_dpdk.packet_transport) {
         /* handle an IPC command */
@@ -66,6 +69,7 @@ wait_for_connection:
             return -1;
         usleep(VR_DPDK_SLEEP_SERVICE_US);
     }
+    rcu_thread_online();
 
     RTE_LOG(DEBUG, VROUTER, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 ((struct vr_usocket *)vr_dpdk.packet_transport)->usock_fd);
