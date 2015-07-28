@@ -20,6 +20,8 @@
 #include "vr_dpdk_virtio.h"
 #include "vr_uvhost.h"
 
+#include <signal.h>
+
 #include <rte_cycles.h>
 #include <rte_ethdev.h>
 #include <rte_malloc.h>
@@ -707,6 +709,25 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
 #endif
 }
 
+/* Setup signal handlers */
+static void
+dpdk_lcore_signals_init(unsigned lcore_id)
+{
+    sigset_t set;
+
+    /* Due to the extra threads we cant block signals on, our only
+     * option is to handle the signals on master (KNI) lcore */
+    if (lcore_id == rte_get_master_lcore()) {
+        RTE_LOG(DEBUG, VROUTER, "Unblocking signals for lcore %u\n",
+                    lcore_id);
+        sigfillset(&set);
+        if (pthread_sigmask(SIG_UNBLOCK, &set, NULL) != 0) {
+            RTE_LOG(CRIT, VROUTER, "Error setting signal mask for core %u\n",
+                        lcore_id);
+        }
+    }
+}
+
 /* Init lcore context */
 static int
 dpdk_lcore_init(unsigned lcore_id)
@@ -729,12 +750,14 @@ dpdk_lcore_init(unsigned lcore_id)
             VR_DPDK_RX_RING_SZ, RING_F_SC_DEQ);
     if (lcore->lcore_rx_ring == NULL) {
         RTE_LOG(CRIT, VROUTER, "Error allocating lcore %u RX ring\n", lcore_id);
+        rte_free(lcore);
         return -ENOMEM;
     }
 
     vr_dpdk.lcores[lcore_id] = lcore;
 
     rcu_register_thread();
+    dpdk_lcore_signals_init(lcore_id);
 
     return 0;
 }
@@ -1026,9 +1049,6 @@ vr_dpdk_lcore_launch(__attribute__((unused)) void *dummy)
         return -ENOMEM;
 
     switch (lcore_id) {
-    case VR_DPDK_NETLINK_LCORE_ID:
-        dpdk_lcore_netlink_loop();
-        break;
     case VR_DPDK_KNI_LCORE_ID:
         dpdk_lcore_kni_loop();
         break;
@@ -1040,6 +1060,9 @@ vr_dpdk_lcore_launch(__attribute__((unused)) void *dummy)
         break;
     case VR_DPDK_PACKET_LCORE_ID:
         dpdk_lcore_packet_loop();
+        break;
+    case VR_DPDK_NETLINK_LCORE_ID:
+        dpdk_lcore_netlink_loop();
         break;
     default:
         dpdk_lcore_fwd_loop();

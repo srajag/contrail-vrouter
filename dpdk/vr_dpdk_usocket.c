@@ -505,6 +505,10 @@ vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: draining packet ring...\n", __func__,
             pthread_self());
+
+    if (unlikely(usockp->usock_parent->usock_vif == NULL))
+        return;
+
     vr_stats = vif_get_stats(usockp->usock_parent->usock_vif, lcore_id);
     do {
         nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,

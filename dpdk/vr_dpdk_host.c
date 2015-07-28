@@ -403,7 +403,6 @@ dpdk_timer(struct rte_timer *tim, void *arg)
 {
     struct vr_timer *vtimer = (struct vr_timer*)arg;
 
-    RTE_LOG(DEBUG, VROUTER, "%s: calling timer function %p\n", __func__, vtimer->vt_timer);
     vtimer->vt_timer(vtimer->vt_vr_arg);
 }
 
