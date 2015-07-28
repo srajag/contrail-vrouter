@@ -19,6 +19,11 @@ enum flow_op {
     FLOW_TABLE_GET,
 }
 
+enum vrouter_op {
+    LOG_SET,
+    LOG_GET,
+}
+
 struct sandesh_hdr {
     1:  sandesh_op  h_op;
     2:  i32         h_id;
@@ -229,6 +234,9 @@ buffer sandesh vrouter_ops {
    10: i32          vo_mirror_entries;
    11: i32          vo_vrfs;
    12: string       vo_build_info;
+   13: u32          vo_log_level;
+   14: list<u32>    vo_log_type_enable;
+   15: list<u32>    vo_log_type_disable;
 }
 
 buffer sandesh vr_mem_stats_req {

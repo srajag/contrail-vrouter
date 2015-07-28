@@ -81,6 +81,7 @@ if dpdk_exists:
     vrctl_sources = ['vrctl.c']
     vrctl = env.Program(target = 'vrctl', source = vrctl_sources)
     env.Requires(vrctl, dpdk_lib)
+    env.Requires(vrouter, dpdk_lib)
     binaries.append(vrctl)
 
 scripts  = ['vifdump']

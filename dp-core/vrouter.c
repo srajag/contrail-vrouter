@@ -315,6 +315,9 @@ vrouter_ops_get_process(void *s_req)
     strncpy(resp->vo_build_info, ContrailBuildInfo,
             strlen(ContrailBuildInfo));
 
+    resp->vo_log_level = rte_get_log_level();
+    resp->vo_log_type_enable = rte_get_log_type();
+
     req = resp;
 generate_response:
     if (ret)
@@ -325,6 +328,36 @@ generate_response:
         vrouter_ops_destroy(resp);
 
     return;
+}
+
+/**
+ * A handler for control messages.
+ *
+ * Currently only logging control is supported.
+ *
+ * @param s_req Received request to be processed.
+ */
+void
+vrouter_ops_add_process(void *s_req)
+{
+    int i;
+
+    vr_ctl_req *req = (vr_ctl_req *)s_req;
+
+    if (req->ctl_log_level)
+        rte_set_log_level(req->ctl_log_level);
+
+    if (req->ctl_log_type_enable_size)
+        for (i = 0; i < req->ctl_log_type_enable_size; ++i)
+            rte_set_log_type(req->ctl_log_type_enable[i], 1);
+
+    if (req->ctl_log_type_disable_size)
+        for (i = 0; i < req->ctl_log_type_disable_size; ++i)
+            rte_set_log_type(req->ctl_log_type_disable[i], 0);
+
+    /* Neither of currently called functions signals an error. Just send OK
+     * response here for now. */
+    vr_send_response(0);
 }
 
 void
@@ -398,6 +431,10 @@ vrouter_ops_process(void *s_req)
 
     case SANDESH_OP_GET:
         vrouter_ops_get_process(s_req);
+        return;
+
+    case SANDESH_OP_ADD:
+        vrouter_ops_add_process(s_req);
         return;
 
     default:
