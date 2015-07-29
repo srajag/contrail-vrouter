@@ -264,7 +264,7 @@ vrouter_ops_get(void)
 {
     vrouter_ops *req;
 
-    req = vr_malloc(sizeof(*req), VR_VROUTER_REQ_OBJECT);
+    req = vr_zalloc(sizeof(*req), VR_VROUTER_REQ_OBJECT);
     if (!req)
         return NULL;
 
@@ -315,8 +315,10 @@ vrouter_ops_get_process(void *s_req)
     strncpy(resp->vo_build_info, ContrailBuildInfo,
             strlen(ContrailBuildInfo));
 
-    resp->vo_log_level = rte_get_log_level();
-    resp->vo_log_type_enable = rte_get_log_type();
+    /* Fill out logging entries */
+    resp->vo_log_level = vr_get_log_level();
+    resp->vo_log_type_enable =
+        vr_get_enabled_log_types(&resp->vo_log_type_enable_size);
 
     req = resp;
 generate_response:
@@ -342,18 +344,18 @@ vrouter_ops_add_process(void *s_req)
 {
     int i;
 
-    vr_ctl_req *req = (vr_ctl_req *)s_req;
+    vrouter_ops *req = (vrouter_ops *)s_req;
 
-    if (req->ctl_log_level)
-        rte_set_log_level(req->ctl_log_level);
+    if (req->vo_log_level)
+        vr_set_log_level(req->vo_log_level);
 
-    if (req->ctl_log_type_enable_size)
-        for (i = 0; i < req->ctl_log_type_enable_size; ++i)
-            rte_set_log_type(req->ctl_log_type_enable[i], 1);
+    if (req->vo_log_type_enable_size)
+        for (i = 0; i < req->vo_log_type_enable_size; ++i)
+            vr_set_log_type(req->vo_log_type_enable[i], 1);
 
-    if (req->ctl_log_type_disable_size)
-        for (i = 0; i < req->ctl_log_type_disable_size; ++i)
-            rte_set_log_type(req->ctl_log_type_disable[i], 0);
+    if (req->vo_log_type_disable_size)
+        for (i = 0; i < req->vo_log_type_disable_size; ++i)
+            vr_set_log_type(req->vo_log_type_disable[i], 0);
 
     /* Neither of currently called functions signals an error. Just send OK
      * response here for now. */

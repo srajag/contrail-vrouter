@@ -35,7 +35,7 @@
 #include "nl_util.h"
 #include "vr_os.h"
 #include "ini_parser.h"
-#include "vr_dpdk.h"
+#include "vrouter.h"
 
 #define BUILD_VERSION_STRING    "\"build-version\":"
 #define BUILD_USER_STRING       "\"build-user\":"
@@ -84,23 +84,23 @@ static int vr_vrouter_op = -1;
 static bool response_pending = false;
 
 static log_level_name_id_t log_levels[] = {
-    {"emergency",   RTE_LOG_EMERG},
-    {"alert",       RTE_LOG_ALERT},
-    {"critical",    RTE_LOG_CRIT},
-    {"error",       RTE_LOG_ERR},
-    {"warning",     RTE_LOG_WARNING},
-    {"notice",      RTE_LOG_NOTICE},
-    {"info",        RTE_LOG_INFO},
-    {"debug",       RTE_LOG_DEBUG},
+    {"emergency",   VR_LOG_EMERG},
+    {"alert",       VR_LOG_ALERT},
+    {"critical",    VR_LOG_CRIT},
+    {"error",       VR_LOG_ERR},
+    {"warning",     VR_LOG_WARNING},
+    {"notice",      VR_LOG_NOTICE},
+    {"info",        VR_LOG_INFO},
+    {"debug",       VR_LOG_DEBUG},
 
     {"", 0} /* Must be the last entry */
 };
 
 static log_type_name_id_t log_types[] = {
-    {"vrouter",     RTE_LOGTYPE_VROUTER},
-    {"usock",       RTE_LOGTYPE_USOCK},
-    {"uvhost",      RTE_LOGTYPE_UVHOST},
-    {"dpcore",      RTE_LOGTYPE_DPCORE},
+    {"vrouter",     VR_LOGTYPE_VROUTER},
+    {"usock",       VR_LOGTYPE_USOCK},
+    {"uvhost",      VR_LOGTYPE_UVHOST},
+    {"dpcore",      VR_LOGTYPE_DPCORE},
 
     {"", 0} /* Must be the last entry */
 };
@@ -114,7 +114,7 @@ is_read_op_set()
 {
    int i;
 
-   for (i = 0; i != -1; ++i)
+   for (i = 0; read_options[i] != -1; ++i)
       if (opt[read_options[i]])
          return true;
 
@@ -126,7 +126,7 @@ is_write_op_set()
 {
    int i;
 
-   for (i = 0; i != -1; ++i)
+   for (i = 0; write_options[i] != -1; ++i)
       if (opt[write_options[i]])
          return true;
 
@@ -236,6 +236,7 @@ vr_response_process(void *s)
         printf("Error: %s\n", strerror(-resp->resp_code));
     }
 
+    response_pending = false;
     return;
 }
 
@@ -475,6 +476,8 @@ prepare_request(vrouter_ops *req)
       usage();
    }
 
+   memset(req, 0, sizeof(*req));
+
    if (read) {
       req->h_op = SANDESH_OP_GET;
    } else {
@@ -507,8 +510,6 @@ main(int argc, char *argv[])
         }
     }
 
-    prepare_request(&req);
-
     cl = nl_register_client();
     if (!cl) {
         exit(1);
@@ -529,6 +530,8 @@ main(int argc, char *argv[])
     if (vrouter_get_family_id(cl) <= 0) {
         return -1;
     }
+
+    prepare_request(&req);
 
     ret = send_request(&req);
     if (ret < 0) {
