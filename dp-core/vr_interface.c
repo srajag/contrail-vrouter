@@ -2033,7 +2033,8 @@ vr_interface_get(vr_interface_req *req)
             goto generate_response;
         }
 
-        vr_interface_make_req(resp, vif, req->vifr_core);
+        /* zero vifr_core means to sum up all the per-core stats */
+        vr_interface_make_req(resp, vif, (unsigned)(req->vifr_core - 1));
     } else
         ret = -ENOENT;
 
@@ -2077,7 +2078,8 @@ vr_interface_dump(vr_interface_req *r)
             i < router->vr_max_interfaces; i++) {
         vif = router->vr_interfaces[i];
         if (vif) {
-            vr_interface_make_req(resp, vif, r->vifr_core);
+            /* zero vifr_core means to sum up all the per-core stats */
+            vr_interface_make_req(resp, vif, (unsigned)(r->vifr_core - 1));
             ret = vr_message_dump_object(dumper, VR_INTERFACE_OBJECT_ID, resp);
             if (ret <= 0)
                 break;

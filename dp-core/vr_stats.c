@@ -115,7 +115,8 @@ vr_drop_stats_req_process(void *s_req)
     if ((req->h_op != SANDESH_OP_GET) && (ret = -EOPNOTSUPP))
         vr_send_response(ret);
 
-    vr_drop_stats_get(req->vds_core);
+    /* zero vds_core means to sum up all the per-core stats */
+    vr_drop_stats_get((unsigned)(req->vds_core - 1));
     return;
 }
 

@@ -679,7 +679,8 @@ op_retry:
         break;
 
     case SANDESH_OP_GET:
-        intf_req.vifr_core = core;
+        /* zero vifr_core means to sum up all the per-core stats */
+        intf_req.vifr_core = (unsigned)(core + 1);
 
         /*
          * this logic is slightly complicated. if --kernel option is set
@@ -697,7 +698,8 @@ op_retry:
         break;
 
     case SANDESH_OP_DUMP:
-        intf_req.vifr_core = core;
+        /* zero vifr_core means to sum up all the per-core stats */
+        intf_req.vifr_core = (unsigned)(core + 1);
         break;
     }
 

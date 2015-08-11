@@ -23,6 +23,7 @@
 #include <rte_ethdev.h>
 #include <rte_ip_frag.h>
 #include <rte_ip.h>
+#include <rte_port_ethdev.h>
 
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
@@ -1188,7 +1189,7 @@ dpdk_if_get_encap(struct vr_interface *vif)
 
 /* Update port statistics */
 static void
-dpdk_port_stats_update(struct vr_interface *vif, unsigned core)
+dpdk_port_stats_update(struct vr_interface *vif, unsigned lcore_id)
 {
     struct vr_interface_stats *stats;
     struct vr_dpdk_lcore *lcore;
@@ -1197,21 +1198,19 @@ dpdk_port_stats_update(struct vr_interface *vif, unsigned core)
     struct rte_port_out_stats tx_stats;
     vr_dpdk_virtioq_t *vq;
 
-    stats = vif_get_stats(vif, core);
-    lcore = vr_dpdk.lcores[core];
+    stats = vif_get_stats(vif, lcore_id);
+    lcore = vr_dpdk.lcores[lcore_id];
 
     if (lcore == NULL)
         return;
 
-    /* for all lcore RX queues */
-    SLIST_FOREACH(queue, &lcore->lcore_rx_head, q_next) {
-        if (queue->q_vif == vif) {
-            /* update stats */
-            if (queue->rxq_ops.f_stats != NULL) {
-                if (queue->rxq_ops.f_stats(queue->q_queue_h,
-                    &rx_stats, 0) != 0)
-                    continue;
-
+    /* RX queue */
+    queue = &lcore->lcore_rx_queues[vif->vif_idx];
+    if (queue->q_vif == vif) {
+        /* update stats */
+        if (queue->rxq_ops.f_stats != NULL) {
+            if (queue->rxq_ops.f_stats(queue->q_queue_h,
+                &rx_stats, 0) == 0) {
                 if (queue->rxq_ops.f_rx == rte_port_ring_reader_ops.f_rx) {
                     stats->vis_queue_ipackets = rx_stats.n_pkts_in;
                     stats->vis_queue_ierrors = rx_stats.n_pkts_drop;
@@ -1220,25 +1219,23 @@ dpdk_port_stats_update(struct vr_interface *vif, unsigned core)
                     stats->vis_port_ierrors = rx_stats.n_pkts_drop;
                 }
             }
-
-            /* update virtio syscalls counters */
-            if (queue->rxq_ops.f_rx == vr_dpdk_virtio_reader_ops.f_rx) {
-                vq = (vr_dpdk_virtioq_t *)queue->q_queue_h;
-                stats->vis_port_isyscalls = vq->vdv_nb_syscalls;
-                stats->vis_port_inombufs = vq->vdv_nb_nombufs;
-            }
         }
-    } /* for all RX queues */
 
-    /* for all lcore TX queues */
-    SLIST_FOREACH(queue, &lcore->lcore_tx_head, q_next) {
-        if (queue->q_vif == vif) {
-            /* update stats */
-            if (queue->txq_ops.f_stats != NULL) {
-                if (queue->txq_ops.f_stats(queue->q_queue_h,
-                    &tx_stats, 0) != 0)
-                    continue;
+        /* update virtio syscalls counters */
+        if (queue->rxq_ops.f_rx == vr_dpdk_virtio_reader_ops.f_rx) {
+            vq = (vr_dpdk_virtioq_t *)queue->q_queue_h;
+            stats->vis_port_isyscalls = vq->vdv_nb_syscalls;
+            stats->vis_port_inombufs = vq->vdv_nb_nombufs;
+        }
+    }
 
+    /* TX queue */
+    queue = &lcore->lcore_tx_queues[vif->vif_idx];
+    if (queue->q_vif == vif) {
+        /* update stats */
+        if (queue->txq_ops.f_stats != NULL) {
+            if (queue->txq_ops.f_stats(queue->q_queue_h,
+                &tx_stats, 0) == 0) {
                 if (queue->txq_ops.f_tx == rte_port_ring_writer_ops.f_tx) {
                     stats->vis_queue_opackets = tx_stats.n_pkts_in;
                     stats->vis_queue_oerrors = tx_stats.n_pkts_drop;
@@ -1247,42 +1244,96 @@ dpdk_port_stats_update(struct vr_interface *vif, unsigned core)
                     stats->vis_port_oerrors = tx_stats.n_pkts_drop;
                 }
             }
-
-            /* update virtio syscalls counters */
-            if (queue->txq_ops.f_tx == vr_dpdk_virtio_writer_ops.f_tx) {
-                vq = (vr_dpdk_virtioq_t *)queue->q_queue_h;
-                stats->vis_port_osyscalls = vq->vdv_nb_syscalls;
-            }
         }
-    } /* for all TX queues */
+
+        /* update virtio syscalls counters */
+        if (queue->txq_ops.f_tx == vr_dpdk_virtio_writer_ops.f_tx) {
+            vq = (vr_dpdk_virtioq_t *)queue->q_queue_h;
+            stats->vis_port_osyscalls = vq->vdv_nb_syscalls;
+        }
+    }
 }
 
-/* Update driver statistics */
+/* Update device statistics */
 static void
-dpdk_dev_stats_update(struct vr_interface *vif)
+dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id)
 {
     struct vr_interface_stats *stats;
     uint8_t port_id;
     struct rte_eth_stats eth_stats;
+    int i;
+    struct vr_dpdk_lcore *lcore;
+    struct vr_dpdk_queue *queue;
+    struct vr_dpdk_queue_params *queue_params;
+    uint16_t queue_id;
 
     /* check if vif is a PMD */
     if (!vif_is_fabric(vif) || vif->vif_os == NULL)
         return;
 
+    /* reset per-lcore device statistics */
+    for (i = 0; i < vr_num_cpus; i++) {
+        stats = vif_get_stats(vif, i);
+
+        stats->vis_dev_ibytes = 0;
+        stats->vis_dev_ipackets = 0;
+        stats->vis_dev_ierrors = 0;
+        stats->vis_dev_inombufs = 0;
+        stats->vis_dev_obytes = 0;
+        stats->vis_dev_opackets = 0;
+        stats->vis_dev_oerrors = 0;
+    }
+
     port_id = ((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id;
     if (rte_eth_stats_get(port_id, &eth_stats) != 0)
         return;
 
-    /* driver stats are not per-lcore, so we just use core 0 */
-    stats = vif_get_stats(vif, 0);
+    if (lcore_id == (unsigned)-1) {
+        /* use lcore 0 to store global device counters */
+        stats = vif_get_stats(vif, 0);
+        stats->vis_dev_ibytes = eth_stats.ibytes;
+        stats->vis_dev_ipackets = eth_stats.ipackets;
+        stats->vis_dev_ierrors = eth_stats.ierrors;
+        stats->vis_dev_inombufs = eth_stats.rx_nombuf;
+        stats->vis_dev_obytes = eth_stats.obytes;
+        stats->vis_dev_opackets = eth_stats.opackets;
+        stats->vis_dev_oerrors = eth_stats.oerrors;
 
-    stats->vis_dev_ibytes = eth_stats.ibytes;
-    stats->vis_dev_ipackets = eth_stats.ipackets;
-    stats->vis_dev_ierrors = eth_stats.ierrors;
-    stats->vis_dev_inombufs = eth_stats.rx_nombuf;
-    stats->vis_dev_obytes = eth_stats.obytes;
-    stats->vis_dev_opackets = eth_stats.opackets;
-    stats->vis_dev_oerrors = eth_stats.oerrors;
+    } else if (lcore_id < vr_num_cpus) {
+        /* per-lcore device counters */
+        lcore = vr_dpdk.lcores[lcore_id];
+        if (lcore == NULL)
+            return;
+
+        stats = vif_get_stats(vif, lcore_id);
+
+        /* get lcore RX queue index */
+        queue = &lcore->lcore_rx_queues[vif->vif_idx];
+        if (queue->rxq_ops.f_rx == rte_port_ethdev_reader_ops.f_rx) {
+            queue_params = &lcore->lcore_rx_queue_params[vif->vif_idx];
+            queue_id = queue_params->qp_ethdev.queue_id;
+            if (queue_id < RTE_ETHDEV_QUEUE_STAT_CNTRS) {
+                stats->vis_dev_ibytes = eth_stats.q_ibytes[queue_id];
+                stats->vis_dev_ipackets = eth_stats.q_ipackets[queue_id];
+                stats->vis_dev_ierrors = eth_stats.q_errors[queue_id];
+                /* there is no per-lcore nombuf counter */
+                stats->vis_dev_inombufs = 0;
+            }
+        }
+
+        /* get lcore TX queue index */
+        queue = &lcore->lcore_tx_queues[vif->vif_idx];
+        if (queue->txq_ops.f_tx == rte_port_ethdev_writer_ops.f_tx) {
+            queue_params = &lcore->lcore_tx_queue_params[vif->vif_idx];
+            queue_id = queue_params->qp_ethdev.queue_id;
+            if (queue_id < RTE_ETHDEV_QUEUE_STAT_CNTRS) {
+                stats->vis_dev_obytes = eth_stats.q_obytes[queue_id];
+                stats->vis_dev_opackets = eth_stats.q_opackets[queue_id];
+                /* there is no TX error counter */
+                stats->vis_dev_oerrors = 0;
+            }
+        }
+    }
 }
 
 /* Update interface statistics */
@@ -1292,18 +1343,16 @@ dpdk_if_stats_update(struct vr_interface *vif, unsigned core)
     int i;
 
     if (core == (unsigned)-1) {
-        /* update device counters */
-        dpdk_dev_stats_update(vif);
-
+        /* update global device counters */
+        dpdk_dev_stats_update(vif, core);
         /* update port counters for all cores */
         for (i = 0; i < vr_num_cpus; i++) {
             dpdk_port_stats_update(vif, i);
         }
     } else if (core < vr_num_cpus) {
-        /* we put device counters into core 0 */
-        if (core == 0)
-            dpdk_dev_stats_update(vif);
-        /* update port counters */
+        /* update device queue counters for a specific core */
+        dpdk_dev_stats_update(vif, core);
+        /* update port counters for a specific core */
         dpdk_port_stats_update(vif, core);
     }
     /* otherwise there is nothing to update */

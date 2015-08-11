@@ -382,7 +382,8 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
     unsigned dst_lcore_id = 0; /* Initialize to avoid warning */
     uint32_t lcore_nb_pkts, chunk_nb_pkts;
     const unsigned nb_fwd_lcores = vr_dpdk.nb_fwd_lcores;
-    const unsigned this_lcore_id = rte_lcore_id() - VR_DPDK_FWD_LCORE_ID;
+    const unsigned lcore_id = rte_lcore_id();
+    const unsigned this_lcore_id = lcore_id - VR_DPDK_FWD_LCORE_ID;
     /* Per lcore bursts (+1 for the header) */
     /* Header bits:
      *   63    - always set to 1
@@ -427,6 +428,7 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
                             (uintptr_t)lcore_pkts[dst_lcore_id][0] + 1);
     }
 
+    stats = vif_get_stats(vif, lcore_id);
     /* pass distributed bursts to other forwarding lcores */
     for (i = 0; i < nb_fwd_lcores; i++) {
         lcore_nb_pkts = (uintptr_t)lcore_pkts[i][0] & 0xFFFFFFFFU;
@@ -435,7 +437,6 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
             RTE_LOG(DEBUG, VROUTER, "%s: enqueueing %u packet to lcore %u\n",
                  __func__, lcore_nb_pkts, dst_lcore_id + VR_DPDK_FWD_LCORE_ID);
 
-            stats = vif_get_stats(vif, this_lcore_id);
             /* round up the number of packets to the chunk size */
             chunk_nb_pkts = (lcore_nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ - 1)
                     /VR_DPDK_RX_RING_CHUNK_SZ*VR_DPDK_RX_RING_CHUNK_SZ;
@@ -444,7 +445,8 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
                     (void **)&lcore_pkts[i][0],
                     chunk_nb_pkts);
             if (unlikely(ret == -ENOBUFS)) {
-                stats->vis_queue_ierrors += lcore_nb_pkts;
+                /* count out the header */
+                stats->vis_queue_ierrors += lcore_nb_pkts - 1;
                 /* never happens, because the size of the ring is greater than mempool */
                 RTE_LOG(INFO, VROUTER, "%s: lcore %u ring is full, dropping %u packets: %d/%d\n",
                      __func__, i + VR_DPDK_FWD_LCORE_ID, lcore_nb_pkts,
@@ -455,7 +457,8 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
                     vr_dpdk_pfree(lcore_pkts[i][j], VP_DROP_INTERFACE_DROP);
                 }
             } else {
-                stats->vis_queue_ipackets += lcore_nb_pkts;
+                /* count out the header */
+                stats->vis_queue_ipackets += lcore_nb_pkts - 1;
             }
         }
     }

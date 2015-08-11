@@ -223,6 +223,8 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
     /* store queue params */
     rx_queue_params->qp_release_op = &dpdk_ethdev_rx_queue_release;
+    rx_queue_params->qp_ethdev.queue_id = rx_queue_id;
+    rx_queue_params->qp_ethdev.port_id = port_id;
 
     return rx_queue;
 }
@@ -399,6 +401,9 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
                     ": %s (%d)\n", port_id, i, rte_strerror(-ret), -ret);
             return ret;
         }
+        /* map RX queue to stats counter ignoring any errors */
+        rte_eth_dev_set_rx_queue_stats_mapping(port_id, i, i);
+
         /* save queue mempool pointer */
         ethdev->ethdev_mempools[i] = mempool;
     }
@@ -415,6 +420,8 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
                     ": %s (%d)\n", port_id, i, rte_strerror(-ret), -ret);
             return ret;
         }
+        /* map TX queue to stats counter ignoring any errors */
+        rte_eth_dev_set_tx_queue_stats_mapping(port_id, i, i);
     }
     return 0;
 }

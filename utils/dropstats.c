@@ -175,7 +175,8 @@ vr_build_drop_stats_request(void)
 {
     stats_req.h_op = SANDESH_OP_GET;
     stats_req.vds_rid = 0;
-    stats_req.vds_core = core;
+    /* zero vds_core means to sum up all the per-core stats */
+    stats_req.vds_core = (unsigned)(core + 1);
 
     return &stats_req;
 }
