@@ -151,7 +151,7 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
  * Must be bigger than mempool size due to the headers and other mempools */
 #define VR_DPDK_RX_RING_SZ          (VR_DPDK_RSS_MEMPOOL_SZ*2)
 /* Use timer to measure flushes (slower, but should improve latency) */
-#define VR_DPDK_USE_TIMER           true
+#define VR_DPDK_USE_TIMER           false
 /* TX flush timeout (in loops or US if USE_TIMER defined) */
 #define VR_DPDK_TX_FLUSH_LOOPS      5
 #define VR_DPDK_TX_FLUSH_US         100
@@ -167,7 +167,6 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
 /* Sleep (in US) or yield if no packets received (use 0 to disable) */
 #define VR_DPDK_SLEEP_NO_PACKETS_US 0
 #define VR_DPDK_YIELD_NO_PACKETS    1
-#define VR_DPDK_PAUSE_NO_PACKETS    0
 /* Timers handling periodicity in US */
 #define VR_DPDK_SLEEP_TIMER_US      100
 /* KNI handling periodicity in US */

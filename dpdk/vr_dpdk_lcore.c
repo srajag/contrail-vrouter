@@ -686,27 +686,17 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
     /* push TX rings */
     total_pkts += dpdk_lcore_rings_push(lcore);
 
-#if VR_DPDK_SLEEP_NO_PACKETS_US > 0
-    /* sleep if no single packet received */
+    /* make a short pause if no single packet received */
     if (unlikely(total_pkts == 0)) {
         rcu_thread_offline();
+#if VR_DPDK_SLEEP_NO_PACKETS_US > 0
         usleep(VR_DPDK_SLEEP_NO_PACKETS_US);
-        rcu_thread_online();
-    }
 #endif
 #if VR_DPDK_YIELD_NO_PACKETS > 0
-    /* yield if no single packet received */
-    if (unlikely(total_pkts == 0)) {
         sched_yield();
-        rcu_quiescent_state();
-    }
 #endif
-#if VR_DPDK_PAUSE_NO_PACKETS > 0
-    /* pause if no single packet received */
-    if (unlikely(total_pkts == 0)) {
-        rte_pause();
+        rcu_thread_online();
     }
-#endif
 }
 
 /* Setup signal handlers */

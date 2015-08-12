@@ -44,8 +44,6 @@ typedef struct vr_dpdk_virtioq {
     uint16_t            vdv_vif_idx;
 
     /* Big and less frequently used fields */
-    uint64_t            vdv_nb_syscalls;
-    uint64_t            vdv_nb_nombufs;
     int                 vdv_callfd; /**< Used to notify the guest (trigger interrupt). */
     int                 vdv_kickfd; /**< Currently unused as polling mode is enabled. */
     /* TODO: not used
@@ -53,7 +51,7 @@ typedef struct vr_dpdk_virtioq {
     int vdv_zero_copy;
      */
     DPDK_DEBUG_VAR(uint32_t vdv_hash);
-} vr_dpdk_virtioq_t __rte_cache_aligned;
+} __rte_cache_aligned vr_dpdk_virtioq_t;
 
 typedef struct vr_dpdk_uvh_mmap_addr{
     uint64_t unmap_mmap_addr;                 /**< mmap() returned address */
@@ -94,11 +92,14 @@ int vr_dpdk_set_virtq_ready(unsigned int vif_idx, unsigned int vring_idx,
 void vr_dpdk_virtio_set_vif_client(unsigned int idx, void *client);
 void *vr_dpdk_virtio_get_vif_client(unsigned int idx);
 
+void vr_dpdk_virtio_xstats_update(struct vr_interface_stats *stats,
+    struct vr_dpdk_queue *queue);
+
 extern struct rte_port_in_ops vr_dpdk_virtio_reader_ops;
 extern struct rte_port_out_ops vr_dpdk_virtio_writer_ops;
 
 extern vr_dpdk_uvh_vif_mmap_addr_t vr_dpdk_virtio_uvh_vif_mmap[VR_MAX_INTERFACES];
-extern vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
-extern vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
+extern struct vr_dpdk_virtioq vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
+extern struct vr_dpdk_virtioq vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
 
 #endif /* __VR_DPDK_VIRTIO_H__ */
