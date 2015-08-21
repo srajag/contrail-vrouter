@@ -31,6 +31,8 @@
 #include <rte_kni.h>
 #include <rte_timer.h>
 
+#define LCORES_ARG "--lcores"
+
 /* dp-core parameters */
 extern unsigned int vr_bridge_entries;
 extern unsigned int vr_bridge_oentries;
@@ -48,7 +50,7 @@ struct vr_dpdk_global vr_dpdk;
 static char *dpdk_argv[] = {
     "dpdk",
     /* the argument will be updated in dpdk_init() */
-    "--lcores", NULL,
+    LCORES_ARG, NULL,
     "-m", VR_DPDK_MAX_MEM,
     "-n", VR_DPDK_MAX_MEMCHANNELS,
     /* up to ten optional arguments (5 pairs of argument + option) */
@@ -165,12 +167,12 @@ dpdk_mempools_create(void)
  *      0 if the system does not have enough cores
  */
 static uint64_t
-dpdk_core_mask_get(void)
+dpdk_core_mask_get(long system_cpus_count)
 {
     cpu_set_t cs;
     uint64_t cpu_core_mask = 0;
     int i;
-    long system_cpus_count, core_mask_count;
+    long core_mask_count;
 
     if (sched_getaffinity(0, sizeof(cs), &cs) < 0) {
         RTE_LOG(ERR, VROUTER, "Error getting affinity."
@@ -203,17 +205,7 @@ dpdk_core_mask_get(void)
      * Do not allow to run vRouter on all the cores available, as some have
      * to be spared for virtual machines.
      */
-    system_cpus_count = sysconf(_SC_NPROCESSORS_CONF);
-    if (system_cpus_count == -1) {
-        RTE_LOG(ERR, VROUTER, "Error getting number of processors."
-            " Falling back do the default core mask 0x%" PRIx64 "\n",
-                (uint64_t)(VR_DPDK_DEF_LCORE_MASK));
-        return cpu_core_mask;
-    }
-
-    core_mask_count
-        = __builtin_popcountll((unsigned long long)cpu_core_mask);
-
+    core_mask_count = __builtin_popcountll((unsigned long long)cpu_core_mask);
     if (core_mask_count == system_cpus_count) {
         RTE_LOG(NOTICE, VROUTER, "Use taskset(1) to set the core mask."
             " Falling back do the default core mask 0x%" PRIx64 "\n",
@@ -228,26 +220,29 @@ dpdk_core_mask_get(void)
 static char *
 dpdk_core_mask_stringify(uint64_t core_mask)
 {
-    int ret, lcore_id = 0, core_id = 0;
-    static char core_mask_string[VR_DPDK_STR_BUF_SZ];
+    int ret;
+    int core_id = 0;
+    int fwd_lcore_id = VR_DPDK_FWD_LCORE_ID;
+    int io_lcore_id = VR_DPDK_IO_LCORE_ID;
+    char core_mask_string[VR_DPDK_STR_BUF_SZ];
     char *p = core_mask_string;
-    bool first_lcore = true;
+    uint64_t io_lcore_masks[VR_MAX_CPUS/VR_DPDK_FWD_LCORES_PER_IO];
+    int nb_fwd_lcores = 0;
 
     while (core_mask) {
         if (core_mask & 1) {
-            if (first_lcore)
-                first_lcore = false;
-            else
+            if (p != core_mask_string)
                 *p++ = ',';
 
             ret = snprintf(p,
-            sizeof(core_mask_string) - (p - core_mask_string),
-                    "%d@%d", lcore_id + VR_DPDK_FWD_LCORE_ID, core_id);
+                    sizeof(core_mask_string) - (p - core_mask_string),
+                    "%d@%d", fwd_lcore_id, core_id);
             p += ret;
 
             if (p - core_mask_string >= sizeof(core_mask_string))
                 return NULL;
-            lcore_id++;
+            fwd_lcore_id++;
+            nb_fwd_lcores++;
         }
         core_mask >>= 1;
         core_id++;
@@ -262,6 +257,7 @@ dpdk_argv_update(void)
 {
     long int system_cpus_count;
     int i;
+    uint64_t core_mask;
     char *core_mask_str;
     static char lcores_string[VR_DPDK_STR_BUF_SZ];
 
@@ -271,11 +267,12 @@ dpdk_argv_update(void)
         system_cpus_count = __builtin_popcountll(
                 (unsigned long long)VR_DPDK_DEF_LCORE_MASK);
     }
+    if (system_cpus_count == 0)
+        return -1;
 
-    core_mask_str = dpdk_core_mask_stringify(dpdk_core_mask_get());
-
-    /* sanity check */
-    if (core_mask_str == NULL || system_cpus_count == 0)
+    core_mask = dpdk_core_mask_get(system_cpus_count);
+    core_mask_str = dpdk_core_mask_stringify(core_mask);
+    if (core_mask_str == NULL)
         return -1;
 
     if (snprintf(lcores_string, sizeof(lcores_string), "(0-%d)@(0-%ld),%s",
@@ -286,8 +283,8 @@ dpdk_argv_update(void)
 
     /* find and update the argument */
     for (i = 0; i < dpdk_argc; i++) {
-        if (dpdk_argv[i] == NULL) {
-            dpdk_argv[i] = lcores_string;
+        if (strncmp(LCORES_ARG, dpdk_argv[i], sizeof(LCORES_ARG)) == 0) {
+            dpdk_argv[i + 1] = lcores_string;
             break;
         }
     }
@@ -365,10 +362,11 @@ dpdk_init(void)
     if (ret < 0)
         return ret;
 
-    /* Get number of ports found in scan */
+    /* get number of ports found in scan */
     nb_sys_ports = rte_eth_dev_count();
     RTE_LOG(INFO, VROUTER, "Found %d eth device(s)\n", nb_sys_ports);
 
+    /* get number of cores */
     vr_dpdk.nb_fwd_lcores = rte_lcore_count();
     vr_dpdk.nb_fwd_lcores -= VR_DPDK_FWD_LCORE_ID;
     RTE_LOG(INFO, VROUTER, "Using %d forwarding lcore(s)\n",
