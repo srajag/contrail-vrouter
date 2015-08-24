@@ -192,7 +192,7 @@ extern int dpdk_vlan_forwarding_if_add(void);
 #define VR_DPDK_FRAG_MAX_IP_FRAGS   7
 #define VR_DPDK_VLAN_FWD_DEF_NAME   "vfw0"
 /* Create IO lcore for the specified number of forwarding cores */
-#define VR_DPDK_FWD_LCORES_PER_IO   3
+#define VR_DPDK_FWD_LCORES_PER_IO   2
 
 /*
  * DPDK LCore IDs
@@ -201,14 +201,22 @@ enum {
     VR_DPDK_KNI_LCORE_ID = 0,
     VR_DPDK_TIMER_LCORE_ID,
     VR_DPDK_UVHOST_LCORE_ID,
+    /*
+     * The actual number of IO lcores depends on the number of
+     * forwarding lcores.
+     */
+    VR_DPDK_IO_LCORE_ID,
+    VR_DPDK_IO2_LCORE_ID,
     /* [PACKET_ID..FWD_ID) lcores have TX queues, but no RX queues */
     VR_DPDK_PACKET_LCORE_ID,
     VR_DPDK_NETLINK_LCORE_ID,
-    /* the actual number of forwarding lcores depends on affinity mask */
+    /* The actual number of forwarding lcores depends on affinity mask. */
     VR_DPDK_FWD_LCORE_ID,
-    /* the actual number of IO lcores depends on number of forwarding lcores */
-    VR_DPDK_IO_LCORE_ID = 100
 };
+
+/* Max number of IO lcores */
+#define VR_DPDK_MAX_IO_LCORES (VR_DPDK_PACKET_LCORE_ID - VR_DPDK_IO_LCORE_ID)
+
 
 /*
  * VRouter/DPDK Data Structures
