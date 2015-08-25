@@ -192,7 +192,7 @@ extern int dpdk_vlan_forwarding_if_add(void);
 #define VR_DPDK_FRAG_MAX_IP_FRAGS   7
 #define VR_DPDK_VLAN_FWD_DEF_NAME   "vfw0"
 /* Create IO lcore for the specified number of forwarding cores */
-#define VR_DPDK_FWD_LCORES_PER_IO   2
+#define VR_DPDK_FWD_LCORES_PER_IO   4
 
 /*
  * DPDK LCore IDs
