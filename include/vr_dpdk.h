@@ -206,7 +206,7 @@ enum {
      * forwarding lcores.
      */
     VR_DPDK_IO_LCORE_ID,
-    VR_DPDK_IO2_LCORE_ID,
+    VR_DPDK_MAX_IO_LCORE_ID,
     /* [PACKET_ID..FWD_ID) lcores have TX queues, but no RX queues */
     VR_DPDK_PACKET_LCORE_ID,
     VR_DPDK_NETLINK_LCORE_ID,
@@ -215,7 +215,7 @@ enum {
 };
 
 /* Max number of IO lcores */
-#define VR_DPDK_MAX_IO_LCORES (VR_DPDK_PACKET_LCORE_ID - VR_DPDK_IO_LCORE_ID)
+#define VR_DPDK_MAX_IO_LCORES (VR_DPDK_MAX_IO_LCORE_ID - VR_DPDK_IO_LCORE_ID + 1)
 
 
 /*
@@ -309,10 +309,18 @@ struct vr_dpdk_lcore {
     struct vr_dpdk_q_slist lcore_rx_head;
     /* TX queues head */
     struct vr_dpdk_q_slist lcore_tx_head;
-    /* Number of rings to push for the lcore */
-    volatile uint16_t lcore_nb_rings_to_push;
-    /* Number of bond queues to TX */
-    volatile uint16_t lcore_nb_bonds_to_tx;
+    union {
+        /* Forwarding lcore: number of rings to push for the lcore */
+        volatile uint16_t lcore_nb_rings_to_push;
+        /* IO lcore: number of forwarding lcores to distribute */
+        uint16_t lcore_nb_fwd_lcores;
+    };
+    union {
+        /* Forwarding lcore: number of bond queues to TX */
+        volatile uint16_t lcore_nb_bonds_to_tx;
+        /* IO lcore: first forwarding lcore ID to distribute */
+        uint16_t lcore_first_fwd_lcore_id;
+    };
     /* Number of hardware RX queues assigned to the lcore (for the scheduler) */
     uint16_t lcore_nb_rx_queues;
     /* Lcore command */
@@ -386,7 +394,9 @@ struct vr_dpdk_global {
     /* VLAN tag */
     uint16_t vlan_tag;
     /* Number of forwarding lcores */
-    unsigned nb_fwd_lcores;
+    uint16_t nb_fwd_lcores;
+    /* Number of IO lcores */
+    uint16_t nb_io_lcores;
     /* Packet lcore event socket
      * TODO: refactor to use event FD
      */
@@ -431,6 +441,8 @@ struct vr_dpdk_global {
     struct rte_ring *vlan_ring;
     /* VLAN forwarding KNI handler */
     struct rte_kni *vlan_kni;
+    /* KNI module inited global flag */
+    bool kni_inited;
 };
 
 extern struct vr_dpdk_global vr_dpdk;

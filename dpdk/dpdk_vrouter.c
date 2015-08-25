@@ -245,7 +245,7 @@ dpdk_io_core_mask_stringify(uint64_t core_mask)
             nb_fwd_cores++;
             if (nb_fwd_cores >= VR_DPDK_FWD_LCORES_PER_IO
                 || (core_mask >> 1) == 0) {
-                if (io_lcore_id >= VR_DPDK_IO_LCORE_ID + VR_DPDK_MAX_IO_LCORES) {
+                if (io_lcore_id > VR_DPDK_MAX_IO_LCORE_ID) {
                     RTE_LOG(ERR, VROUTER, "Error stringifying IO core mask: IO cores limit exceeded\n");
                     return NULL;
                 }
@@ -325,6 +325,10 @@ dpdk_argv_update(void)
         return -1;
 
     core_mask = dpdk_core_mask_get(system_cpus_count);
+    /* calculate number of forwarding and IO cores */
+    vr_dpdk.nb_fwd_lcores = __builtin_popcountll(core_mask);
+    vr_dpdk.nb_io_lcores = (vr_dpdk.nb_fwd_lcores + VR_DPDK_FWD_LCORES_PER_IO - 1)
+                                /VR_DPDK_FWD_LCORES_PER_IO;
 
     io_core_mask_str = dpdk_io_core_mask_stringify(core_mask);
     if (io_core_mask_str == NULL)
@@ -334,8 +338,9 @@ dpdk_argv_update(void)
     if (fwd_core_mask_str == NULL)
         return -1;
 
-    /* service lcores, IO lcores, lcores with TX queues, forwaridng lcores */
-    if (snprintf(lcores_string, sizeof(lcores_string), "(0-%d)@(0-%ld),%s,(%d-%d)@(0-%ld),%s",
+    /* vRouter lcores: service, IO, lcores with TX queues, forwaridng lcores */
+    if (snprintf(lcores_string, sizeof(lcores_string),
+        "(0-%d)@(0-%ld),%s,(%d-%d)@(0-%ld),%s",
         VR_DPDK_IO_LCORE_ID - 1, system_cpus_count - 1,
         io_core_mask_str,
         VR_DPDK_PACKET_LCORE_ID, VR_DPDK_FWD_LCORE_ID - 1, system_cpus_count - 1,
@@ -415,12 +420,6 @@ dpdk_init(void)
     /* set default log level to INFO */
     rte_set_log_level(RTE_LOG_INFO);
 
-    /* TODO: If the host does not support KNIs (i.e. RedHat), we'll get
-     * a panic here.
-     * So the initialization should be moved to vr_dpdk_knidev_init()
-     */
-    rte_kni_init(VR_DPDK_MAX_KNI_INTERFACES);
-
     ret = dpdk_mempools_create();
     if (ret < 0)
         return ret;
@@ -430,12 +429,12 @@ dpdk_init(void)
     RTE_LOG(INFO, VROUTER, "Found %d eth device(s)\n", nb_sys_ports);
 
     /* get number of cores */
-    vr_dpdk.nb_fwd_lcores = rte_lcore_count();
-    vr_dpdk.nb_fwd_lcores -= VR_DPDK_FWD_LCORE_ID;
     RTE_LOG(INFO, VROUTER, "Using %d forwarding lcore(s)\n",
                             vr_dpdk.nb_fwd_lcores);
+    RTE_LOG(INFO, VROUTER, "Using %d IO lcore(s)\n",
+                            vr_dpdk.nb_io_lcores);
     RTE_LOG(INFO, VROUTER, "Using %d service lcore(s)\n",
-                            VR_DPDK_FWD_LCORE_ID);
+                            VR_DPDK_FWD_LCORE_ID - VR_DPDK_MAX_IO_LCORES);
 
     /* init timer subsystem */
     rte_timer_subsystem_init();
