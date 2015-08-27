@@ -957,7 +957,7 @@ linux_pull_outer_headers(struct sk_buff *skb)
             goto pull_fail;
         iph = ip_hdr(skb);
         thdr = vr_ip_transport_header_valid((struct vr_ip *)iph);
-        pull = vr_ip_proto_pull(iph);
+        pull = vr_ip_proto_pull((struct vr_ip *)iph);
         if (pull && thdr) {
             ip_proto = iph->protocol;
         }
@@ -1009,7 +1009,7 @@ linux_pull_outer_headers(struct sk_buff *skb)
                     goto pull_fail;
 
                 iph = (struct iphdr *)(skb->data + offset - sizeof(struct iphdr));
-                if (vr_ip_proto_pull(iph)) {
+                if (vr_ip_proto_pull((struct vr_ip *)iph)) {
                     offset += (iph->ihl * 4) - sizeof(struct iphdr) +
                         sizeof(struct vr_icmp);
 

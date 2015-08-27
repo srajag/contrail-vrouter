@@ -407,7 +407,7 @@ struct vr_ip6 {
     unsigned char ip6_dst[VR_IP6_ADDRESS_LEN];
 } __attribute__((packed));
 
-bool vr_ip_proto_pull(struct iphdr *iph);
+bool vr_ip_proto_pull(struct vr_ip *iph);
 int vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                         unsigned int frag_size,
                         int do_tcp_mss_adj,

@@ -38,9 +38,9 @@ pkt_copy(struct vr_packet *pkt, unsigned short off, unsigned short len)
 }
 
 bool
-vr_ip_proto_pull(struct iphdr *iph)
+vr_ip_proto_pull(struct vr_ip *iph)
 {
-    __u8 proto = iph->protocol;
+    unsigned char proto = iph->ip_proto;
 
     if ((proto == VR_IP_PROTO_TCP) ||
             (proto == VR_IP_PROTO_UDP) ||
@@ -67,7 +67,7 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
     bool thdr_valid = false;
     unsigned int hlen = 0, tcph_pull_len = 0;
     unsigned int pull_len = *pull_lenp;
-    struct tcphdr *tcph;
+    struct vr_tcp *tcph;
     unsigned short th_csum = 0;
     struct vr_icmp *icmph = NULL;
     struct vr_ip *icmp_pl_iph = NULL;
@@ -94,12 +94,12 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
         if (thdr_valid) {
             tcph_pull_len = pull_len;
             if (ip_proto == VR_IP_PROTO_TCP) {
-                pull_len += sizeof(struct tcphdr);
+                pull_len += sizeof(struct vr_tcp);
             } else if (ip_proto == VR_IP_PROTO_UDP) {
-                pull_len += sizeof(struct udphdr);
+                pull_len += sizeof(struct vr_udp);
             } else if ((ip_proto == VR_IP_PROTO_ICMP) ||
                        (ip_proto == VR_IP_PROTO_ICMP6)) {
-                pull_len += sizeof(struct icmphdr);
+                pull_len += sizeof(struct vr_icmp);
             }
 
             if (frag_size < pull_len) {
@@ -110,13 +110,14 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                 /*
                  * Account for TCP options
                  */
-                tcph = (struct tcphdr *) ((char *) iph +  hlen);
+                tcph = (struct vr_tcp *) ((char *) iph +  hlen);
 
                 /*
                  * If SYN, send it to the slow path for possible TCP MSS
                  * adjust.
                  */
-                if (tcph->syn && vr_to_vm_mss_adj) {
+                if ((ntohs(tcph->tcp_offset_r_flags) & VR_TCP_FLAG_SYN) &&
+                        vr_to_vm_mss_adj) {
                     if (do_tcp_mss_adj) {
                         /*
                          * Do TCP MSS adj
@@ -126,14 +127,14 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                     }
                 }
 
-                if ((tcph->doff << 2) > (sizeof(struct tcphdr))) {
-                    pull_len += ((tcph->doff << 2) - (sizeof(struct tcphdr)));
+                if ((VR_TCP_OFFSET(tcph->tcp_offset_r_flags) * 4) > (sizeof(struct vr_tcp))) {
+                    pull_len += ((VR_TCP_OFFSET(tcph->tcp_offset_r_flags) * 4) - (sizeof(struct vr_tcp)));
 
                     if (frag_size < pull_len) {
                         return PKT_RET_SLOW_PATH;
                     }
                 }
-                th_csum = tcph->check;
+                th_csum = tcph->tcp_csum;
             } else if (ip_proto == VR_IP_PROTO_ICMP) {
                 icmph = (struct vr_icmp *)((unsigned char *)iph + hlen);
                 th_csum = icmph->icmp_csum;
@@ -145,7 +146,7 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                     pull_len += (icmp_pl_iph->ip_hl * 4) - sizeof(struct vr_ip);
                     if (frag_size < pull_len)
                         return PKT_RET_SLOW_PATH;
-                    if (vr_ip_proto_pull((struct iphdr *)icmp_pl_iph)) {
+                    if (vr_ip_proto_pull(icmp_pl_iph)) {
                         if (icmp_pl_iph->ip_proto == VR_IP_PROTO_TCP)
                             pull_len += sizeof(struct vr_tcp);
                         else if (icmp_pl_iph->ip_proto == VR_IP_PROTO_UDP)
@@ -171,8 +172,8 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                     }
                 }
             } else if (iph->ip_proto == VR_IP_PROTO_UDP) {
-                th_csum = ((struct udphdr *)
-                        ((unsigned char *)iph + hlen))->check;
+                th_csum = ((struct vr_udp *)
+                        ((unsigned char *)iph + hlen))->udp_csum;
             } else if (ip_proto == VR_IP_PROTO_ICMP6) {
                 icmph = (struct vr_icmp *)((unsigned char *)ip6h + hlen);
                 if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {

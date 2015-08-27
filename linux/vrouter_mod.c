@@ -46,7 +46,6 @@ int vrouter_dbg;
 extern struct vr_packet *linux_get_packet(struct sk_buff *,
         struct vr_interface *);
 
-extern bool vr_ip_proto_pull(struct iphdr *);
 extern int lh_enqueue_to_assembler(struct vrouter *, struct vr_packet *,
         struct vr_forwarding_md *);
 extern int vr_assembler_init(void);
@@ -1610,7 +1609,7 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
                     pull_len += (icmp_pl_iph->ip_hl * 4) - sizeof(struct vr_ip);
                     if (frag_size < pull_len)
                         goto slow_path;
-                    if (vr_ip_proto_pull((struct iphdr *)icmp_pl_iph)) {
+                    if (vr_ip_proto_pull((struct vr_ip *)icmp_pl_iph)) {
                         pull_len -= sizeof(struct vr_icmp);
                         if (icmp_pl_iph->ip_proto == VR_IP_PROTO_TCP)
                             pull_len += sizeof(struct vr_tcp);
