@@ -381,12 +381,14 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
     uint32_t nb_pkts)
 {
     struct rte_mbuf *mbuf;
-    int i, j, ret;
-    unsigned dst_lcore_id = 0; /* Initialize to avoid warning */
+    int i, j, ret, retry;
+    int nb_retry_lcores;
+    unsigned dst_lcore_id = 0;
     uint32_t lcore_nb_pkts, chunk_nb_pkts;
-    const unsigned nb_fwd_lcores = vr_dpdk.nb_fwd_lcores;
+    unsigned nb_fwd_lcores = vr_dpdk.nb_fwd_lcores;
+    const uint16_t first_fwd_lcore_id = VR_DPDK_FWD_LCORE_ID;
     const unsigned lcore_id = rte_lcore_id();
-    const unsigned this_lcore_id = lcore_id - VR_DPDK_FWD_LCORE_ID;
+    const unsigned this_lcore_id = lcore_id - first_fwd_lcore_id;
     /* Per lcore bursts (+1 for the header) */
     /* Header bits:
      *   63    - always set to 1
@@ -396,6 +398,7 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
     /* +chunk size for the round up */
     struct rte_mbuf *lcore_pkts[nb_fwd_lcores][nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ];
     struct vr_interface_stats *stats;
+    unsigned retry_lcores[nb_fwd_lcores];
 
     RTE_LOG(DEBUG, VROUTER, "%s: distributing %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
@@ -404,7 +407,8 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
     for (i = 0; i < nb_fwd_lcores; i++) {
         lcore_pkts[i][0] = (struct rte_mbuf *)(((uintptr_t)1 << 63)
                 | ((uintptr_t)vif->vif_idx << 32) | 1);
-        rte_prefetch0(vr_dpdk.lcores[i + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring);
+        retry_lcores[i] = i;
+        rte_prefetch0(vr_dpdk.lcores[i + first_fwd_lcore_id]->lcore_rx_ring);
     }
 
     /* distribute the burst among the forwarding lcores */
@@ -412,8 +416,6 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
         mbuf = pkts[i];
         rte_prefetch0(rte_pktmbuf_mtod(mbuf, char *));
 
-//        dst_lcore_id = mbuf->hash.rss % nb_fwd_lcores;
-        /* TODO: emulate IO core TX, i.e. pass all the mbufs to other lcores */
         dst_lcore_id = mbuf->hash.rss % (nb_fwd_lcores - 1);
         if (dst_lcore_id >= this_lcore_id) {
             dst_lcore_id++;
@@ -422,8 +424,8 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
         /* put the mbuf to the burst */
         lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_id][0] & 0xFFFFFFFFU;
 
-        RTE_LOG(DEBUG, VROUTER, "%s: RSS hash 0x%x packet %u dst lcore %u\n",
-             __func__, mbuf->hash.rss, lcore_nb_pkts, dst_lcore_id + VR_DPDK_FWD_LCORE_ID);
+        RTE_LOG(DEBUG, VROUTER, "%s: lcore %u RSS hash 0x%x packet %u dst lcore %u\n",
+             __func__, lcore_id, mbuf->hash.rss, lcore_nb_pkts, dst_lcore_id + first_fwd_lcore_id);
 
         lcore_pkts[dst_lcore_id][lcore_nb_pkts] = mbuf;
         /* increase number of packets in the burst */
@@ -432,47 +434,62 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
     }
 
     stats = vif_get_stats(vif, lcore_id);
-    /* pass distributed bursts to other forwarding lcores */
-    for (i = 0; i < nb_fwd_lcores; i++) {
-        lcore_nb_pkts = (uintptr_t)lcore_pkts[i][0] & 0xFFFFFFFFU;
-        /* we route this lcore packets later */
-        if (likely(lcore_nb_pkts > 1 && i != this_lcore_id)) {
-            RTE_LOG(DEBUG, VROUTER, "%s: enqueueing %u packet to lcore %u\n",
-                 __func__, lcore_nb_pkts, dst_lcore_id + VR_DPDK_FWD_LCORE_ID);
+    /*
+     * Pass distributed bursts to other forwarding lcores.
+     * Retry on full RX rings.
+     */
+    for (retry = 0; retry < VR_DPDK_RETRY_NUM; retry++) {
+        nb_retry_lcores = 0;
+        for (i = 0; i < nb_fwd_lcores; i++) {
+            dst_lcore_id = retry_lcores[i];
 
-            /* round up the number of packets to the chunk size */
-            chunk_nb_pkts = (lcore_nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ - 1)
-                    /VR_DPDK_RX_RING_CHUNK_SZ*VR_DPDK_RX_RING_CHUNK_SZ;
-            ret = rte_ring_mp_enqueue_bulk(
-                    vr_dpdk.lcores[i + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring,
-                    (void **)&lcore_pkts[i][0],
-                    chunk_nb_pkts);
-            if (unlikely(ret == -ENOBUFS)) {
-                /* count out the header */
-                stats->vis_queue_ierrors += lcore_nb_pkts - 1;
-                /* never happens, because the size of the ring is greater than mempool */
-                RTE_LOG(INFO, VROUTER, "%s: lcore %u ring is full, dropping %u packets: %d/%d\n",
-                     __func__, i + VR_DPDK_FWD_LCORE_ID, lcore_nb_pkts,
-                     rte_ring_count(vr_dpdk.lcores[i + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring),
-                     rte_ring_free_count(vr_dpdk.lcores[i + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring));
-                /* ring is full, drop the packets */
-                for (j = 1; j < lcore_nb_pkts; j++) {
-                    vr_dpdk_pfree(lcore_pkts[i][j], VP_DROP_INTERFACE_DROP);
+            lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_id][0] & 0xFFFFFFFFU;
+            if (likely(lcore_nb_pkts > 1)) {
+                RTE_LOG(DEBUG, VROUTER, "%s: enqueueing %u packet to lcore %u\n",
+                     __func__, lcore_nb_pkts, dst_lcore_id + first_fwd_lcore_id);
+
+                /* round up the number of packets to the chunk size */
+                chunk_nb_pkts = (lcore_nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ - 1)
+                        /VR_DPDK_RX_RING_CHUNK_SZ*VR_DPDK_RX_RING_CHUNK_SZ;
+                ret = rte_ring_mp_enqueue_bulk(
+                        vr_dpdk.lcores[dst_lcore_id + first_fwd_lcore_id]->lcore_rx_ring,
+                        (void **)&lcore_pkts[dst_lcore_id][0],
+                        chunk_nb_pkts);
+                if (unlikely(ret == -ENOBUFS)) {
+                    /* drop packets if it's the last retry */
+                    if (unlikely(retry == VR_DPDK_RETRY_NUM - 1)) {
+                        /* count out the header */
+                        stats->vis_queue_ierrors += lcore_nb_pkts - 1;
+
+                        RTE_LOG(DEBUG, VROUTER, "%s: lcore %u ring is full, dropping %u packets: %d/%d\n",
+                            __func__, dst_lcore_id + first_fwd_lcore_id, lcore_nb_pkts,
+                            rte_ring_count(vr_dpdk.lcores[dst_lcore_id + first_fwd_lcore_id]->lcore_rx_ring),
+                            rte_ring_free_count(vr_dpdk.lcores[dst_lcore_id + first_fwd_lcore_id]->lcore_rx_ring));
+
+                        /* ring is full, drop the packets */
+                        for (j = 1; j < lcore_nb_pkts; j++) {
+                            vr_dpdk_pfree(lcore_pkts[dst_lcore_id][j], VP_DROP_INTERFACE_DROP);
+                        }
+                    } else {
+                        /* mark the lcore to retry */
+                        retry_lcores[nb_retry_lcores++] = dst_lcore_id;
+                        RTE_LOG(DEBUG, VROUTER, "%s: retrying %d lcore %u...\n",
+                            __func__, retry, dst_lcore_id + first_fwd_lcore_id);
+
+                    }
+                } else {
+                    /* count out the header */
+                    stats->vis_queue_ipackets += lcore_nb_pkts - 1;
                 }
-            } else {
-                /* count out the header */
-                stats->vis_queue_ipackets += lcore_nb_pkts - 1;
-            }
-        }
-    }
+            } /* if there are packets to pass */
+        } /* for all lcores */
 
-    /* route the mbufs destined for this lcore */
-    lcore_nb_pkts = (uintptr_t)lcore_pkts[this_lcore_id][0] & 0xFFFFFFFFU;
-    if (unlikely(lcore_nb_pkts > 1)) {
-        RTE_LOG(DEBUG, VROUTER, "%s: lcore %u number of packets left: %u\n",
-                 __func__, this_lcore_id, lcore_nb_pkts);
-        vr_dpdk_lcore_vroute(vif, &lcore_pkts[this_lcore_id][1], lcore_nb_pkts - 1);
-    }
+        if (likely(nb_retry_lcores == 0))
+            break;
+        /* pause a bit */
+        sched_yield();
+        nb_fwd_lcores = nb_retry_lcores;
+    } /* for all tries */
 }
 
 /* Send a burst of mbufs to vRouter */
