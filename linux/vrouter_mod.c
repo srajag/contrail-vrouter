@@ -1205,7 +1205,7 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
     }
 
     parse_ret = vr_ip_transport_parse(iph, ip6h,
-                      frag_size, 0,
+                      frag_size, NULL,
                       &hlen,
                       &th_csum,
                       &tcph_pull_len,

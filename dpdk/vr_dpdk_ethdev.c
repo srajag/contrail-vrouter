@@ -679,6 +679,10 @@ vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *ethdev)
     return 0;
 }
 
+extern void
+dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
+                    unsigned char iph_len);
+
 /* Emulate smart NIC RSS hash
  * TODO: add MPLSoGRE case
  * Returns:
@@ -694,6 +698,10 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
     uint32_t *l4_ptr;
     uint32_t hash = 0;
     uint8_t iph_len;
+    unsigned int hlen;
+    unsigned short th_csum;
+    unsigned int tcph_pull_len;
+    unsigned int pull_len = sizeof(struct vr_tcp);
 
     if (likely(mbuf->ol_flags & PKT_RX_RSS_HASH)) {
         RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
@@ -728,6 +736,12 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
                 l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + iph_len);
 
                 hash = rte_hash_crc_4byte(*l4_ptr, hash);
+
+                vr_ip_transport_parse((struct vr_ip *)ipv4_hdr,
+                                        (struct vr_ip6 *)ipv4_hdr,
+                                        mbuf->buf_len, dpdk_adjust_tcp_mss, &hlen, &th_csum,
+                                        &tcph_pull_len, &pull_len);
+                /* TODO check return */
                 break;
             }
         }

@@ -801,9 +801,9 @@ error:
     return 0;
 }
 
-static void
-dpdk_adjust_tcp_mss(struct tcphdr *tcph, struct rte_mbuf *m,
-                    unsigned short overlay_len, unsigned char iph_len)
+void
+dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
+                    unsigned char iph_len)
 {
     int opt_off = sizeof(struct tcphdr);
     u_int8_t *opt_ptr = (u_int8_t *) tcph;
@@ -937,7 +937,7 @@ dpdk_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
         rte_panic("%s: tcp header outside first buffer\n", __func__);
 
 
-    dpdk_adjust_tcp_mss(tcph, m, overlay_len, iph_len);
+    dpdk_adjust_tcp_mss(tcph, overlay_len, iph_len);
 
 out:
     return 0;

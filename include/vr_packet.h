@@ -407,10 +407,13 @@ struct vr_ip6 {
     unsigned char ip6_dst[VR_IP6_ADDRESS_LEN];
 } __attribute__((packed));
 
+struct tcphdr;
+
 bool vr_ip_proto_pull(struct vr_ip *iph);
 int vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                         unsigned int frag_size,
-                        int do_tcp_mss_adj,
+                        void (do_tcp_mss_adj)(struct tcphdr *,
+                                                unsigned short, unsigned char),
                         unsigned int *hlenp,
                         unsigned short *th_csump,
                         unsigned int *tcph_pull_lenp,
