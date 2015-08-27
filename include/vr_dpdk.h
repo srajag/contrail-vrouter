@@ -144,13 +144,12 @@ extern int dpdk_vlan_forwarding_if_add(void);
 #define VR_DPDK_VM_MEMPOOL_SZ       1024
 /* How many objects (mbufs) to keep in per-lcore VM mempool cache */
 #define VR_DPDK_VM_MEMPOOL_CACHE_SZ (VR_DPDK_RX_BURST_SZ*8)
-/* Number of mbufs in TX ring */
+/* Number of mbufs in TX rings (like ring to push, socket, VLAN rings etc */
 #define VR_DPDK_TX_RING_SZ          (VR_DPDK_TX_BURST_SZ*2)
 /* RX ring minimum number of pointers to transfer (cache line / size of ptr) */
 #define VR_DPDK_RX_RING_CHUNK_SZ    1
-/* Number of mbufs in lcore RX ring.
- * Must be bigger than mempool size due to the headers and other mempools */
-#define VR_DPDK_RX_RING_SZ          (VR_DPDK_RSS_MEMPOOL_SZ*2)
+/* Number of mbufs in lcore RX ring */
+#define VR_DPDK_RX_RING_SZ          2048
 /* Use timer to measure flushes (slower, but should improve latency) */
 #define VR_DPDK_USE_TIMER           false
 /* TX flush timeout (in loops or US if USE_TIMER defined) */
@@ -193,6 +192,8 @@ extern int dpdk_vlan_forwarding_if_add(void);
 #define VR_DPDK_VLAN_FWD_DEF_NAME   "vfw0"
 /* Create IO lcore for the specified number of forwarding cores */
 #define VR_DPDK_FWD_LCORES_PER_IO   4
+/* Number of retries to enqueue packets */
+#define VR_DPDK_RETRY_NUM           4
 
 /*
  * DPDK LCore IDs
