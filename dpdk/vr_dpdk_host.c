@@ -801,6 +801,11 @@ error:
     return 0;
 }
 
+/**
+ * dpdk_adjust_tcp_mss - helper adjusting TCP Maximum Segment Size, used in
+ * dpdk_pkt_from_vm_tcp_mss_adj vRouter callback for packets from the VM and in
+ * vr_ip_transport_parse to perform MSS adjust for packets sent to the VM.
+ */
 void
 dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
                     unsigned char iph_len)

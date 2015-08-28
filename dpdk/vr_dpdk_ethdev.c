@@ -698,10 +698,8 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
     uint32_t *l4_ptr;
     uint32_t hash = 0;
     uint8_t iph_len;
-    unsigned int hlen;
-    unsigned short th_csum;
-    unsigned int tcph_pull_len;
-    unsigned int pull_len = sizeof(struct vr_tcp);
+    unsigned int pull_len = 0;
+    int parse_ret;
 
     if (likely(mbuf->ol_flags & PKT_RX_RSS_HASH)) {
         RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
@@ -731,17 +729,21 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
                     !vr_ip_fragment((struct vr_ip *)ipv4_hdr))) {
             switch (ipv4_hdr->next_proto_id) {
             case IPPROTO_TCP:
+                /* Find TCP header with SYN and do dpdk_adjust_tcp_mss() on it */
+                if (vr_to_vm_mss_adj) {
+                    parse_ret = vr_ip_transport_parse((struct vr_ip *)ipv4_hdr,
+                                            /*TODO: IPv6 hdr*/NULL,
+                                            mbuf->buf_len, dpdk_adjust_tcp_mss,
+                                            NULL, NULL, NULL, &pull_len);
+                    if (parse_ret) {
+                        vr_dpdk_pfree(mbuf, VP_DROP_PULL);
+                    }
+                } /* intentionally no `break;` here */
             case IPPROTO_UDP:
                 mbuf->ol_flags |= PKT_RX_IPV4_HDR_EXT;
                 l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + iph_len);
 
                 hash = rte_hash_crc_4byte(*l4_ptr, hash);
-
-                vr_ip_transport_parse((struct vr_ip *)ipv4_hdr,
-                                        (struct vr_ip6 *)ipv4_hdr,
-                                        mbuf->buf_len, dpdk_adjust_tcp_mss, &hlen, &th_csum,
-                                        &tcph_pull_len, &pull_len);
-                /* TODO check return */
                 break;
             }
         }

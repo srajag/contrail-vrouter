@@ -114,8 +114,8 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                 tcph = (struct vr_tcp *) ((char *) iph +  hlen);
 
                 /*
-                 * If SYN, send it to the slow path for possible TCP MSS
-                 * adjust.
+                 * If SYN, do TCP MSS adjust using passed callback, or send it
+                 * to the slow path.
                  */
                 if ((ntohs(tcph->tcp_offset_r_flags) & VR_TCP_FLAG_SYN) &&
                         vr_to_vm_mss_adj) {
@@ -191,9 +191,12 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
         }
     }
 
-    *hlenp = hlen;
-    *th_csump = th_csum;
-    *tcph_pull_lenp = tcph_pull_len;
+    if (hlenp)
+        *hlenp = hlen;
+    if (th_csump)
+        *th_csump = th_csum;
+    if (tcph_pull_lenp)
+        *tcph_pull_lenp = tcph_pull_len;
     *pull_lenp = pull_len;
 
     return 0;
