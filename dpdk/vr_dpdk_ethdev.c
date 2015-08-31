@@ -679,67 +679,185 @@ vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *ethdev)
     return 0;
 }
 
-/* Emulate smart NIC RSS hash
- * TODO: add MPLSoGRE case
+/*
+ * MPLS header pointer.
+ */
+static inline uint32_t *
+dpdk_mbuf_get_header_mpls_gre(struct vr_gre *const gre_header)
+{
+    /* Initial GRE header len. */
+    uint8_t gre_header_len = 4;
+    /* We are not RFC 1701 compliant receiver. */
+    if (gre_header->gre_flags & (~(VR_GRE_FLAG_CSUM | VR_GRE_FLAG_KEY ))){
+        return NULL;
+    }
+    if (gre_header->gre_flags & VR_GRE_FLAG_CSUM) {
+        gre_header_len += 4;
+    }
+    if (gre_header->gre_flags & VR_GRE_FLAG_KEY) {
+        gre_header_len += 4;
+    }
+    return (uint32_t *) ((uintptr_t)gre_header + gre_header_len);
+
+}
+
+/*
+ * GRE header pointer.
+ */
+static inline struct vr_gre *
+dpdk_mbuf_get_header_gre_ipv4(struct vr_ip *const ipv4_header)
+{
+    return (struct vr_gre *)((uintptr_t)ipv4_header + (ipv4_header->ip_hl)
+                                                        * IPV4_IHL_MULTIPLIER);
+};
+/*
+ * IPv4 header pointer.
+ */
+static inline struct vr_ip *
+dpdk_mbuf_get_header_ipv4_ethernet(struct vr_eth *const eth_header){
+
+    return (struct vr_ip*)((uintptr_t)eth_header + sizeof(struct vr_eth));
+}
+
+/*
+ * Parse MPLS over GRE.
+ *
  * Returns:
- *     0  if the mbuf has been hashed by NIC
- *     1  otherwise
+ *  on error,  <pointer to outer L2 header>
+ *  otherwise, <pointer to inner L2 header>
+ */
+static inline struct vr_eth*
+dpdk_mbuf_get_inner_l2_mpls_o_gre(struct vr_gre *gre_header, struct vr_eth *eth_header)
+{
+    /*
+     * MPLS data structure
+     *
+     * We dont need a parse whole header, we only need a size of header.
+     * MPLS header has 32 bit size,
+     */
+    uint32_t *simple_mpls_header = NULL;
+
+    if (unlikely(gre_header->gre_proto != rte_cpu_to_be_16(VR_GRE_PROTO_MPLS))) {
+        RTE_LOG(DEBUG, VROUTER, "GRE protocol is not set to MPLS.\n");
+        return eth_header;
+    }
+
+    /* Inner Header - probably MPLS over GRE */
+    simple_mpls_header = dpdk_mbuf_get_header_mpls_gre(gre_header);
+    if (unlikely(!simple_mpls_header)) {
+        RTE_LOG(DEBUG, VROUTER, "Outer MPLS parsing failed, %s\n", __func__);
+        return eth_header;
+    }
+
+    /* The bottom of stack is NOT set to 1 */
+    if (unlikely(!(rte_cpu_to_be_32(*simple_mpls_header) & 0x100))) {
+        RTE_LOG(DEBUG, VROUTER, "MPLS header has not set bottom of stack to 1.\n");
+        return eth_header;
+    }
+
+    return (struct vr_eth*)((uintptr_t)simple_mpls_header + sizeof(uint32_t));
+
+}
+
+/*
+ * Returns ethernet header,
+ * In case when we use a MPLS over GRE returns pointer to the inner ethernet
+ * header.
+ */
+static inline struct vr_eth *
+dpdk_mbuf_rss_hash_get_eth(struct vr_eth *eth_header)
+{
+    /*
+     * Ethernet data structures
+     */
+    struct vr_ip *ipv4_header = NULL;
+     /*
+     * GRE data structure
+     *
+     * We dont need a parse WHOLE header, we only need a size of header and
+     *protocol type.
+     */
+    struct vr_gre *gre_header = NULL;
+
+    if (unlikely(eth_header->eth_proto != rte_cpu_to_be_16(VR_ETH_PROTO_IP))) {
+        return NULL;
+    }
+    /* Minimum outer packet size + MPLS header
+     *  ETH = 14B
+     *  IPv4 = 20B
+     *  GRE = 4B
+     *  MPLS = 4B
+     **/
+    ipv4_header = dpdk_mbuf_get_header_ipv4_ethernet(eth_header);
+    /* Probably MPLS over GRE */
+    if (likely(ipv4_header->ip_proto == VR_IP_PROTO_GRE)) {
+        gre_header = dpdk_mbuf_get_header_gre_ipv4(ipv4_header);
+        return dpdk_mbuf_get_inner_l2_mpls_o_gre(gre_header, eth_header);
+    }
+
+    return eth_header;
+}
+
+
+/*
+ * Emulates RSS hash.
+ *
  */
 static inline int
 dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
 {
-    struct ether_hdr *eth_hdr = rte_pktmbuf_mtod(mbuf, struct ether_hdr *);
-    struct ipv4_hdr *ipv4_hdr;
-    uint64_t *ipv4_addr_ptr;
-    uint32_t *l4_ptr;
-    uint32_t hash = 0;
+    register uint32_t l3_l4_hash_tuple_sum = 0;
+    /*
+     * Ethernet data structures
+     */
+    register struct vr_eth *eth_header = rte_pktmbuf_mtod(mbuf, struct vr_eth*);
+    struct vr_eth *inner_eth_header = NULL;
+    /*
+     * IPv4 data structures
+     */
+    struct vr_ip *ipv4_header = NULL;
+    uint64_t *ipv4_addr_ptr = NULL; 
     uint8_t iph_len;
 
-    if (likely(mbuf->ol_flags & PKT_RX_RSS_HASH)) {
-        RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
-                __func__, mbuf->hash.rss);
-        return 0;
-    }
+    uint32_t *l4_ptr = NULL;
+    /* TODO: inner IPv6 */
+    /* TODO: inner VLAN */
 
-    /* TODO: IPv6 support */
-    /* TODO: VLAN support */
-    if (likely(eth_hdr->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
-        mbuf->ol_flags |= PKT_RX_IPV4_HDR;
-        ipv4_hdr = (struct ipv4_hdr *)((uintptr_t)eth_hdr
-                                    + sizeof(struct ether_hdr));
-        ipv4_addr_ptr = (uint64_t *)((uintptr_t)ipv4_hdr
-                                    + offsetof(struct ipv4_hdr, src_addr));
+    inner_eth_header=dpdk_mbuf_rss_hash_get_eth(eth_header);
 
+    if (likely(((inner_eth_header == eth_header)) && (mbuf->ol_flags & PKT_RX_RSS_HASH))) {
+                RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
+                        __func__, mbuf->hash.rss);
+                return 0;
+            }
+    if (inner_eth_header) {
+        ipv4_header = dpdk_mbuf_get_header_ipv4_ethernet(inner_eth_header);
+        ipv4_addr_ptr = (uint64_t *)((uintptr_t)ipv4_header
+                        + offsetof(struct vr_ip, ip_saddr));
+        mbuf->ol_flags |= PKT_RX_IPV4_HDR | PKT_RX_RSS_HASH;
         /* We use SSE4.2 CRC hash. No need to match NIC's Toeplitz hash ATM. */
         /* Hash src and dst address at a time */
-        hash = rte_hash_crc_8byte(*ipv4_addr_ptr, hash);
+        l3_l4_hash_tuple_sum = rte_hash_crc_8byte(*ipv4_addr_ptr, l3_l4_hash_tuple_sum);
+        iph_len = ipv4_header->ip_hl * IPV4_IHL_MULTIPLIER;
+        if (likely((rte_pktmbuf_data_len(mbuf) > sizeof(struct vr_eth)
+                        + iph_len +
+                        sizeof(struct vr_udp)) &&
+                    !vr_ip_fragment((struct vr_ip *)ipv4_header))) {
 
-        iph_len = (ipv4_hdr->version_ihl & IPV4_HDR_IHL_MASK) *
-                    IPV4_IHL_MULTIPLIER;
-
-        if (likely((rte_pktmbuf_data_len(mbuf) > sizeof(struct ether_hdr)
-                    + iph_len
-                    + sizeof(struct udp_hdr)) &&
-                    !vr_ip_fragment((struct vr_ip *)ipv4_hdr))) {
-            switch (ipv4_hdr->next_proto_id) {
-            case IPPROTO_TCP:
-            case IPPROTO_UDP:
-                mbuf->ol_flags |= PKT_RX_IPV4_HDR_EXT;
-                l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + iph_len);
-
-                hash = rte_hash_crc_4byte(*l4_ptr, hash);
-                break;
+            switch (ipv4_header->ip_proto) {
+                case VR_IP_PROTO_TCP:
+                case VR_IP_PROTO_UDP:
+                    l4_ptr = (uint32_t *)((uintptr_t)ipv4_header + iph_len);
+                    l3_l4_hash_tuple_sum = rte_hash_crc_4byte(*l4_ptr, l3_l4_hash_tuple_sum);
+                    RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (emulated)\n", __func__,
+                            mbuf->hash.rss);
+                    return 1;
             }
         }
-        mbuf->ol_flags |= PKT_RX_RSS_HASH;
-        mbuf->hash.rss = hash;
-        RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (emulated)\n",
-                __func__, mbuf->hash.rss);
+        mbuf->hash.rss = l3_l4_hash_tuple_sum;
     }
-
     return 1;
 }
-
 /* Emulate smart NIC RX for a burst of mbufs
  * Returns:
  *     0  if at least one mbuf has been hashed by NIC, so there is
@@ -777,6 +895,5 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPD
             return 0;
         }
     }
-
     return 1;
 }
