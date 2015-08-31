@@ -865,7 +865,7 @@ dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
 
         default:
             if ((opt_off + 1) == (tcph->doff*4))
-            return;
+                return;
 
             if (opt_ptr[opt_off+1])
                 opt_off += opt_ptr[opt_off+1];
