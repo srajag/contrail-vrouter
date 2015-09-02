@@ -679,10 +679,6 @@ vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *ethdev)
     return 0;
 }
 
-extern void
-dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
-                    unsigned char iph_len);
-
 /* Emulate smart NIC RSS hash
  * TODO: add MPLSoGRE case
  * Returns:
@@ -694,13 +690,10 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
 {
     struct ether_hdr *eth_hdr = rte_pktmbuf_mtod(mbuf, struct ether_hdr *);
     struct ipv4_hdr *ipv4_hdr;
-    struct vr_ip *inner_ipv4_hdr;
     uint64_t *ipv4_addr_ptr;
     uint32_t *l4_ptr;
     uint32_t hash = 0;
     uint8_t iph_len;
-    unsigned int pull_len = 0;
-    int parse_ret;
 
     if (likely(mbuf->ol_flags & PKT_RX_RSS_HASH)) {
         RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
@@ -729,25 +722,8 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
                     + sizeof(struct udp_hdr)) &&
                     !vr_ip_fragment((struct vr_ip *)ipv4_hdr))) {
             switch (ipv4_hdr->next_proto_id) {
-            case IPPROTO_UDP:
-                /*
-                 * Find inner TCP header with SYN flag inside MPLS-o-{UDP|GRE}
-                 * packet and do dpdk_adjust_tcp_mss() on it
-                 */
-                if (vr_to_vm_mss_adj) {
-                    /* TODO: GRE support */
-                    inner_ipv4_hdr = (struct vr_ip *)((char *)ipv4_hdr +
-                        iph_len + sizeof(struct udp_hdr) + VR_MPLS_HDR_LEN +
-                        sizeof(struct ether_hdr));
-                    parse_ret = vr_ip_transport_parse(inner_ipv4_hdr,
-                                            /*TODO: IPv6 hdr*/NULL,
-                                            mbuf->buf_len, dpdk_adjust_tcp_mss,
-                                            NULL, NULL, NULL, &pull_len);
-                    if (parse_ret) {
-                        vr_dpdk_pfree(mbuf, VP_DROP_PULL);
-                    }
-                } /* intentionally no `break;` here */
             case IPPROTO_TCP:
+            case IPPROTO_UDP:
                 mbuf->ol_flags |= PKT_RX_IPV4_HDR_EXT;
                 l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + iph_len);
 

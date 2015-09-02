@@ -121,7 +121,6 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                         vr_to_vm_mss_adj) {
                     if (do_tcp_mss_adj) {
                         /* Kernel will never get here, it will return slow path */
-                        /* TODO: what's with overlay len? */
                         do_tcp_mss_adj((struct tcphdr *)tcph,
                                             VROUTER_L2_OVERLAY_LEN, hlen);
                     } else {
