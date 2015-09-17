@@ -17,7 +17,6 @@
 #include "vr_dpdk.h"
 
 #include <vr_mpls.h>
-#include "cust_rte_mbuf.h"
 
 #include <rte_eth_bond.h>
 #include <rte_errno.h>
@@ -704,7 +703,6 @@ dpdk_mbuf_emulate_protocol_type_and_offsets(struct rte_mbuf *mbuf)
     struct vr_ip6 *ipv6_header = NULL;
     struct vr_udp *udp_header = NULL;
     struct vr_gre *gre_header = NULL;
-    struct tcphdr *tcp_header = NULL;
     uint32_t *simple_mpls_header = NULL;
     unsigned int pull_len = VR_ETHER_HLEN, ipv4_len;
     int encap_type, helper_ret;
@@ -724,8 +722,6 @@ dpdk_mbuf_emulate_protocol_type_and_offsets(struct rte_mbuf *mbuf)
         if (ipv4_header->ip_proto == VR_IP_PROTO_GRE) {
             /* In future we should use `new` protocol type in
              * a mbuf structure */
-            mbuf->udata64 |= RTE_PTYPE_L3_IPV4_EXT |
-                RTE_PTYPE_TUNNEL_GRE;
             gre_header = (struct vr_gre *)((uintptr_t)ipv4_header +
                 ipv4_len);
 
@@ -770,7 +766,6 @@ dpdk_mbuf_emulate_protocol_type_and_offsets(struct rte_mbuf *mbuf)
                 gre_proto_udp_dport = gre_header->gre_proto;
             }
         } else if (ipv4_header->ip_proto == VR_IP_PROTO_UDP) {
-            mbuf->udata64 |= RTE_PTYPE_L4_UDP;
             udp_header = (struct vr_udp *)((uintptr_t)ipv4_header + ipv4_len);
 
             /* In case, when MPLS parsing fail or MPLS has not set BoS,
@@ -781,7 +776,6 @@ dpdk_mbuf_emulate_protocol_type_and_offsets(struct rte_mbuf *mbuf)
 
             simple_mpls_header = (uint32_t *)((uintptr_t)udp_header +
                 sizeof(struct vr_udp));
-            mbuf->udata64 |= RTE_PTYPE_L3_IPV4_EXT;
             /* The bottom of stack is NOT set to 1 */
             if (unlikely(!(rte_cpu_to_be_32(*simple_mpls_header) & 0x100))) {
                 RTE_LOG(DEBUG, VROUTER,
@@ -819,26 +813,19 @@ dpdk_mbuf_emulate_protocol_type_and_offsets(struct rte_mbuf *mbuf)
             return -1;
 
         helper_ret = vr_ip_transport_parse(ipv4_header, ipv6_header,
-                                           &tcp_header, mbuf->buf_len,
+                                           NULL, mbuf->buf_len,
                                            dpdk_adjust_tcp_mss, NULL, NULL,
                                            NULL, &pull_len);
         if (unlikely(helper_ret != 0))
             return -1;
 
-        /* TODO: do we need this? it's possible to get other data about inner
-         * packet if needed. */
         if (ipv6_header) {
-            mbuf->udata64 |= RTE_PTYPE_INNER_L3_IPV6;
             mbuf->l3_len = sizeof(struct vr_ip6);
         } else if (!ipv6_header && ipv4_header){
-            mbuf->udata64 |= RTE_PTYPE_INNER_L3_IPV4;
             mbuf->l3_len = ipv4_header->ip_hl * IPV4_IHL_MULTIPLIER;
         } else {
             return -1;
         }
-
-        if (tcp_header)
-            mbuf->udata64 |= RTE_PTYPE_INNER_L4_TCP;
 
         if (unlikely(!ipv6_header && ipv4_header && vr_ip_fragment(ipv4_header))) {
             RTE_LOG(DEBUG, VROUTER, "Fragmented IP inner packet, %s\n",
@@ -858,6 +845,7 @@ dpdk_mbuf_emulate_protocol_type_and_offsets(struct rte_mbuf *mbuf)
 static inline int
 dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
 {
+    struct ether_hdr *eth_hdr = rte_pktmbuf_mtod(mbuf, struct ether_hdr *);
     struct ipv4_hdr *ipv4_hdr;
     uint64_t *ipv4_addr_ptr;
     uint32_t *l4_ptr;
@@ -876,15 +864,15 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
 
     /* TODO: inner IPv6 support */
     /* TODO: inner VLAN support */
-    if (likely(mbuf->udata64 |= RTE_PTYPE_L3_IPV4)) {
+    if (likely(mbuf->udata64 & RTE_PTYPE_L3_IPV4)) {
         mbuf->ol_flags |= PKT_RX_IPV4_HDR;
 
         if (mbuf->udata64 & DPDK_PTYPE_TUNNEL_MPLS_GRE) {
-            ipv4_hdr = rte_pktmbuf_mtod_offset(mbuf, struct ipv4_hdr *,
-                mbuf->outer_l2_len + mbuf->outer_l3_len +
-                sizeof(uint32_t) + mbuf->outer_l2_len);
+            ipv4_hdr = (struct ipv4_hdr *)((uintptr_t)eth_hdr +
+                mbuf->outer_l2_len + mbuf->outer_l3_len + sizeof(uint32_t) +
+                mbuf->outer_l2_len);
         } else {
-            ipv4_hdr = rte_pktmbuf_mtod_offset(mbuf, struct ipv4_hdr *,
+            ipv4_hdr = (struct ipv4_hdr *)((uintptr_t)eth_hdr +
                 mbuf->outer_l2_len);
         }
         ipv4_addr_ptr = (uint64_t *)((uintptr_t)ipv4_hdr +
