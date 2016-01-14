@@ -93,10 +93,11 @@ struct virtq_used {
 };
 
 typedef struct {
-    int kickfd, callfd;
-    struct virtq_desc desc[VIRTQ_DESC_MAX_SIZE]         __attribute__((aligned(4)));
-    struct virtq_avail avail                            __attribute__((aligned(2)));
-    struct virtq_used used                              __attribute__((aligned(4096)));
+    int kickfd;
+    int callfd;
+    struct virtq_desc desc[VIRTQ_DESC_MAX_SIZE] __attribute__((aligned(4)));
+    struct virtq_avail avail                    __attribute__((aligned(2)));
+    struct virtq_used used                      __attribute__((aligned(4096)));
 } uvhost_virtq;
 
 struct virtq {
@@ -115,12 +116,29 @@ typedef struct {
 
 } virtq_control;
 
+typedef int (*AvailHandler)(void* context, void* buf, size_t size);
+typedef int (*MapHandler)(void* context, uint64_t addr);
+
+struct ProcessHandler {
+    void* context;
+    AvailHandler avail_handler;
+    MapHandler  map_handler;
+};
+
+struct set_host_virtq {
+    struct vhost_vring_state num;
+    struct vhost_vring_state base;
+    struct vhost_vring_file kick;
+    struct vhost_vring_file call;
+    struct vhost_vring_addr addr;
+} set_virtq_init;
 
 typedef enum {
     E_VIRT_QUEUE_OK = EXIT_SUCCESS,
     E_VIRT_QUEUE_ERR_ALLOC,
     E_VIRT_QUEUE_ERR_UNK,
     E_VIRT_QUEUE_ERR_FARG,
+    E_VIRT_QUEUE_ERR_HOST_VIRTQ,
     E_VIRT_QUEUE_ERR_MAP_REG,
     E_VIRT_QUEUE_LAST
 } VIRT_QUEUE_H_RET_VAL;

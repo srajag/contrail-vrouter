@@ -8,6 +8,8 @@
 #define CLIENT_H
 
 #include <limits.h>
+#include <sys/socket.h>
+
 #include  "uvhost.h"
 
 /* FDs First initialization value
@@ -17,6 +19,7 @@
  *
  */
 #define CLIENT_INIT_FD_VAL (-2)
+
 #define QEMU_PROT_VERSION (0x01)
 
 typedef enum client_status {
@@ -39,7 +42,6 @@ typedef struct {
 
 } Client;
 
-
 typedef enum {
     E_CLIENT_OK = EXIT_SUCCESS,
     E_CLIENT_ERR_ALLOC,
@@ -54,9 +56,12 @@ typedef enum {
     E_CLIENT_LAST
 } CLIENT_H_RET_VAL;
 
-int vhost_ioctl_set_send_msg(Client *client, VhostUserRequest request, void *req_ptr, VhostUserMsg *msg, int *fd );
-int vhost_ioctl_set_recv_msg(VhostUserRequest request, void *req_ptr, VhostUserMsg *msg);
-
-
+int client_vhost_ioctl(Client *client, VhostUserRequest request, void *req_ptr);
+int client_vhost_ioctl_set_send_msg(Client *client, VhostUserRequest request,
+                         void *req_ptr, VhostUserMsg *msg, int *fd, size_t *fd_num);
+int client_vhost_ioctl_set_recv_msg(VhostUserRequest request, void *req_ptr, VhostUserMsg *msg);
+int client_vhost_ioctl_recv_fds_handler(struct cmsghdr *cmsgh, int *fds, size_t *fd_num);
+int client_vhost_ioctl_send_fds(VhostUserMsg *msg, int fd, int *fds, size_t fd_num);
+int client_vhost_ioctl_recv_fds(int fd, VhostUserMsg *msg, int *fds, size_t *fd_num);
 #endif
 

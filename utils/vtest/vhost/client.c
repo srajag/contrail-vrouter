@@ -4,6 +4,7 @@
  * Copyright (c) 2015 Juniper Networks, Inc. All rights reserved.
 */
 
+#include <errno.h>
 #include <linux/vhost.h>
 #include <limits.h>
 #include <string.h>
@@ -16,7 +17,6 @@
 
 #include "client.h"
 
-//Todo implement sendmsg and recv wrapper functions
 int
 client_init_path(Client *client, const char *path) {
 
@@ -80,18 +80,21 @@ client_disconnect_socket(Client *client) {
 }
 
 int
-vhost_ioctl(Client *client, VhostUserRequest request, void *req_ptr) {
+client_vhost_ioctl(Client *client, VhostUserRequest request, void *req_ptr) {
 
     Client *const cl = client;
-    int fd[VHOST_MEMORY_MAX_NREGIONS] = {-2};
+    int fds[VHOST_MEMORY_MAX_NREGIONS] = {-2};
     VhostUserMsg message = {0, .flags=0};
     CLIENT_H_RET_VAL ret_val = E_CLIENT_OK;
+    CLIENT_H_RET_VAL ret_set_val = E_CLIENT_VIOCTL_REPLY;
+    size_t fd_num = 0;
 
     if (!client) {
         return E_CLIENT_ERR_FARG;
     }
 
-    /* Function argument pointer (req_ptr) SHOULD not be null */
+    /* Function argument pointer (req_ptr) for following messages
+     * SHOULD not be NULL. */
     switch (request) {
         case VHOST_USER_SET_MEM_TABLE:
         case VHOST_USER_SET_LOG_BASE:
@@ -112,45 +115,50 @@ vhost_ioctl(Client *client, VhostUserRequest request, void *req_ptr) {
     message.flags &= ~VHOST_USER_VERSION_MASK;
     message.flags |= QEMU_PROT_VERSION;
 
-    /* Set message structure for sending data */
-    ret_val = vhost_ioctl_set_send_msg(cl, request, req_ptr, &message, fd);
+    /* Set message structure for sending data. */
+    ret_set_val = client_vhost_ioctl_set_send_msg(cl, request, req_ptr, &message, fds, &fd_num);
 
-    if (!(ret_val == E_CLIENT_OK || ret_val == E_CLIENT_VIOCTL_REPLY)) {
+    if (!(ret_set_val == E_CLIENT_OK || ret_set_val == E_CLIENT_VIOCTL_REPLY)) {
         return E_CLIENT_ERR_VIOCTL;
     }
-    //todo send msg
 
-    if (ret_val == E_CLIENT_VIOCTL_REPLY) {
+    ret_val = client_vhost_ioctl_send_fds(&message, cl->socket, fds, fd_num );
+    if (ret_val != E_CLIENT_OK) {
+        return ret_val;
+    }
 
-        ret_val = vhost_ioctl_set_recv_msg(request, req_ptr, &message);
-        //todo recv msg
+    if (ret_set_val == E_CLIENT_VIOCTL_REPLY) {
 
         /* Set message structure after receive data */
+        ret_val = client_vhost_ioctl_set_recv_msg(request, req_ptr, &message);
         if (!(ret_val == E_CLIENT_OK)) {
             return E_CLIENT_ERR_VIOCTL;
-
         }
 
+        ret_val = client_vhost_ioctl_recv_fds(cl->socket, &message, fds, &fd_num);
+
+        if (ret_val != E_CLIENT_OK) {
+            return ret_val;
+        }
     }
 
     return E_CLIENT_OK;
 }
 
 int
-vhost_ioctl_set_send_msg(Client *client, VhostUserRequest request, void *req_ptr,
-                     VhostUserMsg *msg, int *fd ) {
+client_vhost_ioctl_set_send_msg(Client *client, VhostUserRequest request, void *req_ptr,
+                     VhostUserMsg *msg, int *fds, size_t *fd_num ) {
 
     VhostUserMsg *const message = msg;
     bool msg_has_reply = false;
 
-    size_t fd_num = -1;
+    size_t *const l_fd_num = fd_num;
     struct vring_file {unsigned int index; int fd;} *file;
 
-    if (!client || msg || fd) {
+    if (!client || !msg || !fds || !fd_num) {
 
         return E_CLIENT_ERR_FARG;
     }
-
 
     switch (request) {
 
@@ -180,14 +188,14 @@ vhost_ioctl_set_send_msg(Client *client, VhostUserRequest request, void *req_ptr
             message->size = sizeof(((VhostUserMemory*)0)->padding);
             message->size += sizeof(((VhostUserMemory*)0)->nregions);
 
-            for (fd_num = 0; fd_num < message->memory.nregions; fd_num++) {
-                fd[fd_num] = client->sh_mem_fds[fd_num];
+            for (*l_fd_num = 0; *l_fd_num < message->memory.nregions; fd_num++) {
+                fds[*l_fd_num] = client->sh_mem_fds[*l_fd_num];
                 message->size = sizeof(VhostUserMemoryRegion);
             }
             break;
 
         case VHOST_USER_SET_LOG_FD:
-            fd[++fd_num] = *((int *) req_ptr);
+            fds[++(*l_fd_num)] = *((int *) req_ptr);
             break;
 
         case VHOST_USER_SET_VRING_NUM:
@@ -208,7 +216,7 @@ vhost_ioctl_set_send_msg(Client *client, VhostUserRequest request, void *req_ptr
             message->u64 = file->index;
             message->size = sizeof(((VhostUserMsg*)0)->u64);
             if (file->fd > 0 ) {
-                client->sh_mem_fds[fd_num++] = file->fd;
+                client->sh_mem_fds[(*l_fd_num)++] = file->fd;
             }
             break;
 
@@ -224,7 +232,7 @@ vhost_ioctl_set_send_msg(Client *client, VhostUserRequest request, void *req_ptr
 }
 
 int
-vhost_ioctl_set_recv_msg(VhostUserRequest request, void *req_ptr, VhostUserMsg *msg) {
+client_vhost_ioctl_set_recv_msg(VhostUserRequest request, void *req_ptr, VhostUserMsg *msg) {
 
     VhostUserMsg *const message = msg;
 
@@ -244,10 +252,138 @@ vhost_ioctl_set_recv_msg(VhostUserRequest request, void *req_ptr, VhostUserMsg *
             return E_CLIENT_ERR_IOCTL_REPLY;
     }
 
+    return E_CLIENT_OK;
+}
+
+int
+client_vhost_ioctl_send_fds(VhostUserMsg *msg, int fd, int *fds, size_t fd_num) {
+
+    struct iovec iov;
+    struct msghdr msgh;
+    struct cmsghdr *cmsgh = NULL;
+    char controlbuf[CMSG_SPACE(fd_num * sizeof(int))];
+
+    size_t vhost_user_msg_member_size = ((sizeof(((VhostUserMsg*)0)->request)) +
+    (sizeof(((VhostUserMsg*)0)->flags)) + (sizeof(((VhostUserMsg*)0)->size)));
+
+    const VhostUserMsg *const message = msg;
+    int ret = 0;
+
+    if (!msg || !fds) {
+        return E_CLIENT_ERR_FARG;
+    }
+
+    memset(controlbuf, 0, sizeof(controlbuf));
+    memset(&msgh, 0, sizeof(struct msghdr));
+    memset(&iov, 0, sizeof(struct iovec));
+
+    iov.iov_base = (void *) message;
+    iov.iov_len = vhost_user_msg_member_size + message->size;
+
+    msgh.msg_iov = &iov;
+    msgh.msg_iovlen = 1;
+
+    if (fd_num) {
+        msgh.msg_name = NULL;
+        msgh.msg_namelen = 0;
+        msgh.msg_control = controlbuf;
+
+        cmsgh = CMSG_FIRSTHDR(&msgh);
+        cmsgh->cmsg_len = CMSG_LEN(sizeof(int) * fd_num);
+        cmsgh->cmsg_level = SOL_SOCKET;
+        cmsgh->cmsg_type = SCM_RIGHTS;
+
+        msgh.msg_controllen = cmsgh->cmsg_len;
+
+        memcpy(CMSG_DATA(cmsgh), fds, sizeof(int) * fd_num);
+
+    } else {
+        msgh.msg_control = NULL;
+        msgh.msg_controllen = 0;
+    }
+
+    do {
+        ret = sendmsg(fd, &msgh, 0);
+
+    } while (ret < 0 && errno == EINTR);
+
+    if (ret < 0) {
+        return E_CLIENT_ERR_IOCTL_SEND;
+    }
 
     return E_CLIENT_OK;
 }
 
+int
+client_vhost_ioctl_recv_fds(int fd, VhostUserMsg *msg, int *fds, size_t *fd_num) {
+
+    struct  msghdr msgh;
+    struct iovec iov;
+    struct cmsghdr *cmsgh = NULL;
+    char controlbuf[CMSG_SPACE(sizeof(int) * (*fd_num))];
+    VhostUserMsg *const message = msg;
+    int *const l_fds = fds;
+    size_t *const l_fd_num = fd_num;
+    int ret = 0;
+
+    if (!msg || !fds || !fd_num) {
+
+        return E_CLIENT_ERR_FARG;
+    }
+
+    memset(controlbuf, 0, sizeof(controlbuf));
+    memset(&msgh, 0, sizeof(struct msghdr));
+    memset(&iov, 0, sizeof(struct iovec));
+
+    msgh.msg_name = NULL;
+    msgh.msg_namelen = 0;
+
+    msgh.msg_iov = &iov;
+    msgh.msg_iovlen = 1;
+    msgh.msg_control = controlbuf;
+    msgh.msg_controllen = sizeof(controlbuf);
+
+    iov.iov_base = (void *) message;
+    iov.iov_len = VHOST_USER_HDR_SIZE;
+
+    ret = recvmsg(fd, &msgh, 0);
+
+    if ((ret > 0 && msgh.msg_flags & (MSG_TRUNC | MSG_CTRUNC)) || ret < 0 ) {
+       return E_CLIENT_ERR_IOCTL_REPLY;
+    }
+
+    cmsgh = CMSG_FIRSTHDR(&msgh);
+    if (cmsgh && cmsgh->cmsg_len > 0 && cmsgh->cmsg_level == SOL_SOCKET &&
+            cmsgh->cmsg_type == SCM_RIGHTS) {
+
+        client_vhost_ioctl_recv_fds_handler(cmsgh, l_fds, l_fd_num);
+
+    }
+
+    read(fd, ((char*)msg) + ret, message->size);
+    return E_CLIENT_OK;
+}
+
+int
+client_vhost_ioctl_recv_fds_handler(struct cmsghdr *cmsgh, int *fds, size_t *fd_num) {
+
+    struct cmsghdr *const l_cmsgh = cmsgh;
+    int *const l_fds = fds;
+    size_t *const l_fd_num = fd_num;
+    size_t fd_size = 0;
+
+    if (!cmsgh || !fds || !fd_num) {
+        return E_CLIENT_ERR_FARG;
+    }
+
+    if (*fd_num * sizeof(int) >= l_cmsgh->cmsg_len - CMSG_LEN(0)) {
+       fd_size = l_cmsgh->cmsg_len - CMSG_LEN(0);
+       *l_fd_num = fd_size / sizeof(int);
+       memcpy(l_fds, CMSG_DATA(l_cmsgh), fd_size);
+    }
+
+    return E_CLIENT_OK;
+}
 
 
 

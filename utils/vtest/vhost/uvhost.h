@@ -9,15 +9,18 @@
 #define __QEMU_UVHOST_H__
 
 /* TODO: We can import structures from linux/vhost */
+
+#include <stdlib.h>
 #include <linux/vhost.h>
 
-#include "virt_queue.h"
 #include "client.h"
-#include "stdlib.h"
+#include "virt_queue.h"
+#include "virtio_hdr.h"
 
-
+#define VHOST_USER_HDR_SIZE sizeof(struct virtio_net_hdr)
 #define VHOST_MEMORY_MAX_NREGIONS    8
 #define VHOST_CLIENT_MAX_VRINGS      2
+
 
 #define uvhost_safe_free(ptr) uvhost_safer_free((void**)&(ptr))
 
@@ -53,13 +56,13 @@ typedef struct VhostUserMemory {
     VhostUserMemoryRegion regions[VHOST_MEMORY_MAX_NREGIONS];
 } VhostUserMemory;
 
-
 typedef struct VhostClient {
     VhostUserMemory mem;
     size_t page_size;
     size_t virtq_num;
     /* Map RX/TX virtq */
     struct uvhost_virtq *sh_mem_virtq_table[VHOST_CLIENT_MAX_VRINGS];
+    struct ProcessHandler handler;
     uint16_t features;
     Client client;
 } VhostClient;
@@ -82,25 +85,20 @@ typedef struct VhostUserMsg {
 
 } __attribute__((packed)) VhostUserMsg;
 
-
-
 typedef enum {
     E_UVHOST_OK = EXIT_SUCCESS,
     E_UVHOST_ERR_ALLOC,
     E_UVHOST_ERR_UNK,
     E_UVHOST_ERR_FARG,
+    E_UVHOST_ERR,
     E_UVHOST_LAST
 } UVHOST_H_RET_VAL;
 
-
-
-
-
+static int uvhost_vhost_init_control_msgs(VhostClient *vhost_client);
 /*
  * VHOST_USER_HSIZE - size of the header of the user space vhost message. This
  * doesn't include the variable part of the message (union above).
  */
 #define VHOST_USER_HSIZE (offsetof(VhostUserMsg, u64))
 
-#endif /* __QEMU_UVHOST_H__ */
-
+#endif

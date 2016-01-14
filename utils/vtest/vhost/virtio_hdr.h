@@ -2,6 +2,8 @@
 #ifndef VIRT_HDR_H
 #define VIRT_HDR_H
 
+#include <stdint.h>
+
 struct virtio_net_hdr {
 
 #define VIRTIO_NET_HDR_F_NEEDS_CSUM    1
@@ -19,3 +21,4 @@ struct virtio_net_hdr {
     uint16_t num_buffers;
 };
 #endif
+
