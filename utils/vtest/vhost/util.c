@@ -6,6 +6,8 @@
 #include <sys/select.h>
 #include "util.h"
 
+//todo select()
+
 int
 utils_init_fd_rw_t(fd_rw_t *fd_rw_list, struct timeval tv) {
 
@@ -17,17 +19,17 @@ utils_init_fd_rw_t(fd_rw_t *fd_rw_list, struct timeval tv) {
 
     FD_ZERO(&(fd_rw_list->rwfd_set[FD_TYPE_READ]));
     FD_ZERO(&(fd_rw_list->rwfd_set[FD_TYPE_WRITE]));
+
     l_fd_rw_list->rwfdmax = -2;
+    l_fd_rw_list->tv = tv;
 
     for (size_t j = 0; j  < FD_TYPE_MAX; j++ ) {
-
         for (size_t i = 0; i < FD_LIST_SIZE; i++) {
             l_fd_rw_list->rwfds[j][i].fd = -2;
             l_fd_rw_list->rwfds[j][i].fd_arg = NULL;
+            l_fd_rw_list->rwfds[j][i].fd_handler = 0;
         }
     }
-
-    l_fd_rw_list->tv = tv;
 
     return E_UTILS_OK;
 }
@@ -43,12 +45,10 @@ utils_add_fd_to_fd_rw_t(fd_rw_t *fd_rw_list, fd_type fd_type, int fd,
         return E_UTILS_ERR_FARG;
     }
 
-    if (fd_type == FD_TYPE_READ) {
+    if ((fd_type == FD_TYPE_READ) || (fd_type == FD_TYPE_WRITE)) {
 
         l_fd_rw_element = l_fd_rw_list->rwfds[FD_TYPE_READ];
-    } else if ( fd_type == FD_TYPE_WRITE) {
 
-        l_fd_rw_element = l_fd_rw_list->rwfds[FD_TYPE_READ];
     } else {
 
         return E_UTILS_ERR_FARG;

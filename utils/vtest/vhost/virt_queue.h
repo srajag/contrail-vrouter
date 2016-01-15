@@ -10,6 +10,7 @@
 #include <stdlib.h>
 
 #include "uvhost.h"
+#include "virtio_hdr.h"
 
 #define VIRTQ_IDX_NONE ((uint16_t)-1)
 
@@ -17,7 +18,7 @@
 #define VIRTQ_DESC_MAX_SIZE (32768)
 
 /* Maximal ethernet MTU + sizeof(virtio_net_hdr) */
-#define VIRTQ_DESC_BUFF_SIZE (ETH_MAX_MTU + 14)
+#define VIRTQ_DESC_BUFF_SIZE (ETH_MAX_MTU + sizeof(struct virtio_net_hdr))
 #define ETH_MAX_MTU (1514)
 
 typedef enum virtq_desc_flags {
@@ -147,6 +148,9 @@ int virt_queue_map_vring(uvhost_virtq **virtq, void *base_virtq);
 int virt_queue_map_mem_reqion_virtq(uvhost_virtq **virtq, uint64_t guest_phys_addr);
 int virt_queue_map_all_mem_reqion_virtq(uvhost_virtq **virtq, VhostUserMemory *mem,
                                      size_t virtq_number);
+
+int virtq_queue_set_host_vring(Client *client, struct set_host_virtq set_virtq);
+int virtq_set_host_virtq_table(uvhost_virtq **virtq, size_t virtq_table_size, Client *client);
 
 static inline int virtq_need_event(uint16_t event_idx, uint16_t new_idx, uint16_t old_idx)
 {

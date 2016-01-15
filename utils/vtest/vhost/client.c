@@ -16,6 +16,46 @@
 
 
 #include "client.h"
+#include "util.h"
+
+int
+client_init_Client(Client *client, const char *path) {
+
+    CLIENT_H_RET_VAL client_ret_val = E_CLIENT_OK;
+    UTILS_H_RET_VAL utils_ret_val = E_UTILS_OK;
+
+    struct timeval tm = {.tv_sec=1, .tv_usec=0};
+
+    if (!client || !path) {
+        return E_CLIENT_ERR_FARG;
+    }
+
+    client_ret_val = client_init_path(client, path);
+    if (client_ret_val != E_CLIENT_OK) {
+        return client_ret_val;
+    }
+
+    client_ret_val = client_init_socket(client);
+    if (client_ret_val != E_CLIENT_OK) {
+        return client_ret_val;
+    }
+
+    client_ret_val = client_connect_socket(client);
+    if (client_ret_val != E_CLIENT_OK) {
+        return client_ret_val;
+    }
+
+    utils_ret_val = utils_init_fd_rw_t(&client->fd_rw_list, tm);
+    if (utils_ret_val != E_UTILS_OK) {
+        return E_CLIENT_ERR;
+    }
+
+    memset(&client->shm_mem_path,
+           -2, sizeof(int) * VHOST_MEMORY_MAX_NREGIONS);
+
+    return E_CLIENT_OK;
+}
+
 
 int
 client_init_path(Client *client, const char *path) {
@@ -30,7 +70,7 @@ client_init_path(Client *client, const char *path) {
 }
 
 int
-clinet_init_socket(Client *client) {
+client_init_socket(Client *client) {
 
     if (!client) {
         return E_CLIENT_ERR_FARG;

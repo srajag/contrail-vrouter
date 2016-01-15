@@ -15,6 +15,7 @@
 #include "client.h"
 #include "sh_mem.h"
 #include "virt_queue.h"
+#include "virtio_hdr.h"
 
 /* TODO */
 
@@ -48,17 +49,6 @@ uvhost_init_VhostClient(VhostClient *vhost_client) {
     vhost_cl->virtq_num = VHOST_CLIENT_MAX_VRINGS;
     vhost_cl->page_size = VHOST_CLIENT_PAGE_SIZE;
 
-
-    // TODO: Init client in client part
-    // //
-    /* Needs init FDs to different value than >=-1
-     * *_open functions on success return FD in range (0,+)
-     * otherwise -1
-     * To be sure, that FD is not in use.
-   *
-    memset(&((*vhost_client)->client.shm_mem_fds),
-            SH_MEM_INIT_FD_VAL, sizeof(int) * VHOST_MEMORY_MAX_NREGIONS);
-    */
     return E_UVHOST_OK;
 }
 
@@ -85,7 +75,7 @@ uvhost_set_mem_VhostClient(VhostClient *vhost_client) {
         }
 
         sh_mem_addr = sh_mem_mmap(*(vhost_cl->client.sh_mem_fds + i),
-                    vhost_cl->page_size);
+                vhost_cl->page_size);
         if (sh_mem_addr == NULL ) {
             return E_UVHOST_ERR_UNK;
         }
@@ -98,28 +88,68 @@ uvhost_set_mem_VhostClient(VhostClient *vhost_client) {
         memset(fd_path_buff, 0, sizeof(char) * PATH_MAX);
     }
 
-    //todo virt_queue_map_all_mem_region_virtq
+    virt_queue_map_all_mem_region_virtq(vhost_cl->sh_mem_virtq_table,
+            VHOST_CLIENT_MAX_VRINGS, &vhost_client->mem);
     return E_UVHOST_OK;
 }
 
-int inline
-uvhost_create_VhostClient(VhostClient *vhost_client) {
+VhostClient*
+uvhost_create_vhost_client(void) {
 
-    uvhost_init_VhostClient(vhost_client);
+    VhostClient *vhost_client = NULL;
+    UVHOST_H_RET_VAL uvhost_ret_val = E_UVHOST_OK;
+    CLIENT_H_RET_VAL client_ret_val = E_CLIENT_OK;
 
-    return E_UVHOST_OK;
-}
-
-void
-uvhost_safer_free(void **mem) {
-
-    if (mem && *mem) {
-        free(*mem);
-        *mem = NULL;
+    uvhost_ret_val = uvhost_alloc_VhostClient(&vhost_client);
+    if (uvhost_ret_val != E_UVHOST_OK) {
+        return NULL;
+        //boze na nebesiach
     }
 
-    return;
+    uvhost_ret_val = uvhost_init_VhostClient(vhost_client);
+    if (uvhost_ret_val != E_UVHOST_OK) {
+        return NULL;
+        //boze na nebesiach
+    }
+
+    client_ret_val = client_init_Client(&vhost_client->client, "/var/run/vrouter/vm1");
+    if (client_ret_val != E_CLIENT_OK) {
+        return NULL;
+    }
+
+    return vhost_client;
 }
+
+int
+uvhost_run_vhost_client(void) {
+
+    VhostClient *vhost_client = NULL;
+    UVHOST_H_RET_VAL uvhost_ret_val = E_UVHOST_OK;
+
+    vhost_client = uvhost_create_vhost_client();
+    if (!vhost_client) {
+        return E_UVHOST_ERR;
+    }
+
+    uvhost_ret_val = uvhost_set_mem_VhostClient(vhost_client);
+    if (uvhost_ret_val != E_UVHOST_OK) {
+        return uvhost_ret_val;
+        //boze na nebesiach
+    }
+
+    utils_add_fd_to_fd_rw_t(&(vhost_client->client.fd_rw_list), FD_TYPE_READ, vhost_client->sh_mem_virtq_table[2]->kickfd);
+
+
+    uvhost_ret_val = uvhost_init_control_communication(vhost_client);
+    if (uvhost_ret_val != E_UVHOST_OK) {
+        return uvhost_ret_val;
+        //boze na nebesiach
+    }
+
+
+    return E_UVHOST_OK;
+}
+
 
 int
 uvhost_init_control_communication(VhostClient *vhost_client) {
@@ -176,4 +206,14 @@ uvhost_vhost_init_control_msgs(VhostClient *vhost_client) {
     return E_UVHOST_OK;
 }
 
+void
+uvhost_safer_free(void **mem) {
+
+    if (mem && *mem) {
+        free(*mem);
+        *mem = NULL;
+    }
+
+    return;
+}
 

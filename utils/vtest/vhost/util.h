@@ -41,5 +41,8 @@ typedef enum {
     E_UTILS_LAST
 } UTILS_H_RET_VAL;
 
+int utils_init_fd_rw_t(fd_rw_t *fd_rw_list, struct timeval tv);
+int utils_add_fd_to_fd_rw_t(fd_rw_t *fd_rw_list, fd_type fd_type, int fd,
+                         void* fd_handler_arg, fd_handler fd_handler);
 #endif
 

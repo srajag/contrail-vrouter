@@ -13,7 +13,7 @@ int
 virt_queue_map_all_mem_reqion_virtq(uvhost_virtq **virtq, VhostUserMemory *mem,
                                      size_t virtq_number) {
 
-    int ret = 0;
+    VIRT_QUEUE_H_RET_VAL ret_val = E_VIRT_QUEUE_OK;
 
     if (!virtq || !*virtq) {
         return E_VIRT_QUEUE_ERR_FARG;
@@ -21,10 +21,11 @@ virt_queue_map_all_mem_reqion_virtq(uvhost_virtq **virtq, VhostUserMemory *mem,
 
     for (size_t i = 0; i < virtq_number; i++) {
 
-        ret = (virt_queue_map_mem_reqion_virtq((virtq + i),
+        ret_val = (virt_queue_map_mem_reqion_virtq((virtq + i),
                     mem->regions[i].guest_phys_addr));
-       //TODO: if (ret)
-       // handle error
+        if (ret_val != E_VIRT_QUEUE_OK){
+            return ret_val;
+        }
     }
 
     return E_VIRT_QUEUE_OK;
@@ -40,7 +41,6 @@ virt_queue_map_mem_reqion_virtq(uvhost_virtq **virtq, uint64_t guest_phys_addr) 
     virt_queue_map_vring(virtq, (void *)guest_phys_addr);
     if (!*virtq) {
         //TODO handle error
-
         return E_VIRT_QUEUE_ERR_MAP_REG;
     }
 
@@ -111,7 +111,6 @@ int
 virtq_set_host_virtq_table(uvhost_virtq **virtq, size_t virtq_table_size, Client *client) {
 
     VIRT_QUEUE_H_RET_VAL ret_val = E_VIRT_QUEUE_OK;
-
     struct set_host_virtq set_virtq_init;
 
     if (!virtq || !*virtq || !client) {
@@ -152,9 +151,7 @@ virtq_set_host_virtq_table(uvhost_virtq **virtq, size_t virtq_table_size, Client
        }
        memset(&(set_virtq_init), 0, sizeof(struct set_host_virtq));
 
-
     }
-
 
     return E_VIRT_QUEUE_OK;
 }

@@ -84,6 +84,12 @@ typedef struct VhostUserMsg {
     };
 
 } __attribute__((packed)) VhostUserMsg;
+/*
+ * VHOST_USER_HSIZE - size of the header of the user space vhost message. This
+ * doesn't include the variable part of the message (union above).
+ */
+#define VHOST_USER_HSIZE (offsetof(VhostUserMsg, u64))
+
 
 typedef enum {
     E_UVHOST_OK = EXIT_SUCCESS,
@@ -94,11 +100,12 @@ typedef enum {
     E_UVHOST_LAST
 } UVHOST_H_RET_VAL;
 
+int uvhost_init_control_communication(VhostClient *vhost_client);
+void uvhost_safer_free(void **mem);
+int inline uvhost_set_mem_VhostClient(VhostClient *vhost_client);
+static int inline uvhost_alloc_VhostClient(VhostClient **vhost_client);
+
 static int uvhost_vhost_init_control_msgs(VhostClient *vhost_client);
-/*
- * VHOST_USER_HSIZE - size of the header of the user space vhost message. This
- * doesn't include the variable part of the message (union above).
- */
-#define VHOST_USER_HSIZE (offsetof(VhostUserMsg, u64))
+int uvhost_init_control_communication(VhostClient *vhost_client);
 
 #endif
