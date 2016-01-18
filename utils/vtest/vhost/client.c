@@ -10,13 +10,16 @@
 #include <string.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include <sys/types.h>
+
 #include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/un.h>
 
 
 #include "client.h"
 #include "util.h"
+#include "virtio_hdr.h"
 
 int
 client_init_Client(Client *client, const char *path) {
@@ -24,11 +27,14 @@ client_init_Client(Client *client, const char *path) {
     CLIENT_H_RET_VAL client_ret_val = E_CLIENT_OK;
     UTILS_H_RET_VAL utils_ret_val = E_UTILS_OK;
 
-    struct timeval tm = {.tv_sec=1, .tv_usec=0};
+    struct timeval tm;
 
     if (!client || !path) {
         return E_CLIENT_ERR_FARG;
     }
+
+    tm.tv_sec = 0;
+    tm.tv_usec = 500;
 
     client_ret_val = client_init_path(client, path);
     if (client_ret_val != E_CLIENT_OK) {
@@ -50,7 +56,7 @@ client_init_Client(Client *client, const char *path) {
         return E_CLIENT_ERR;
     }
 
-    memset(&client->shm_mem_path,
+    memset(&client->sh_mem_path,
            -2, sizeof(int) * VHOST_MEMORY_MAX_NREGIONS);
 
     return E_CLIENT_OK;
@@ -88,15 +94,23 @@ client_init_socket(Client *client) {
 int
 client_connect_socket(Client *client) {
 
-    struct sockaddr_un unix_socket = {0, .sun_path = {0}};
+    struct sockaddr_un unix_socket;
     size_t addrlen = 0;
-
+    struct stat unix_socket_stat;
     if (!client->socket || strlen(client->socket_path) == 0) {
         return E_CLIENT_ERR_FARG;
     }
 
+    if (!(stat(client->socket_path, &unix_socket_stat) == 0
+                && S_ISSOCK(unix_socket_stat.st_mode))) {
+
+        return E_CLIENT_ERR_CONN;
+    }
+
+    memset(&unix_socket, 0, sizeof(struct sockaddr_un));
+
     unix_socket.sun_family = AF_UNIX;
-    strncpy(unix_socket.sun_path, client->socket_path, PATH_MAX);
+    strncpy(unix_socket.sun_path, client->socket_path, sizeof(unix_socket.sun_path) - 1);
     addrlen = strlen(unix_socket.sun_path) + sizeof(AF_UNIX);
 
     if (connect(client->socket, (struct sockaddr *)&unix_socket, addrlen)  == -1) {
@@ -113,9 +127,10 @@ client_disconnect_socket(Client *client) {
     if (!client) {
         return E_CLIENT_ERR_FARG;
     }
-
-    close(client->socket);
-
+    if (!(client->socket < 0)) {
+        close(client->socket);
+        client->socket = -2;
+    }
     return E_CLIENT_OK;
 }
 
@@ -124,7 +139,7 @@ client_vhost_ioctl(Client *client, VhostUserRequest request, void *req_ptr) {
 
     Client *const cl = client;
     int fds[VHOST_MEMORY_MAX_NREGIONS] = {-2};
-    VhostUserMsg message = {0, .flags=0};
+    VhostUserMsg message;
     CLIENT_H_RET_VAL ret_val = E_CLIENT_OK;
     CLIENT_H_RET_VAL ret_set_val = E_CLIENT_VIOCTL_REPLY;
     size_t fd_num = 0;
@@ -150,6 +165,8 @@ client_vhost_ioctl(Client *client, VhostUserRequest request, void *req_ptr) {
         default:
             break;
     }
+
+    memset(&message, 0, sizeof(VhostUserMsg));
 
     message.request = request;
     message.flags &= ~VHOST_USER_VERSION_MASK;

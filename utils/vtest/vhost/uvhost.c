@@ -11,6 +11,7 @@
 #include <string.h>
 #include <limits.h>
 
+#include "util.h"
 #include "uvhost.h"
 #include "client.h"
 #include "sh_mem.h"
@@ -25,7 +26,7 @@
 #define ALIGN(v, b) (((long int)v + (long int)b -1) & (-(long int)b))
 
 
-static int inline
+int
 uvhost_alloc_VhostClient(VhostClient **vhost_client) {
 
     if (!vhost_client) {
@@ -36,7 +37,7 @@ uvhost_alloc_VhostClient(VhostClient **vhost_client) {
      return vhost_client? E_UVHOST_OK: E_UVHOST_ERR_ALLOC;
 }
 
-int inline
+int
 uvhost_init_VhostClient(VhostClient *vhost_client) {
 
     VhostClient *const vhost_cl = vhost_client;
@@ -45,8 +46,8 @@ uvhost_init_VhostClient(VhostClient *vhost_client) {
         return E_UVHOST_ERR_FARG;
     }
 
-    vhost_cl->mem.nregions = VHOST_CLIENT_MAX_VRINGS;
-    vhost_cl->virtq_num = VHOST_CLIENT_MAX_VRINGS;
+    vhost_cl->mem.nregions = VHOST_CLIENT_VRING_MAX_VRINGS;
+    vhost_cl->virtq_num = VHOST_CLIENT_VRING_MAX_VRINGS;
     vhost_cl->page_size = VHOST_CLIENT_PAGE_SIZE;
 
     return E_UVHOST_OK;
@@ -59,6 +60,7 @@ uvhost_set_mem_VhostClient(VhostClient *vhost_client) {
     void *sh_mem_addr = NULL;
     char fd_path_buff[PATH_MAX] = {'\0'};
     VhostClient *const vhost_cl = vhost_client;
+    VIRT_QUEUE_H_RET_VAL ret_val = E_VIRT_QUEUE_OK;
 
     if (!vhost_client) {
         return E_UVHOST_ERR_FARG;
@@ -66,10 +68,10 @@ uvhost_set_mem_VhostClient(VhostClient *vhost_client) {
 
     for (size_t i = 0; i < vhost_cl->mem.nregions; i++) {
 
-        snprintf(fd_path_buff, PATH_MAX, "%s%d", vhost_cl->client.sh_mem_path, i);
+        snprintf(fd_path_buff, PATH_MAX, "%s%d", vhost_cl->client.sh_mem_path, (int)i);
 
-        ret = sh_mem_init_fd(&fd_path_buff,
-                &(vhost_cl->client.sh_mem_fds + i));
+        ret = sh_mem_init_fd(fd_path_buff,
+                (vhost_cl->client.sh_mem_fds + i));
         if (ret != E_SH_MEM_OK) {
             return E_UVHOST_ERR_UNK;
         }
@@ -88,8 +90,11 @@ uvhost_set_mem_VhostClient(VhostClient *vhost_client) {
         memset(fd_path_buff, 0, sizeof(char) * PATH_MAX);
     }
 
-    virt_queue_map_all_mem_region_virtq(vhost_cl->sh_mem_virtq_table,
-            VHOST_CLIENT_MAX_VRINGS, &vhost_client->mem);
+    ret_val = virt_queue_map_all_mem_reqion_virtq(vhost_cl->sh_mem_virtq_table,
+           &vhost_client->mem, VHOST_CLIENT_VRING_MAX_VRINGS);
+    if (ret_val != E_VIRT_QUEUE_OK) {
+        return ret_val;
+    }
     return E_UVHOST_OK;
 }
 
@@ -112,7 +117,7 @@ uvhost_create_vhost_client(void) {
         //boze na nebesiach
     }
 
-    client_ret_val = client_init_Client(&vhost_client->client, "/var/run/vrouter/vm1");
+    client_ret_val = client_init_Client(&vhost_client->client, "/var/run/vrouter/uvh_vif_vm1");
     if (client_ret_val != E_CLIENT_OK) {
         return NULL;
     }
@@ -136,8 +141,8 @@ uvhost_run_vhost_client(void) {
         return uvhost_ret_val;
         //boze na nebesiach
     }
-
-    utils_add_fd_to_fd_rw_t(&(vhost_client->client.fd_rw_list), FD_TYPE_READ, vhost_client->sh_mem_virtq_table[2]->kickfd);
+    //todo This will be problem -> probably needs rewrite structure
+  //  utils_add_fd_to_fd_rw_t(&(vhost_client->client.fd_rw_list), FD_TYPE_READ, vhost_client->sh_mem_virtq_table[VHOST_CLIENT_VRING_IDX_RX]->kickfd);
 
 
     uvhost_ret_val = uvhost_init_control_communication(vhost_client);
@@ -155,7 +160,7 @@ int
 uvhost_init_control_communication(VhostClient *vhost_client) {
 
     VhostClient *const l_vhost_client = vhost_client;
-    CLIENT_H_RET_VAL ret_val = E_CLIENT_OK;
+    UVHOST_H_RET_VAL ret_val = E_UVHOST_OK;
 
     if (!vhost_client) {
         return E_UVHOST_ERR_FARG;
@@ -169,7 +174,7 @@ uvhost_init_control_communication(VhostClient *vhost_client) {
     return E_UVHOST_OK;
 }
 
-static int
+int
 uvhost_vhost_init_control_msgs(VhostClient *vhost_client) {
 
     Client *l_client = NULL ;

@@ -10,12 +10,12 @@
 #include "client.h"
 
 int
-virt_queue_map_all_mem_reqion_virtq(uvhost_virtq **virtq, VhostUserMemory *mem,
+virt_queue_map_all_mem_reqion_virtq(struct uvhost_virtq **virtq, VhostUserMemory *mem,
                                      size_t virtq_number) {
 
     VIRT_QUEUE_H_RET_VAL ret_val = E_VIRT_QUEUE_OK;
 
-    if (!virtq || !*virtq) {
+    if (!virtq) {
         return E_VIRT_QUEUE_ERR_FARG;
     }
 
@@ -32,7 +32,7 @@ virt_queue_map_all_mem_reqion_virtq(uvhost_virtq **virtq, VhostUserMemory *mem,
 }
 
 int
-virt_queue_map_mem_reqion_virtq(uvhost_virtq **virtq, uint64_t guest_phys_addr) {
+virt_queue_map_mem_reqion_virtq(struct uvhost_virtq **virtq, uint64_t guest_phys_addr) {
 
     if (!virtq) {
         return E_VIRT_QUEUE_ERR_FARG;
@@ -48,12 +48,12 @@ virt_queue_map_mem_reqion_virtq(uvhost_virtq **virtq, uint64_t guest_phys_addr) 
 }
 
 int
-virt_queue_map_vring(uvhost_virtq **virtq, void *base_virtq_addr) {
+virt_queue_map_vring(struct uvhost_virtq **virtq, void *base_virtq_addr) {
 
     uvhost_virtq *const virtq_map = (uvhost_virtq *)base_virtq_addr;
     uintptr_t desc_addr = (uintptr_t)((uintptr_t *)virtq_map + sizeof(uvhost_virtq));
 
-    if (!virtq || !*virtq || base_virtq_addr) {
+    if (!virtq || !base_virtq_addr) {
 
         return E_VIRT_QUEUE_ERR_FARG;
     }
@@ -72,7 +72,7 @@ virt_queue_map_vring(uvhost_virtq **virtq, void *base_virtq_addr) {
     virtq_map->used.idx = 0;
     virtq_map->desc[VIRTQ_DESC_MAX_SIZE - 1].next = VIRTQ_IDX_NONE;
 
-    *virtq = virtq_map;
+    *virtq = (struct uvhost_virtq *)virtq_map;
 
     return E_VIRT_QUEUE_OK;
 }

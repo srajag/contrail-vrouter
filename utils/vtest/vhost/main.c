@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "main.h"
+#include "uvhost.h"
 
 int main (int argc, char **argv) {
 
@@ -9,5 +9,7 @@ int main (int argc, char **argv) {
 // send or receive
 //
 
-    return E_OK;
+    uvhost_run_vhost_client();
+
+    return EXIT_SUCCESS;
 }

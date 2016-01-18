@@ -8,10 +8,11 @@
 #define CLIENT_H
 
 #include <limits.h>
+#include <unistd.h>
 #include <sys/socket.h>
 
-#include "uvhost.h"
 #include "util.h"
+#include "uvhost.h"
 
 /* FDs First initialization value
  *
@@ -21,26 +22,6 @@
  */
 #define CLIENT_INIT_FD_VAL (-2)
 #define QEMU_PROT_VERSION (0x01)
-
-typedef enum client_status {
-    CREATED = 1,
-    INITIALIZED,
-    MEM_INITIALIZED,
-    DEVICE_CONNECTED,
-    CLEANING,
-    CLEAR,
-    UNKNOWN_ERROR,
-    LAST
-} client_status;
-
-typedef struct {
-    char socket_path[PATH_MAX];
-    int socket;
-    char shm_mem_path[PATH_MAX];
-    int sh_mem_fds[VHOST_MEMORY_MAX_NREGIONS];
-    client_status status;
-    fd_rw_t fd_rw_list;
-} Client;
 
 typedef enum {
     E_CLIENT_OK = EXIT_SUCCESS,

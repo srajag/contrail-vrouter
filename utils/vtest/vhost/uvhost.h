@@ -5,24 +5,28 @@
  * Copyright (c) 2015 Juniper Networks, Inc. All rights reserved.
  */
 
-#ifndef __QEMU_UVHOST_H__
-#define __QEMU_UVHOST_H__
+#ifndef QEMU_UVHOST_H
+#define QEMU_UVHOST_H
 
 /* TODO: We can import structures from linux/vhost */
 
 #include <stdlib.h>
 #include <linux/vhost.h>
+#include <stdint.h>
 
-#include "client.h"
-#include "virt_queue.h"
-#include "virtio_hdr.h"
-
-#define VHOST_USER_HDR_SIZE sizeof(struct virtio_net_hdr)
-#define VHOST_MEMORY_MAX_NREGIONS    8
-#define VHOST_CLIENT_MAX_VRINGS      2
-
+//#include "client.h"
+#include "util.h"
 
 #define uvhost_safe_free(ptr) uvhost_safer_free((void**)&(ptr))
+
+#define VHOST_USER_HDR_SIZE (sizeof(struct virtio_net_hdr))
+#define VHOST_MEMORY_MAX_NREGIONS    8
+typedef enum {
+    VHOST_CLIENT_VRING_IDX_RX = 0,
+    VHOST_CLIENT_VRING_IDX_TX = 1,
+    VHOST_CLIENT_VRING_MAX_VRINGS
+}VHOST_CLIENT_VRING;
+
 
 typedef enum VhostUserRequest {
     VHOST_USER_NONE = 0,
@@ -61,8 +65,8 @@ typedef struct VhostClient {
     size_t page_size;
     size_t virtq_num;
     /* Map RX/TX virtq */
-    struct uvhost_virtq *sh_mem_virtq_table[VHOST_CLIENT_MAX_VRINGS];
-    struct ProcessHandler handler;
+    struct uvhost_virtq *sh_mem_virtq_table[VHOST_CLIENT_VRING_MAX_VRINGS];
+  //  struct ProcessHandler handler;
     uint16_t features;
     Client client;
 } VhostClient;
@@ -90,7 +94,6 @@ typedef struct VhostUserMsg {
  */
 #define VHOST_USER_HSIZE (offsetof(VhostUserMsg, u64))
 
-
 typedef enum {
     E_UVHOST_OK = EXIT_SUCCESS,
     E_UVHOST_ERR_ALLOC,
@@ -99,13 +102,13 @@ typedef enum {
     E_UVHOST_ERR,
     E_UVHOST_LAST
 } UVHOST_H_RET_VAL;
-
+int uvhost_init_VhostClient(VhostClient *vhost_client);
+int uvhost_run_vhost_client(void);
+VhostClient* uvhost_create_vhost_client(void);
 int uvhost_init_control_communication(VhostClient *vhost_client);
 void uvhost_safer_free(void **mem);
-int inline uvhost_set_mem_VhostClient(VhostClient *vhost_client);
-static int inline uvhost_alloc_VhostClient(VhostClient **vhost_client);
-
-static int uvhost_vhost_init_control_msgs(VhostClient *vhost_client);
+int uvhost_set_mem_VhostClient(VhostClient *vhost_client);
+int uvhost_vhost_init_control_msgs(VhostClient *vhost_client);
 int uvhost_init_control_communication(VhostClient *vhost_client);
 
 #endif

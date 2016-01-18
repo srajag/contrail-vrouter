@@ -34,29 +34,7 @@ typedef enum virtq_desc_flags {
 
 } virtq_desc_flags;
 
-typedef enum virtq_used_flags {
-    /* The device uses this in used->flags to advise the driver: don’t kick me
-     * when you add a buffer.  It’s unreliable, so it’s simply an
-     * optimization. */
-    VIRTQ_USED_F_NO_NOTIFY = 1,
-
-    /* The driver uses this in avail->flags to advise the device: don’t
-     * interrupt me when you consume a buffer.  It’s unreliable, so it’s
-     * simply an optimization.  */
-    VIRTQ_AVAIL_F_NO_INTERRUPT = 1,
-
-    /* Support for indirect descriptors */
-    VIRTIO_F_INDIRECT_DESC = 28,
-
-    /* Support for avail_event and used_event fields */
-    VIRTIO_F_EVENT_IDX = 29,
-
-    /* Arbitrary descriptor layouts. */
-    VIRTIO_F_ANY_LAYOUT = 27
-
-} virtq_used_flags;
-
-typedef virtq_used_flags virtq_avail_flags;
+//typedef virtq_used_flags virtq_avail_flags;
 
 
 /* Virtqueue descriptors: 16 bytes.
@@ -117,15 +95,6 @@ typedef struct {
 
 } virtq_control;
 
-typedef int (*AvailHandler)(void* context, void* buf, size_t size);
-typedef int (*MapHandler)(void* context, uint64_t addr);
-
-struct ProcessHandler {
-    void* context;
-    AvailHandler avail_handler;
-    MapHandler  map_handler;
-};
-
 struct set_host_virtq {
     struct vhost_vring_state num;
     struct vhost_vring_state base;
@@ -144,13 +113,14 @@ typedef enum {
     E_VIRT_QUEUE_LAST
 } VIRT_QUEUE_H_RET_VAL;
 
-int virt_queue_map_vring(uvhost_virtq **virtq, void *base_virtq);
-int virt_queue_map_mem_reqion_virtq(uvhost_virtq **virtq, uint64_t guest_phys_addr);
-int virt_queue_map_all_mem_reqion_virtq(uvhost_virtq **virtq, VhostUserMemory *mem,
-                                     size_t virtq_number);
 
-int virtq_queue_set_host_vring(Client *client, struct set_host_virtq set_virtq);
-int virtq_set_host_virtq_table(uvhost_virtq **virtq, size_t virtq_table_size, Client *client);
+int virt_queue_map_all_mem_reqion_virtq(struct uvhost_virtq **virtq, VhostUserMemory *mem,
+                                        size_t virtq_number);
+int virt_queue_map_vring(struct uvhost_virtq **virtq, void *base_virtq);
+int virt_queue_map_mem_reqion_virtq(struct uvhost_virtq **virtq, uint64_t guest_phys_addr);
+
+//int virtq_queue_set_host_vring(Client *client, struct set_host_virtq set_virtq);
+//int virtq_set_host_virtq_table(uvhost_virtq **virtq, size_t virtq_table_size, Client *client);
 
 static inline int virtq_need_event(uint16_t event_idx, uint16_t new_idx, uint16_t old_idx)
 {
