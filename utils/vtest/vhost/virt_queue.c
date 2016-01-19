@@ -49,7 +49,6 @@ virt_queue_map_mem_reqion_virtq(struct uvhost_virtq **virtq, uint64_t guest_phys
 
 int
 virt_queue_map_vring(struct uvhost_virtq **virtq, void *base_virtq_addr) {
-    printf("Ej boha %p \n",base_virtq_addr);
 
     struct uvhost_virtq *virtq_map = (struct uvhost_virtq *)base_virtq_addr;
     uintptr_t desc_addr = (uintptr_t)((uintptr_t *)virtq_map + sizeof(struct uvhost_virtq));

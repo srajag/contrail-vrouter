@@ -4,7 +4,6 @@
  * Copyright (c) 2015 Juniper Networks, Inc. All rights reserved.
  */
 
-/*TODO DEALLOCATION */
 /*TODO Warning/error msgs */
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +35,15 @@ uvhost_alloc_VhostClient(VhostClient **vhost_client) {
     *vhost_client = (VhostClient *) calloc(1, sizeof(VhostClient));
      return vhost_client? E_UVHOST_OK: E_UVHOST_ERR_ALLOC;
 }
+
+int
+uvhost_dealloc_VhostClient(VhostClient *vhost_client) {
+
+    uvhost_safe_free(vhost_client);
+
+    return E_UVHOST_OK;
+
+};
 
 int
 uvhost_init_VhostClient(VhostClient *vhost_client) {
@@ -87,7 +95,6 @@ uvhost_set_mem_VhostClient(VhostClient *vhost_client) {
         vhost_cl->mem.regions[i].memory_size = vhost_cl->page_size;
         vhost_cl->mem.regions[i].mmap_offset = 0;
 
-        printf("Ej boha %lu \n", vhost_cl->mem.regions[i].guest_phys_addr);
         memset(fd_path_buff, 0, sizeof(char) * PATH_MAX);
     }
 
@@ -126,6 +133,55 @@ uvhost_create_vhost_client(void) {
     return vhost_client;
 }
 
+
+int
+uvhost_deset_sh_mem_VhostClient(VhostClient *vhost_client) {
+
+    char fd_path_buff[PATH_MAX] = {'\0'};
+    VhostClient *const vhost_cl = vhost_client;
+    int ret = 0;
+
+    if (!vhost_client) {
+        return E_UVHOST_ERR_FARG;
+    }
+
+    for (size_t i = 0; i < vhost_client->mem.nregions; i++) {
+        snprintf(fd_path_buff, PATH_MAX, "%s%d", vhost_cl->client.sh_mem_path, (int)i);
+
+        ret = sh_mem_unmmap((void *)vhost_cl->mem.regions[i].guest_phys_addr,
+                vhost_cl->mem.regions[i].memory_size);
+        ret = sh_mem_unlink(fd_path_buff);
+
+        memset(fd_path_buff, 0, sizeof(char) * PATH_MAX);
+    }
+
+    return E_UVHOST_OK;
+}
+
+
+
+int
+uvhost_delete_VhostClient(VhostClient *vhost_client) {
+
+    UVHOST_H_RET_VAL uvhost_ret_val = E_UVHOST_OK;
+    CLIENT_H_RET_VAL client_ret_val = E_CLIENT_OK;
+
+    VhostClient *const vhost_cl = vhost_client;
+
+    if (!vhost_client) {
+        return E_UVHOST_ERR_FARG;
+    }
+
+    client_ret_val = client_disconnect_socket(&vhost_cl->client);
+    client_ret_val = client_close_fds(&vhost_cl->client);
+
+    uvhost_deset_sh_mem_VhostClient(vhost_cl);
+    uvhost_ret_val = uvhost_dealloc_VhostClient(vhost_cl);
+
+
+    return uvhost_ret_val;
+}
+
 int
 uvhost_run_vhost_client(void) {
 
@@ -152,6 +208,7 @@ uvhost_run_vhost_client(void) {
         //boze na nebesiach
     }
 
+    uvhost_delete_VhostClient(vhost_client);
 
     return E_UVHOST_OK;
 }

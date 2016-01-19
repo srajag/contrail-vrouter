@@ -142,6 +142,21 @@ client_disconnect_socket(Client *client) {
 }
 
 int
+client_close_fds(Client *client) {
+
+    if (!client) {
+        return E_CLIENT_ERR_FARG;
+    }
+
+    for (size_t i = 0; i < VHOST_MEMORY_MAX_NREGIONS; i++) {
+        if (client->sh_mem_fds[i] >= 0 ) {
+            close(client->sh_mem_fds[i]);
+        }
+    }
+    return E_CLIENT_OK;
+}
+
+int
 client_vhost_ioctl(Client *client, VhostUserRequest request, void *req_ptr) {
 
     Client *const cl = client;

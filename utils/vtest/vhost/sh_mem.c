@@ -28,8 +28,7 @@ sh_mem_init_fd(const char* file_path, int *fd) {
     * Access permissions for shared memory is set to:
     *   rw-|---|---|
     */
-   // ret_fd = shm_open(file_path, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
-    ret_fd = shm_open(file_path, O_RDWR | O_CREAT , 0666 );
+    ret_fd = shm_open(file_path, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
     if (ret_fd < 0 ) {
         return E_SH_MEM_ERR_SHM_OPEN;
     } else {
@@ -48,6 +47,7 @@ sh_mem_unlink(const char *path) {
     if (!path) {
         return E_SH_MEM_ERR_FARG;
     }
+
     ret = shm_unlink(path);
     if (ret != 0 )
         return E_SH_MEM_ERR_SHM_UNLINK;
@@ -81,6 +81,8 @@ sh_mem_unmmap(void *mem_ptr, size_t length) {
     ret = munmap(mem_ptr, length);
     if (ret != 0 )
         return E_SH_MEM_ERR_SHM_UNMAP;
+
+    mem_ptr = NULL;
 
     return E_SH_MEM_OK;
 }

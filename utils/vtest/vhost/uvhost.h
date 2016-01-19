@@ -102,6 +102,8 @@ typedef enum {
     E_UVHOST_ERR,
     E_UVHOST_LAST
 } UVHOST_H_RET_VAL;
+
+int uvhost_delete_VhostClient(VhostClient *vhost_client);
 int uvhost_init_VhostClient(VhostClient *vhost_client);
 int uvhost_run_vhost_client(void);
 VhostClient* uvhost_create_vhost_client(void);

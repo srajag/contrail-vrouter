@@ -38,6 +38,7 @@ typedef enum {
     E_CLIENT_LAST
 } CLIENT_H_RET_VAL;
 
+int client_close_fds(Client *client);
 int client_disconnect_socket(Client *client);
 int client_connect_socket(Client *client);
 int client_init_socket(Client *client);
