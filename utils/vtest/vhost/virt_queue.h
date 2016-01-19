@@ -71,7 +71,7 @@ struct virtq_used {
     struct virtq_used_elem ring[VIRTQ_DESC_MAX_SIZE];
 };
 
-typedef struct {
+typedef struct uvhost_virtq {
     int kickfd;
     int callfd;
     struct virtq_desc desc[VIRTQ_DESC_MAX_SIZE] __attribute__((aligned(4)));
@@ -114,7 +114,7 @@ typedef enum {
 } VIRT_QUEUE_H_RET_VAL;
 
 
-int virt_queue_map_all_mem_reqion_virtq(struct uvhost_virtq **virtq, VhostUserMemory *mem,
+int virt_queue_map_all_mem_reqion_virtq(struct uvhost_virtq *virtq[], VhostUserMemory *mem,
                                         size_t virtq_number);
 int virt_queue_map_vring(struct uvhost_virtq **virtq, void *base_virtq);
 int virt_queue_map_mem_reqion_virtq(struct uvhost_virtq **virtq, uint64_t guest_phys_addr);

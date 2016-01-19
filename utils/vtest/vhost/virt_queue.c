@@ -4,24 +4,24 @@
 
 #include <string.h>
 #include <sys/eventfd.h>
+#include <stdio.h>
 
 #include "virt_queue.h"
 #include "uvhost.h"
 #include "client.h"
 
 int
-virt_queue_map_all_mem_reqion_virtq(struct uvhost_virtq **virtq, VhostUserMemory *mem,
+virt_queue_map_all_mem_reqion_virtq(struct uvhost_virtq *virtq[], VhostUserMemory *mem,
                                      size_t virtq_number) {
 
     VIRT_QUEUE_H_RET_VAL ret_val = E_VIRT_QUEUE_OK;
 
     if (!virtq) {
         return E_VIRT_QUEUE_ERR_FARG;
-    }
+    }    for (size_t i = 0; i < virtq_number; i++) {
 
-    for (size_t i = 0; i < virtq_number; i++) {
 
-        ret_val = (virt_queue_map_mem_reqion_virtq((virtq + i),
+        ret_val = (virt_queue_map_mem_reqion_virtq((&(virtq[i])),
                     mem->regions[i].guest_phys_addr));
         if (ret_val != E_VIRT_QUEUE_OK){
             return ret_val;
@@ -49,9 +49,10 @@ virt_queue_map_mem_reqion_virtq(struct uvhost_virtq **virtq, uint64_t guest_phys
 
 int
 virt_queue_map_vring(struct uvhost_virtq **virtq, void *base_virtq_addr) {
+    printf("Ej boha %p \n",base_virtq_addr);
 
-    uvhost_virtq *const virtq_map = (uvhost_virtq *)base_virtq_addr;
-    uintptr_t desc_addr = (uintptr_t)((uintptr_t *)virtq_map + sizeof(uvhost_virtq));
+    struct uvhost_virtq *virtq_map = (struct uvhost_virtq *)base_virtq_addr;
+    uintptr_t desc_addr = (uintptr_t)((uintptr_t *)virtq_map + sizeof(struct uvhost_virtq));
 
     if (!virtq || !base_virtq_addr) {
 
@@ -72,7 +73,7 @@ virt_queue_map_vring(struct uvhost_virtq **virtq, void *base_virtq_addr) {
     virtq_map->used.idx = 0;
     virtq_map->desc[VIRTQ_DESC_MAX_SIZE - 1].next = VIRTQ_IDX_NONE;
 
-    *virtq = (struct uvhost_virtq *)virtq_map;
+    *virtq = virtq_map;
 
     return E_VIRT_QUEUE_OK;
 }

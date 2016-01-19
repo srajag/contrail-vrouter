@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <sys/mman.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -27,12 +28,14 @@ sh_mem_init_fd(const char* file_path, int *fd) {
     * Access permissions for shared memory is set to:
     *   rw-|---|---|
     */
-    ret_fd = shm_open(file_path, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
+   // ret_fd = shm_open(file_path, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
+    ret_fd = shm_open(file_path, O_RDWR | O_CREAT , 0666 );
     if (ret_fd < 0 ) {
         return E_SH_MEM_ERR_SHM_OPEN;
     } else {
         *fd = ret_fd;
     }
+
 
     return E_SH_MEM_OK;
 }
@@ -54,6 +57,10 @@ sh_mem_unlink(const char *path) {
 
 void *
 sh_mem_mmap(int fd, size_t length) {
+
+    if (ftruncate(fd, length) != 0) {
+        return NULL;
+    }
 
     void *mmaped_mem = mmap(0, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 

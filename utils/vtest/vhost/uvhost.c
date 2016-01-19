@@ -22,7 +22,7 @@
 
 /* Copied from reference app, I don't know why we must align to 1MB :-( */
 #define VHOST_CLIENT_PAGE_SIZE \
-        ALIGN(sizeof(uvhost_virtq) + VIRTQ_DESC_BUFF_SIZE * VIRTQ_DESC_MAX_SIZE, 1024 * 1024)
+        ALIGN(sizeof(struct uvhost_virtq) + VIRTQ_DESC_BUFF_SIZE * VIRTQ_DESC_MAX_SIZE, 1024 * 1024)
 #define ALIGN(v, b) (((long int)v + (long int)b -1) & (-(long int)b))
 
 
@@ -87,6 +87,7 @@ uvhost_set_mem_VhostClient(VhostClient *vhost_client) {
         vhost_cl->mem.regions[i].memory_size = vhost_cl->page_size;
         vhost_cl->mem.regions[i].mmap_offset = 0;
 
+        printf("Ej boha %lu \n", vhost_cl->mem.regions[i].guest_phys_addr);
         memset(fd_path_buff, 0, sizeof(char) * PATH_MAX);
     }
 

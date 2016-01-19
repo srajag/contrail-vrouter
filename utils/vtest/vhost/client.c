@@ -5,6 +5,7 @@
 */
 
 #include <errno.h>
+#include <libgen.h>
 #include <linux/vhost.h>
 #include <limits.h>
 #include <string.h>
@@ -56,7 +57,7 @@ client_init_Client(Client *client, const char *path) {
         return E_CLIENT_ERR;
     }
 
-    memset(&client->sh_mem_path,
+    memset(&client->sh_mem_fds,
            -2, sizeof(int) * VHOST_MEMORY_MAX_NREGIONS);
 
     return E_CLIENT_OK;
@@ -66,11 +67,17 @@ client_init_Client(Client *client, const char *path) {
 int
 client_init_path(Client *client, const char *path) {
 
+    char *basename_path = NULL;
+
     if (!client || !path || strlen(path) == 0) {
         return E_CLIENT_ERR_FARG;
     }
+   basename_path = basename((char *)path);
 
-   strncpy(client->socket_path, path, PATH_MAX);
+   strncpy(client->socket_path, path, strlen(path));
+
+   strncpy(client->sh_mem_path, basename_path, strlen(basename_path));
+
 
    return E_CLIENT_OK;
 }
@@ -245,9 +252,9 @@ client_vhost_ioctl_set_send_msg(Client *client, VhostUserRequest request, void *
             message->size = sizeof(((VhostUserMemory*)0)->padding);
             message->size += sizeof(((VhostUserMemory*)0)->nregions);
 
-            for (*l_fd_num = 0; *l_fd_num < message->memory.nregions; fd_num++) {
+            for (*l_fd_num = 0; *l_fd_num < message->memory.nregions; (*l_fd_num)++) {
                 fds[*l_fd_num] = client->sh_mem_fds[*l_fd_num];
-                message->size = sizeof(VhostUserMemoryRegion);
+                message->size = message->size + sizeof(VhostUserMemoryRegion);
             }
             break;
 
@@ -344,13 +351,13 @@ client_vhost_ioctl_send_fds(VhostUserMsg *msg, int fd, int *fds, size_t fd_num) 
         msgh.msg_name = NULL;
         msgh.msg_namelen = 0;
         msgh.msg_control = controlbuf;
+        msgh.msg_controllen = sizeof(controlbuf);
 
         cmsgh = CMSG_FIRSTHDR(&msgh);
         cmsgh->cmsg_len = CMSG_LEN(sizeof(int) * fd_num);
         cmsgh->cmsg_level = SOL_SOCKET;
         cmsgh->cmsg_type = SCM_RIGHTS;
 
-        msgh.msg_controllen = cmsgh->cmsg_len;
 
         memcpy(CMSG_DATA(cmsgh), fds, sizeof(int) * fd_num);
 
