@@ -8,14 +8,19 @@
 #include <sys/time.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <limits.h>
-
+#include <linux/un.h>
 
 #define VHOST_USER_HDR_SIZE (sizeof(struct virtio_net_hdr))
 #define VHOST_MEMORY_MAX_NREGIONS    8
 
+#define ALIGN(v,b)   (((long int)v + (long int)b - 1)&(-(long int)b))
+
+
 #define FD_LIST_SIZE (16)
-typedef int (*fd_handler)(int fd, void *arg);
+
+struct fd_rw_element;
+
+typedef int (*fd_handler)(struct fd_rw_element *arg);
 
 typedef enum {
     FD_TYPE_READ = 0,
@@ -23,9 +28,9 @@ typedef enum {
     FD_TYPE_MAX
 } fd_type;
 
-typedef struct {
+typedef struct fd_rw_element{
     int fd;
-    void *fd_arg;
+    void *context;
     fd_handler fd_handler;
 } fd_rw_element;
 
@@ -46,6 +51,13 @@ struct ProcessHandler {
     MapHandler  map_handler;
 };
 
+typedef int (*PollHandler)(void *context);
+
+struct AppHandler {
+    void *context;
+    PollHandler poll_handler;
+};
+
 typedef enum client_status {
     CREATED = 1,
     INITIALIZED,
@@ -58,14 +70,14 @@ typedef enum client_status {
 } client_status;
 
 typedef struct {
-    char socket_path[PATH_MAX];
+    char socket_path[UNIX_PATH_MAX];
     int socket;
-    char sh_mem_path[PATH_MAX];
+    char sh_mem_path[UNIX_PATH_MAX];
     int sh_mem_fds[VHOST_MEMORY_MAX_NREGIONS];
     client_status status;
     fd_rw_t fd_rw_list;
+    struct AppHandler vhost_net_app_handler;
 } Client;
-
 
 typedef enum {
     E_UTILS_OK = EXIT_SUCCESS,

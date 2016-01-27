@@ -15,7 +15,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/un.h>
+#include <linux/un.h>
 
 
 #include "client.h"
@@ -69,7 +69,7 @@ client_init_path(Client *client, const char *path) {
 
     char *basename_path = NULL;
 
-    if (!client || !path || strlen(path) == 0) {
+    if (!client || !path || strlen(path) == 0 || strlen(path) > (UNIX_PATH_MAX - 1)) {
         return E_CLIENT_ERR_FARG;
     }
    basename_path = basename((char *)path);
@@ -134,6 +134,7 @@ client_disconnect_socket(Client *client) {
     if (!client) {
         return E_CLIENT_ERR_FARG;
     }
+
     if (!(client->socket < 0)) {
         close(client->socket);
         client->socket = -2;
@@ -151,6 +152,7 @@ client_close_fds(Client *client) {
     for (size_t i = 0; i < VHOST_MEMORY_MAX_NREGIONS; i++) {
         if (client->sh_mem_fds[i] >= 0 ) {
             close(client->sh_mem_fds[i]);
+            client->sh_mem_fds[i] = -2;
         }
     }
     return E_CLIENT_OK;
@@ -239,6 +241,7 @@ client_vhost_ioctl_set_send_msg(Client *client, VhostUserRequest request, void *
         return E_CLIENT_ERR_FARG;
     }
 
+
     switch (request) {
 
         case VHOST_USER_NONE:
@@ -295,7 +298,7 @@ client_vhost_ioctl_set_send_msg(Client *client, VhostUserRequest request, void *
             message->u64 = file->index;
             message->size = sizeof(((VhostUserMsg*)0)->u64);
             if (file->fd > 0 ) {
-                client->sh_mem_fds[(*l_fd_num)++] = file->fd;
+                fds[(*l_fd_num)++] = file->fd;
             }
             break;
 

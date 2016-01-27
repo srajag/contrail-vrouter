@@ -14,7 +14,6 @@
 #include <linux/vhost.h>
 #include <stdint.h>
 
-//#include "client.h"
 #include "util.h"
 
 #define uvhost_safe_free(ptr) uvhost_safer_free((void**)&(ptr))
@@ -66,7 +65,7 @@ typedef struct VhostClient {
     size_t virtq_num;
     /* Map RX/TX virtq */
     struct uvhost_virtq *sh_mem_virtq_table[VHOST_CLIENT_VRING_MAX_VRINGS];
-  //  struct ProcessHandler handler;
+    struct virtq_control *virtq_control[VHOST_CLIENT_VRING_MAX_VRINGS];
     uint16_t features;
     Client client;
 } VhostClient;
@@ -103,6 +102,10 @@ typedef enum {
     E_UVHOST_LAST
 } UVHOST_H_RET_VAL;
 
+int uvhost_poll_client_tx(void *context);
+
+
+int uvhost_kick_client(struct fd_rw_element *fd_rw_element);
 int uvhost_delete_VhostClient(VhostClient *vhost_client);
 int uvhost_init_VhostClient(VhostClient *vhost_client);
 int uvhost_run_vhost_client(void);

@@ -2,11 +2,11 @@
 #ifndef VIRT_HDR_H
 #define VIRT_HDR_H
 
-#include <stdint.h>
 
 struct virtio_net_hdr {
 
 #define VIRTIO_NET_HDR_F_NEEDS_CSUM    1
+#define VIRTIO_NED_HDR_F_DATA_VALID    2
     uint8_t flags;
 #define VIRTIO_NET_HDR_GSO_NONE        0
 #define VIRTIO_NET_HDR_GSO_TCPV4       1
@@ -18,7 +18,6 @@ struct virtio_net_hdr {
     uint16_t gso_size;
     uint16_t csum_start;
     uint16_t csum_offset;
-    uint16_t num_buffers;
 };
 #endif
 

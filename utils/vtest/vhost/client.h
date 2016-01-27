@@ -7,7 +7,6 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-#include <limits.h>
 #include <unistd.h>
 #include <sys/socket.h>
 

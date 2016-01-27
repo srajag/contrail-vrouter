@@ -21,6 +21,7 @@
 #define VIRTQ_DESC_BUFF_SIZE (ETH_MAX_MTU + sizeof(struct virtio_net_hdr))
 #define ETH_MAX_MTU (1514)
 
+
 typedef enum virtq_desc_flags {
 
     /* This marks a buffer as continuing via the next field. */
@@ -34,16 +35,14 @@ typedef enum virtq_desc_flags {
 
 } virtq_desc_flags;
 
-//typedef virtq_used_flags virtq_avail_flags;
-
 
 /* Virtqueue descriptors: 16 bytes.
  *  * These can chain together via "next". */
 struct virtq_desc {
     /* Address (guest-physical). */
-    uint16_t addr;
+    uint64_t addr;
     /* Length. */
-    uint16_t len;
+    uint32_t len;
     /* The flags as indicated above. */
     uint16_t flags;
     /* We chain unused descriptors via this, too */
@@ -86,7 +85,7 @@ struct virtq {
     struct virtq_used *used;
 };
 
-typedef struct {
+typedef struct virtq_control {
     struct virtq virtq;
     uint16_t last_used_idx;
     uint16_t last_avail_idx;
@@ -113,14 +112,21 @@ typedef enum {
     E_VIRT_QUEUE_LAST
 } VIRT_QUEUE_H_RET_VAL;
 
+int virt_queue_kick(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id);
+int virt_queue_put_vring(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id, void *src_buf, size_t src_buf_len);
+int virt_queue_process_used_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id);
+int virt_queue_free_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id, uint32_t desc_idx);
+int virt_queue_process_desc_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id, uint32_t avail_idx);
+int virt_queue_process_avail_virt_queue(struct virtq_control **virtq_control ,VHOST_CLIENT_VRING vq_id);
+int virt_queue_map_uvhost_virtq_2_virtq_control(VhostClient *vhost_client);
 
-int virt_queue_map_all_mem_reqion_virtq(struct uvhost_virtq *virtq[], VhostUserMemory *mem,
+int virt_queue_map_all_mem_reqion_virtq(struct uvhost_virtq **virtq, VhostUserMemory *mem,
                                         size_t virtq_number);
 int virt_queue_map_vring(struct uvhost_virtq **virtq, void *base_virtq);
 int virt_queue_map_mem_reqion_virtq(struct uvhost_virtq **virtq, uint64_t guest_phys_addr);
 
-//int virtq_queue_set_host_vring(Client *client, struct set_host_virtq set_virtq);
-//int virtq_set_host_virtq_table(uvhost_virtq **virtq, size_t virtq_table_size, Client *client);
+//int virt_queue_set_host_vring(Client *client, struct set_host_virtq set_virtq);
+int virt_queue_set_host_virtq_table(uvhost_virtq **virtq, size_t virtq_table_size, Client *client);
 
 static inline int virtq_need_event(uint16_t event_idx, uint16_t new_idx, uint16_t old_idx)
 {
