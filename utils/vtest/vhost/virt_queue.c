@@ -95,7 +95,7 @@ virt_queue_map_vring(struct uvhost_virtq **virtq, void *base_virtq_addr) {
     for (size_t i = 0; i < VIRTQ_DESC_MAX_SIZE; i++) {
 
        desc_addr = ALIGN(desc_addr, 8);
-       virtq_map->desc[i].len = 1526;//VIRTQ_DESC_BUFF_SIZE;
+       virtq_map->desc[i].len = VIRTQ_DESC_BUFF_SIZE;
        virtq_map->desc[i].flags = VIRTIO_DESC_F_WRITE;
        virtq_map->desc[i].next = i + 1;
        virtq_map->desc[i].addr = desc_addr;
@@ -246,6 +246,8 @@ virt_queue_put_vring(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq
     if (!virtq_control) {
         return E_VIRT_QUEUE_ERR_FARG;
     }
+
+
     used = virtq_control[vq_id]->virtq.used;
     avail = virtq_control[vq_id]->virtq.avail;
     desc = virtq_control[vq_id]->virtq.desc;
@@ -256,7 +258,11 @@ virt_queue_put_vring(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq
     if (src_buf_len > desc[last_avail_idx].len) {
         return E_VIRT_QUEUE_ERR_FARG;
     }
-
+   if ( avail->idx % num < last_used_idx && last_used_idx - (avail->idx % num) <= 2) {
+        return -1;
+   } else if ( last_used_idx > avail->idx % num && avail->idx % num - last_used_idx >= num -2) {
+        return -1;
+    }
 
     virtq_control[vq_id]->last_avail_idx = desc[last_avail_idx].next;
 
@@ -281,6 +287,8 @@ virt_queue_put_vring(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq
     avail->ring[avail->idx % num] = last_avail_idx;
     avail->idx++;
 
+    printf(" src_buf_len %u \n", desc[last_avail_idx].len - (unsigned int)sizeof(struct virtio_net_hdr));
+
     return E_VIRT_QUEUE_OK;
 }
 
@@ -303,9 +311,7 @@ virt_queue_process_used_virt_queue(struct virtq_control **virtq_control,
     used = virtq_control[vq_id]->virtq.used;
     desc = virtq_control[vq_id]->virtq.desc;
     used_idx = virtq_control[vq_id]->last_used_idx;
-
     for (;used_idx != used->idx ; used_idx++ ) {
-
         virt_queue_free_virt_queue(virtq_control, vq_id, used->ring[used_idx % num].id);
     }
 
