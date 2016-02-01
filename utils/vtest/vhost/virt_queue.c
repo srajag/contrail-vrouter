@@ -395,22 +395,10 @@ virt_queue_process_used_rx_virt_queue(struct virtq_control **virtq_control,
     desc = virtq_control[vq_id]->virtq.desc;
     last_used_idx = virtq_control[vq_id]->last_used_idx;
 
-    for (;last_used_idx != used->idx ; last_used_idx++ ) {
-        size_t len = used->ring[last_used_idx % num].len;
-        uint8_t * p = (uint8_t *) desc[used->ring[last_used_idx %num].id].addr;
-        int i;
-        fprintf(stdout,
-                "................................................................................");
-        for(i=0;i<len;i++) {
-            if(i%16 == 0)fprintf(stdout,"\n");
-            fprintf(stdout,"%.2x ",p[i]);
-        }
-        fprintf(stdout,"\n");
-
-
-
+    if (last_used_idx != used->idx)  {
 
         virt_queue_free_virt_queue(virtq_control, vq_id, used->ring[last_used_idx % num].id);
+        last_used_idx++;
     }
 
     virtq_control[vq_id]->last_used_idx = last_used_idx;

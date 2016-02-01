@@ -245,6 +245,8 @@ uvhost_run_vhost_client(Vhost_Client **vhost_cl, const char *uvhost_path, CLIENT
 
     virt_queue_ret_val = virt_queue_map_uvhost_virtq_2_virtq_control(l_vhost_client);
 /*
+ * Actually We do not need it
+ *
     utils_add_fd_to_fd_rw_t(&(l_vhost_client->client.fd_rw_list), FD_TYPE_READ,
             l_vhost_client->sh_mem_virtq_table[VHOST_CLIENT_VRING_IDX_RX]->kickfd,
             (void *)l_vhost_client, uvhost_kick_client);
@@ -333,24 +335,10 @@ send_packet(Vhost_Client *vhost_client, void *src_buf, size_t src_buf_len) {
     return virt_queue_ret_val;
 }
 
-
-int
-uvhost_poll_client_tx(void *context, void *src_buf , size_t *src_buf_len) {
-
-    Vhost_Client *vhost_client = NULL;
-    uint32_t vq_id = VHOST_CLIENT_VRING_IDX_TX;
-    VIRT_QUEUE_H_RET_VAL virt_queue_ret_val = E_VIRT_QUEUE_OK;
-
-    if (!context || !src_buf || src_buf_len == 0) {
-        return E_UVHOST_ERR_FARG;
-    }
-
-    vhost_client = (Vhost_Client *) context;
-    virt_queue_process_used_tx_virt_queue(vhost_client->virtq_control, vq_id);
-    virt_queue_ret_val = send_packet(vhost_client, src_buf, *src_buf_len);
+static inline int
+map_virt_queue_ret_val_to_main_val(VIRT_QUEUE_H_RET_VAL virt_queue_ret_val) {
 
     switch (virt_queue_ret_val) {
-
         case E_VIRT_QUEUE_OK:
             return EXIT_SUCCESS;
             break;
@@ -363,48 +351,96 @@ uvhost_poll_client_tx(void *context, void *src_buf , size_t *src_buf_len) {
             return EXIT_SUCCESS + 20;
             break;
 
+        case E_VIRT_QUEUE_ERR_ALLOC_PACKET:
+            return EXIT_SUCCESS + 30;
+            break;
+
+        case E_VIRT_QUEUE_ERR_RECV_PACKET:
+            return EXIT_SUCCESS + 40;
+            break;
+
         default:
-            return EXIT_SUCCESS + 100;
+            return EXIT_SUCCESS + 1000;
             break;
     };
 
 }
 
+
 int
-uvhost_poll_client_rx(void *context, void *src_buf, size_t *src_buf_len) {
+uvhost_poll_client_tx(void *context, void *src_buf , size_t *src_buf_len) {
 
     Vhost_Client *vhost_client = NULL;
-    uint32_t vq_id = VHOST_CLIENT_VRING_IDX_RX;
+    VHOST_CLIENT_VRING vq_id = VHOST_CLIENT_VRING_IDX_TX;
     VIRT_QUEUE_H_RET_VAL virt_queue_ret_val = E_VIRT_QUEUE_OK;
 
     if (!context || !src_buf || src_buf_len == 0) {
+        return map_virt_queue_ret_val_to_main_val(E_VIRT_QUEUE_ERR_FARG);
+    }
+
+    vhost_client = (Vhost_Client *) context;
+    virt_queue_process_used_tx_virt_queue(vhost_client->virtq_control, vq_id);
+    virt_queue_ret_val = send_packet(vhost_client, src_buf, *src_buf_len);
+    return map_virt_queue_ret_val_to_main_val(virt_queue_ret_val);
+
+}
+
+static inline int
+recv_packet(virtq_control *virtq_control, uint64_t *dst_buf, size_t *dst_buf_len, int *remove_flag) {
+
+    struct virtq_used *used = NULL;
+    struct virtq_desc *desc = NULL;
+    uint16_t last_used_idx = 0;
+    uint64_t num = 0;
+
+    if (!virtq_control || !dst_buf ) {
         return E_UVHOST_ERR_FARG;
     }
-    vhost_client = (Vhost_Client *) context;
+    if (*remove_flag) *remove_flag = 0;
+    else *remove_flag = 1;
 
-    virt_queue_process_used_rx_virt_queue(vhost_client->virtq_control, vq_id);
-    virt_queue_put_rx_virt_queue(vhost_client->virtq_control, vq_id, *src_buf_len);
-//    virt_queue_ret_val = recv_packet(vhost_client);
+    last_used_idx = virtq_control->last_used_idx;
+    used = virtq_control->virtq.used;
+    desc = virtq_control->virtq.desc;
+    num = virtq_control->virtq.num;
 
-    switch (virt_queue_ret_val) {
-
-        case E_VIRT_QUEUE_OK:
-            return EXIT_SUCCESS;
-            break;
-
-        case E_VIRT_QUEUE_ERR_FARG:
-            return EXIT_SUCCESS + 10;
-            break;
-
-        case E_VIRT_QUEUE_ERR_SEND_PACKET:
-            return EXIT_SUCCESS + 20;
-            break;
-
-        default:
-            return EXIT_SUCCESS + 100;
-            break;
-    };
+    if (last_used_idx != used->idx) {
+        *dst_buf = (uint64_t ) desc[used->ring[last_used_idx %num].id].addr;
+        *dst_buf_len = used->ring[last_used_idx % num].len;
+    } else {
+       return E_VIRT_QUEUE_ERR_RECV_PACKET;
+    }
 
     return E_UVHOST_OK;
+}
+
+int
+uvhost_poll_client_rx(void *context, void *dst_buf, size_t *dst_buf_len) {
+
+    Vhost_Client *vhost_client = NULL;
+    VHOST_CLIENT_VRING vq_id = VHOST_CLIENT_VRING_IDX_RX;
+    VIRT_QUEUE_H_RET_VAL virt_queue_ret_val = E_VIRT_QUEUE_OK;
+    int remove_flag = 0;
+
+    if (!context || !dst_buf ) {
+        return map_virt_queue_ret_val_to_main_val(E_VIRT_QUEUE_ERR_FARG);
+    }
+
+    vhost_client = (Vhost_Client *) context;
+
+    virt_queue_ret_val = recv_packet((vhost_client->virtq_control[vq_id]),
+                         (uint64_t *)dst_buf, dst_buf_len, &remove_flag);
+
+    //if (map_virt_queue_ret_val_to_main_val(virt_queue_ret_val) != EXIT_SUCCESS)
+     //   return map_virt_queue_ret_val_to_main_val(virt_queue_ret_val);
+
+    if (remove_flag) {
+        virt_queue_process_used_rx_virt_queue(vhost_client->virtq_control, vq_id);
+    }
+
+    virt_queue_ret_val = virt_queue_put_rx_virt_queue(vhost_client->virtq_control,
+                             vq_id, ETH_MAX_MTU);
+
+    return map_virt_queue_ret_val_to_main_val(virt_queue_ret_val);
 }
 

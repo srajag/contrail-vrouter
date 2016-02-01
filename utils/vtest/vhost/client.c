@@ -51,12 +51,13 @@ client_init_Client(Client *client, const char *path) {
     if (client_ret_val != E_CLIENT_OK) {
         return client_ret_val;
     }
-
+/*
+ * Actually we do need this
     utils_ret_val = utils_init_fd_rw_t(&client->fd_rw_list, tm);
     if (utils_ret_val != E_UTILS_OK) {
         return E_CLIENT_ERR;
     }
-
+*/
     memset(&client->sh_mem_fds,
            -2, sizeof(int) * VHOST_MEMORY_MAX_NREGIONS);
 
