@@ -16,7 +16,6 @@
 
 #include "util.h"
 
-#define uvhost_safe_free(ptr) uvhost_safer_free((void**)&(ptr))
 
 #define VHOST_USER_HDR_SIZE (sizeof(struct virtio_net_hdr))
 #define VHOST_MEMORY_MAX_NREGIONS    8
@@ -59,7 +58,7 @@ typedef struct VhostUserMemory {
     VhostUserMemoryRegion regions[VHOST_MEMORY_MAX_NREGIONS];
 } VhostUserMemory;
 
-typedef struct VhostClient {
+typedef struct Vhost_Client {
     VhostUserMemory mem;
     size_t page_size;
     size_t virtq_num;
@@ -68,7 +67,7 @@ typedef struct VhostClient {
     struct virtq_control *virtq_control[VHOST_CLIENT_VRING_MAX_VRINGS];
     uint16_t features;
     Client client;
-} VhostClient;
+} Vhost_Client;
 
 typedef struct VhostUserMsg {
     VhostUserRequest request;
@@ -102,18 +101,30 @@ typedef enum {
     E_UVHOST_LAST
 } UVHOST_H_RET_VAL;
 
-int uvhost_poll_client_tx(void *context);
 
+#define uvhost_safe_free(ptr) uvhost_safer_free((void**)&(ptr))
+static void
+uvhost_safer_free(void **mem) {
+
+    if (mem && *mem) {
+        free(*mem);
+        *mem = NULL;
+    }
+
+    return;
+}
+
+int uvhost_poll_client_tx(void *context, void *src_buf , size_t *src_buf_len);
+int uvhost_poll_client_rx(void *context, void *src_buf , size_t *src_buf_len);
 
 int uvhost_kick_client(struct fd_rw_element *fd_rw_element);
-int uvhost_delete_VhostClient(VhostClient *vhost_client);
-int uvhost_init_VhostClient(VhostClient *vhost_client);
-int uvhost_run_vhost_client(void);
-VhostClient* uvhost_create_vhost_client(void);
-int uvhost_init_control_communication(VhostClient *vhost_client);
-void uvhost_safer_free(void **mem);
-int uvhost_set_mem_VhostClient(VhostClient *vhost_client);
-int uvhost_vhost_init_control_msgs(VhostClient *vhost_client);
-int uvhost_init_control_communication(VhostClient *vhost_client);
+int uvhost_delete_Vhost_Client(Vhost_Client *vhost_client);
+static int uvhost_init_Vhost_Client(Vhost_Client *vhost_client);
+int uvhost_run_vhost_client(Vhost_Client **vhost_cl, const char *, CLIENT_TYPE);
+static Vhost_Client* uvhost_create_vhost_client(void);
+int uvhost_init_control_communication(Vhost_Client *vhost_client);
+static int uvhost_set_mem_Vhost_Client(Vhost_Client *vhost_client);
+static int uvhost_vhost_init_control_msgs(Vhost_Client *vhost_client);
+int uvhost_init_control_communication(Vhost_Client *vhost_client);
 
 #endif

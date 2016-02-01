@@ -49,7 +49,7 @@ virt_queue_map_mem_reqion_virtq(struct uvhost_virtq **virtq, uint64_t guest_phys
 }
 
 int
-virt_queue_map_uvhost_virtq_2_virtq_control(VhostClient *vhost_client) {
+virt_queue_map_uvhost_virtq_2_virtq_control(Vhost_Client *vhost_client) {
 
     struct uvhost_virtq **uvhost_virtq = NULL;
     struct virtq_control **virtq_control = NULL;
@@ -230,8 +230,75 @@ virt_queue_process_avail_virt_queue(struct virtq_control **virtq_control ,VHOST_
  *      => src_buf_len MUST NOT be greater than desc[x].len
  */
 int
-virt_queue_put_vring(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id,
+virt_queue_put_tx_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id,
         void *src_buf, size_t src_buf_len) {
+
+    struct virtq_avail* avail = NULL;
+    struct virtq_desc* desc = NULL;
+    struct virtq_used *used = NULL;
+
+    size_t num = 0;
+    struct virtio_net_hdr *virtio_hdr = NULL;
+    uint16_t last_avail_idx = 0;
+    uint16_t last_used_idx = 0;
+    void *desc_address = NULL;
+
+    if (!virtq_control) {
+        return E_VIRT_QUEUE_ERR_FARG;
+    }
+
+    used = virtq_control[vq_id]->virtq.used;
+    avail = virtq_control[vq_id]->virtq.avail;
+    desc = virtq_control[vq_id]->virtq.desc;
+    num = virtq_control[vq_id]->virtq.num;
+    last_avail_idx = virtq_control[vq_id]->last_avail_idx % num;
+    last_used_idx = virtq_control[vq_id]->last_used_idx;
+
+    if (src_buf_len + sizeof(struct virtio_net_hdr) > desc[last_avail_idx].len) {
+        return E_VIRT_QUEUE_ERR_FARG;
+    }
+
+    if ( avail->idx % num < last_used_idx % num && last_used_idx %num  - (avail->idx % num ) <= 2) {
+        return E_VIRT_QUEUE_ERR_SEND_PACKET;
+    } else if ( last_used_idx % num < avail->idx % num  && avail->idx % num  - last_used_idx % num> num -2 ) {
+        return E_VIRT_QUEUE_ERR_SEND_PACKET;
+    } else if (last_used_idx != used->idx  && avail->idx %num  == last_used_idx %num) {
+        return E_VIRT_QUEUE_ERR_SEND_PACKET;
+    }
+    virtq_control[vq_id]->last_avail_idx = desc[last_avail_idx].next;
+
+    desc_address = (void *)(uintptr_t) desc[last_avail_idx].addr;
+
+    virtio_hdr = (struct virtio_net_hdr *)desc_address;
+
+    virtio_hdr->csum_start =0;
+    virtio_hdr->csum_offset = 0;
+    virtio_hdr->flags = 0;
+    virtio_hdr->gso_type = 0;
+    virtio_hdr->gso_size = 0;
+    virtio_hdr->hdr_len = 0;
+
+    memcpy(desc_address + sizeof(struct virtio_net_hdr),
+            src_buf, src_buf_len);
+
+    desc[last_avail_idx].len = sizeof(struct virtio_net_hdr) + src_buf_len;
+    desc[last_avail_idx].next = VIRTQ_IDX_NONE;
+    desc[last_avail_idx].flags = VIRTIO_DESC_F_WRITE;
+
+    avail->ring[avail->idx % num] = last_avail_idx;
+    avail->idx++;
+
+
+    return E_VIRT_QUEUE_OK;
+}
+
+/* Copy data from src_buf to desc,
+ * currently only single buffer is supported
+ *      => src_buf_len MUST NOT be greater than desc[x].len
+ */
+int
+virt_queue_put_rx_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id,
+        size_t src_buf_len) {
 
     struct virtq_avail* avail = NULL;
     struct virtq_desc* desc = NULL;
@@ -253,32 +320,24 @@ virt_queue_put_vring(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq
     desc = virtq_control[vq_id]->virtq.desc;
     num = virtq_control[vq_id]->virtq.num;
     last_avail_idx = virtq_control[vq_id]->last_avail_idx % num;
-    last_used_idx = virtq_control[vq_id]->last_used_idx %num;
+    last_used_idx = virtq_control[vq_id]->last_used_idx;
 
     if (src_buf_len > desc[last_avail_idx].len) {
         return E_VIRT_QUEUE_ERR_FARG;
     }
-   if ( avail->idx % num < last_used_idx && last_used_idx - (avail->idx % num) <= 2) {
-        return -1;
-   } else if ( last_used_idx > avail->idx % num && avail->idx % num - last_used_idx >= num -2) {
-        return -1;
-    }
 
+    if ( avail->idx % num < last_used_idx % num && last_used_idx %num  - (avail->idx % num ) <= 2) {
+        return E_VIRT_QUEUE_ERR_SEND_PACKET;
+    } else if ( last_used_idx % num < avail->idx % num  && avail->idx % num  - last_used_idx % num> num -2 ) {
+        return E_VIRT_QUEUE_ERR_SEND_PACKET;
+    } else if (last_used_idx != used->idx  && avail->idx %num  == last_used_idx %num) {
+        return E_VIRT_QUEUE_ERR_SEND_PACKET;
+    }
     virtq_control[vq_id]->last_avail_idx = desc[last_avail_idx].next;
 
     desc_address = (void *)(uintptr_t) desc[last_avail_idx].addr;
 
     virtio_hdr = (struct virtio_net_hdr *)desc_address;
-
-    virtio_hdr->csum_start =0;
-    virtio_hdr->csum_offset = 0;
-    virtio_hdr->flags = 0;
-    virtio_hdr->gso_type = 0;
-    virtio_hdr->gso_size = 0;
-    virtio_hdr->hdr_len = 0;
-
-    memcpy(desc_address + sizeof(struct virtio_net_hdr),
-          src_buf, src_buf_len);
 
     desc[last_avail_idx].len = sizeof(struct virtio_net_hdr) + src_buf_len;
     desc[last_avail_idx].next = VIRTQ_IDX_NONE;
@@ -287,20 +346,18 @@ virt_queue_put_vring(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq
     avail->ring[avail->idx % num] = last_avail_idx;
     avail->idx++;
 
-    printf(" src_buf_len %u \n", desc[last_avail_idx].len - (unsigned int)sizeof(struct virtio_net_hdr));
 
     return E_VIRT_QUEUE_OK;
 }
 
+
 int
-virt_queue_process_used_virt_queue(struct virtq_control **virtq_control,
+virt_queue_process_used_tx_virt_queue(struct virtq_control **virtq_control,
         VHOST_CLIENT_VRING vq_id) {
 
     struct virtq_desc* desc = NULL;
-    struct virtq_avail* avail = NULL;
     struct virtq_used* used = NULL;
     uint16_t used_idx = 0;
-    uint16_t avail_idx = 0;
     unsigned int num = 0;
 
     if (!virtq_control) {
@@ -316,6 +373,47 @@ virt_queue_process_used_virt_queue(struct virtq_control **virtq_control,
     }
 
     virtq_control[vq_id]->last_used_idx = used_idx;
+
+    return E_VIRT_QUEUE_OK;
+}
+
+int
+virt_queue_process_used_rx_virt_queue(struct virtq_control **virtq_control,
+        VHOST_CLIENT_VRING vq_id) {
+
+    struct virtq_desc* desc = NULL;
+    struct virtq_used* used = NULL;
+    uint16_t last_used_idx = 0;
+    unsigned int num = 0;
+
+    if (!virtq_control) {
+        return E_VIRT_QUEUE_ERR_FARG;
+    }
+
+    num = virtq_control[vq_id]->virtq.num;
+    used = virtq_control[vq_id]->virtq.used;
+    desc = virtq_control[vq_id]->virtq.desc;
+    last_used_idx = virtq_control[vq_id]->last_used_idx;
+
+    for (;last_used_idx != used->idx ; last_used_idx++ ) {
+        size_t len = used->ring[last_used_idx % num].len;
+        uint8_t * p = (uint8_t *) desc[used->ring[last_used_idx %num].id].addr;
+        int i;
+        fprintf(stdout,
+                "................................................................................");
+        for(i=0;i<len;i++) {
+            if(i%16 == 0)fprintf(stdout,"\n");
+            fprintf(stdout,"%.2x ",p[i]);
+        }
+        fprintf(stdout,"\n");
+
+
+
+
+        virt_queue_free_virt_queue(virtq_control, vq_id, used->ring[last_used_idx % num].id);
+    }
+
+    virtq_control[vq_id]->last_used_idx = last_used_idx;
 
     return E_VIRT_QUEUE_OK;
 }
@@ -337,6 +435,7 @@ virt_queue_free_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VR
     desc[desc_idx].flags |= VIRTIO_DESC_F_WRITE;
     desc[desc_idx].next = free_idx;
     virtq_control[vq_id]->last_avail_idx = desc_idx;
+
     return E_VIRT_QUEUE_OK;
 }
 

@@ -20,20 +20,14 @@
 
 /* TODO */
 
-/* Copied from reference app, I don't know why we must align to 1MB :-( */
-#define VHOST_CLIENT_PAGE_SIZE \
-        ALIGN(sizeof(struct uvhost_virtq) + VIRTQ_DESC_BUFF_SIZE * VIRTQ_DESC_MAX_SIZE, 1024 * 1024)
-
-
-
-int
-uvhost_alloc_VhostClient(VhostClient **vhost_client) {
+static int
+uvhost_alloc_Vhost_Client(Vhost_Client **vhost_client) {
 
     if (!vhost_client) {
         return E_UVHOST_ERR_FARG;
     }
 
-    *vhost_client = (VhostClient *) calloc(1, sizeof(VhostClient));
+    *vhost_client = (Vhost_Client *) calloc(1, sizeof(Vhost_Client));
      if(!*vhost_client) {
          return  E_UVHOST_ERR_ALLOC;
      }
@@ -49,7 +43,7 @@ uvhost_alloc_VhostClient(VhostClient **vhost_client) {
 }
 
 int
-uvhost_dealloc_VhostClient(VhostClient *vhost_client) {
+uvhost_dealloc_Vhost_Client(Vhost_Client *vhost_client) {
 
     for (size_t i = 0 ; i < VHOST_CLIENT_VRING_MAX_VRINGS; i++) {
         uvhost_safe_free(vhost_client->virtq_control[i]);
@@ -60,10 +54,10 @@ uvhost_dealloc_VhostClient(VhostClient *vhost_client) {
 
 }
 
-int
-uvhost_init_VhostClient(VhostClient *vhost_client) {
+static int
+uvhost_init_Vhost_Client(Vhost_Client *vhost_client) {
 
-    VhostClient *const vhost_cl = vhost_client;
+    Vhost_Client *const vhost_cl = vhost_client;
 
     if (!vhost_client) {
         return E_UVHOST_ERR_FARG;
@@ -76,13 +70,13 @@ uvhost_init_VhostClient(VhostClient *vhost_client) {
     return E_UVHOST_OK;
 }
 
-int inline
-uvhost_set_mem_VhostClient(VhostClient *vhost_client) {
+static int inline
+uvhost_set_mem_Vhost_Client(Vhost_Client *vhost_client) {
 
     int ret = 0;
     void *sh_mem_addr = NULL;
     char fd_path_buff[UNIX_PATH_MAX] = {'\0'};
-    VhostClient *const vhost_cl = vhost_client;
+    Vhost_Client *const vhost_cl = vhost_client;
     VIRT_QUEUE_H_RET_VAL ret_val = E_VIRT_QUEUE_OK;
 
     if (!vhost_client) {
@@ -121,27 +115,19 @@ uvhost_set_mem_VhostClient(VhostClient *vhost_client) {
     return E_UVHOST_OK;
 }
 
-VhostClient*
+static Vhost_Client*
 uvhost_create_vhost_client(void) {
 
-    VhostClient *vhost_client = NULL;
+    Vhost_Client *vhost_client = NULL;
     UVHOST_H_RET_VAL uvhost_ret_val = E_UVHOST_OK;
-    CLIENT_H_RET_VAL client_ret_val = E_CLIENT_OK;
 
-    uvhost_ret_val = uvhost_alloc_VhostClient(&vhost_client);
+    uvhost_ret_val = uvhost_alloc_Vhost_Client(&vhost_client);
     if (uvhost_ret_val != E_UVHOST_OK) {
         return NULL;
-        //boze na nebesiach
     }
 
-    uvhost_ret_val = uvhost_init_VhostClient(vhost_client);
+    uvhost_ret_val = uvhost_init_Vhost_Client(vhost_client);
     if (uvhost_ret_val != E_UVHOST_OK) {
-        return NULL;
-        //boze na nebesiach
-    }
-
-    client_ret_val = client_init_Client(&vhost_client->client, "/var/run/vrouter/uvh_vif_vm1");
-    if (client_ret_val != E_CLIENT_OK) {
         return NULL;
     }
 
@@ -149,12 +135,12 @@ uvhost_create_vhost_client(void) {
 }
 
 
-int
-uvhost_unset_sh_mem_VhostClient(VhostClient *vhost_client) {
+static int
+uvhost_unset_sh_mem_Vhost_Client(Vhost_Client *vhost_client) {
 
     char fd_path_buff[UNIX_PATH_MAX] = {'\0'};
-    VhostClient *const vhost_cl = vhost_client;
-    int ret = 0;
+    Vhost_Client *const vhost_cl = vhost_client;
+    SH_MEM_H_RET_VAL ret = E_SH_MEM_OK;
 
     if (!vhost_client) {
         return E_UVHOST_ERR_FARG;
@@ -174,12 +160,37 @@ uvhost_unset_sh_mem_VhostClient(VhostClient *vhost_client) {
 }
 
 int
-uvhost_delete_VhostClient(VhostClient *vhost_client) {
+uvhost_close_kick_call_fds_Vhost_client(Vhost_Client *vhost_client) {
+
+    Vhost_Client *const l_vhost_cl = vhost_client;
+    int ret = 0;
+
+    if (!vhost_client) {
+        return E_UVHOST_ERR_FARG;
+    }
+
+    for (size_t i = 0; i < VHOST_CLIENT_VRING_MAX_VRINGS; i++) {
+
+        if (l_vhost_cl->virtq_control[i]->kickfd >= 0) {
+            ret = close(l_vhost_cl->virtq_control[i]->kickfd);
+            if (ret) return E_UVHOST_ERR;
+        }
+        if (l_vhost_cl->virtq_control[i]->callfd >= 0){
+            ret = close(l_vhost_cl->virtq_control[i]->callfd);
+            if (ret) return E_UVHOST_ERR;
+
+        }
+    }
+    return E_UVHOST_OK;
+}
+
+int
+uvhost_delete_Vhost_Client(Vhost_Client *vhost_client) {
 
     UVHOST_H_RET_VAL uvhost_ret_val = E_UVHOST_OK;
     CLIENT_H_RET_VAL client_ret_val = E_CLIENT_OK;
 
-    VhostClient *const vhost_cl = vhost_client;
+    Vhost_Client *const vhost_cl = vhost_client;
 
     if (!vhost_client) {
         return E_UVHOST_ERR_FARG;
@@ -188,101 +199,73 @@ uvhost_delete_VhostClient(VhostClient *vhost_client) {
     client_ret_val = client_disconnect_socket(&vhost_cl->client);
     client_ret_val = client_close_fds(&vhost_cl->client);
 
-    uvhost_unset_sh_mem_VhostClient(vhost_cl);
-    uvhost_ret_val = uvhost_dealloc_VhostClient(vhost_cl);
+    uvhost_unset_sh_mem_Vhost_Client(vhost_cl);
+    uvhost_ret_val = uvhost_dealloc_Vhost_Client(vhost_cl);
 
 
     return uvhost_ret_val;
 }
 
-static struct AppHandler vhost_net_app_handler = {
-    .context = 0,
-    .poll_handler = uvhost_poll_client_tx
-};
-
 int
-uvhost_run_vhost_client(void) {
+uvhost_run_vhost_client(Vhost_Client **vhost_cl, const char *uvhost_path, CLIENT_TYPE client_type) {
 
-    VhostClient *vhost_client = NULL;
+    Vhost_Client *l_vhost_client = NULL;
     UVHOST_H_RET_VAL uvhost_ret_val = E_UVHOST_OK;
     VIRT_QUEUE_H_RET_VAL virt_queue_ret_val = E_VIRT_QUEUE_OK;
+    CLIENT_H_RET_VAL client_ret_val = E_CLIENT_OK;
 
-    vhost_client = uvhost_create_vhost_client();
-    if (!vhost_client) {
-        return E_UVHOST_ERR;
-    }
-
-    uvhost_ret_val = uvhost_set_mem_VhostClient(vhost_client);
-    if (uvhost_ret_val != E_UVHOST_OK) {
-        return uvhost_ret_val;
-        //boze na nebesiach
-    }
-
-    uvhost_ret_val = uvhost_init_control_communication(vhost_client);
-    if (uvhost_ret_val != E_UVHOST_OK) {
-        return uvhost_ret_val;
-        //boze na nebesiach
-    }
-
-    virt_queue_ret_val = virt_queue_map_uvhost_virtq_2_virtq_control(vhost_client);
-
-    utils_add_fd_to_fd_rw_t(&(vhost_client->client.fd_rw_list), FD_TYPE_READ,
-            vhost_client->sh_mem_virtq_table[VHOST_CLIENT_VRING_IDX_RX]->kickfd,
-            (void *)vhost_client, uvhost_kick_client);
-
-    memcpy(&vhost_client->client.vhost_net_app_handler,
-           &vhost_net_app_handler, sizeof(struct AppHandler));
-
-    vhost_client->client.vhost_net_app_handler.context = vhost_client;
-
-    size_t iter = 10;
-    while(iter) {
-        (vhost_client->client.vhost_net_app_handler.
-
-            poll_handler(vhost_client->client.vhost_net_app_handler.context)
-        );
-    }
-
-    uvhost_delete_VhostClient(vhost_client);
-
-    return E_UVHOST_OK;
-}
-
-int
-uvhost_kick_client(struct fd_rw_element *fd_rw_element) {
-
-    VhostClient *vhost_client = (VhostClient *)fd_rw_element->context;
-    int kickfd = fd_rw_element->fd;
-    ssize_t return_val;
-    uint64_t kick_it = 0;
-
-    if (!fd_rw_element) {
+    if (!vhost_cl || strlen(uvhost_path) == 0) {
         return E_UVHOST_ERR_FARG;
     }
 
-    return_val = read(kickfd, &kick_it, sizeof(kick_it));
-    if (return_val < 0) {
-
-        printf("Error read < 0 \n");
-        //TODO
-        return E_UVHOST_OK;
-
-    } else if (return_val == 0 ) {
-
-        printf("Error read == 0 \n");
-        //TODO
-        return E_UVHOST_OK;
+    if (client_type >= CLIENT_TYPE_LAST) {
+        return E_UVHOST_ERR_FARG;
     }
-    virt_queue_process_avail_virt_queue((vhost_client->virtq_control),
-            VHOST_CLIENT_VRING_IDX_RX);
+
+    l_vhost_client = uvhost_create_vhost_client();
+    *vhost_cl = l_vhost_client;
+    if (!l_vhost_client) {
+        return E_UVHOST_ERR;
+    }
+
+
+    client_ret_val = client_init_Client(&l_vhost_client->client, uvhost_path);
+    if (client_ret_val != E_CLIENT_OK) {
+        return E_UVHOST_ERR;;
+    }
+    uvhost_ret_val = uvhost_set_mem_Vhost_Client(l_vhost_client);
+    if (uvhost_ret_val != E_UVHOST_OK) {
+        return uvhost_ret_val;
+    }
+
+    uvhost_ret_val = uvhost_init_control_communication(l_vhost_client);
+    if (uvhost_ret_val != E_UVHOST_OK) {
+        return uvhost_ret_val;
+    }
+
+    virt_queue_ret_val = virt_queue_map_uvhost_virtq_2_virtq_control(l_vhost_client);
+/*
+    utils_add_fd_to_fd_rw_t(&(l_vhost_client->client.fd_rw_list), FD_TYPE_READ,
+            l_vhost_client->sh_mem_virtq_table[VHOST_CLIENT_VRING_IDX_RX]->kickfd,
+            (void *)l_vhost_client, uvhost_kick_client);
+*/
+    l_vhost_client->client.vhost_net_app_handler.context = l_vhost_client;
+
+    if (client_type == CLIENT_TYPE_TX) {
+        l_vhost_client->client.vhost_net_app_handler.poll_func_handler= uvhost_poll_client_tx;
+    } else if (client_type == CLIENT_TYPE_RX) {
+        l_vhost_client->client.vhost_net_app_handler.poll_func_handler = uvhost_poll_client_rx;
+    }
+
+    //TODO uvhost_delete_Vhost_Client(vhost_client);
 
     return E_UVHOST_OK;
 }
 
 int
-uvhost_init_control_communication(VhostClient *vhost_client) {
+uvhost_init_control_communication(Vhost_Client *vhost_client) {
 
-    VhostClient *const l_vhost_client = vhost_client;
+    Vhost_Client *const l_vhost_client = vhost_client;
     UVHOST_H_RET_VAL ret_val = E_UVHOST_OK;
 
     if (!vhost_client) {
@@ -296,55 +279,12 @@ uvhost_init_control_communication(VhostClient *vhost_client) {
 
     return E_UVHOST_OK;
 }
-unsigned int incrementer = 0;
-static int
-send_packet(VhostClient *vhost_client) {
 
-   static char data_send [55] = { 0xde, 0xad, 0xbe, 0xef, 0x00, 0x01, 0xde, 0xad, 0xbe, 0xef, 0x00, 0x02, 0x00,0x08, 0x00, 0x45, 0xcc, 0x00, 0x1d, 0x09, 0xf0, 0x92, 0xab, 0x08, 0x06, 0x00, 0x01,
-0x08, 0x00, 0x06, 0x04, 0x00, 0x02, 0x00, 0x1d, 0x09, 0xf0, 0x92, 0xab, 0x0a, 0x0a, 0x0a, 0x01,
-0x00, 0x1a, 0x6b, 0x6c, 0x0c, 0xcc, 0x0a, 0x0a, 0x0a, 0x02};
-    int ret = 0;
-
-    ret =virt_queue_put_vring(vhost_client->virtq_control,
-            VHOST_CLIENT_VRING_IDX_TX, data_send, ((55 + incrementer) % 25 ) + 20 );
-    if (ret != E_VIRT_QUEUE_OK) {
-        return E_UVHOST_ERR;
-    }
-    incrementer++;
-
-    return E_UVHOST_OK;
-//virt_queue_kick(vhost_client->virtq_control, VHOST_CLIENT_VRING_IDX_TX);
-}
-
-
-int
-uvhost_poll_client_tx(void *context) {
-
-    VhostClient *vhost_client = (VhostClient *) context;
-    uint32_t vq_id = VHOST_CLIENT_VRING_IDX_TX;
-    int ret = 0;
-/*
-    char data_send[] = { 0x00, 0xde, 0xad, 0xbe, 0xef,
-        0x00, 0x02, 0xde, 0xad, 0xbe, 0xef, 0x11, 0x01,
-        0x08, 0x06, 0x99, 0x99 };
-*/
-
-  //size_t data_len = sizeof(data_send);
-
-    virt_queue_process_used_virt_queue(vhost_client->virtq_control, vq_id);
-    ret = send_packet(vhost_client);
-    if (ret != E_UVHOST_OK) {
-        return E_UVHOST_ERR;
-    }
-
-    return E_UVHOST_OK;
-}
-
-int
-uvhost_vhost_init_control_msgs(VhostClient *vhost_client) {
+static int inline
+uvhost_vhost_init_control_msgs(Vhost_Client *vhost_client) {
 
     Client *l_client = NULL ;
-    VhostClient *const l_vhost_client = vhost_client;
+    Vhost_Client *const l_vhost_client = vhost_client;
     CLIENT_H_RET_VAL client_ret_val = E_CLIENT_OK;
     VIRT_QUEUE_H_RET_VAL virt_queue_ret_val = E_VIRT_QUEUE_OK;
 
@@ -381,14 +321,90 @@ uvhost_vhost_init_control_msgs(VhostClient *vhost_client) {
     return E_UVHOST_OK;
 }
 
-void
-uvhost_safer_free(void **mem) {
 
-    if (mem && *mem) {
-        free(*mem);
-        *mem = NULL;
+static inline int
+send_packet(Vhost_Client *vhost_client, void *src_buf, size_t src_buf_len) {
+
+    VIRT_QUEUE_H_RET_VAL virt_queue_ret_val = E_VIRT_QUEUE_OK;
+
+    virt_queue_ret_val =virt_queue_put_tx_virt_queue(vhost_client->virtq_control,
+            VHOST_CLIENT_VRING_IDX_TX, src_buf, src_buf_len);
+
+    return virt_queue_ret_val;
+}
+
+
+int
+uvhost_poll_client_tx(void *context, void *src_buf , size_t *src_buf_len) {
+
+    Vhost_Client *vhost_client = NULL;
+    uint32_t vq_id = VHOST_CLIENT_VRING_IDX_TX;
+    VIRT_QUEUE_H_RET_VAL virt_queue_ret_val = E_VIRT_QUEUE_OK;
+
+    if (!context || !src_buf || src_buf_len == 0) {
+        return E_UVHOST_ERR_FARG;
     }
 
-    return;
+    vhost_client = (Vhost_Client *) context;
+    virt_queue_process_used_tx_virt_queue(vhost_client->virtq_control, vq_id);
+    virt_queue_ret_val = send_packet(vhost_client, src_buf, *src_buf_len);
+
+    switch (virt_queue_ret_val) {
+
+        case E_VIRT_QUEUE_OK:
+            return EXIT_SUCCESS;
+            break;
+
+        case E_VIRT_QUEUE_ERR_FARG:
+            return EXIT_SUCCESS + 10;
+            break;
+
+        case E_VIRT_QUEUE_ERR_SEND_PACKET:
+            return EXIT_SUCCESS + 20;
+            break;
+
+        default:
+            return EXIT_SUCCESS + 100;
+            break;
+    };
+
+}
+
+int
+uvhost_poll_client_rx(void *context, void *src_buf, size_t *src_buf_len) {
+
+    Vhost_Client *vhost_client = NULL;
+    uint32_t vq_id = VHOST_CLIENT_VRING_IDX_RX;
+    VIRT_QUEUE_H_RET_VAL virt_queue_ret_val = E_VIRT_QUEUE_OK;
+
+    if (!context || !src_buf || src_buf_len == 0) {
+        return E_UVHOST_ERR_FARG;
+    }
+    vhost_client = (Vhost_Client *) context;
+
+    virt_queue_process_used_rx_virt_queue(vhost_client->virtq_control, vq_id);
+    virt_queue_put_rx_virt_queue(vhost_client->virtq_control, vq_id, *src_buf_len);
+//    virt_queue_ret_val = recv_packet(vhost_client);
+
+    switch (virt_queue_ret_val) {
+
+        case E_VIRT_QUEUE_OK:
+            return EXIT_SUCCESS;
+            break;
+
+        case E_VIRT_QUEUE_ERR_FARG:
+            return EXIT_SUCCESS + 10;
+            break;
+
+        case E_VIRT_QUEUE_ERR_SEND_PACKET:
+            return EXIT_SUCCESS + 20;
+            break;
+
+        default:
+            return EXIT_SUCCESS + 100;
+            break;
+    };
+
+    return E_UVHOST_OK;
 }
 

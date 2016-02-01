@@ -109,16 +109,20 @@ typedef enum {
     E_VIRT_QUEUE_ERR_FARG,
     E_VIRT_QUEUE_ERR_HOST_VIRTQ,
     E_VIRT_QUEUE_ERR_MAP_REG,
+    E_VIRT_QUEUE_ERR_SEND_PACKET,
+    E_VIRT_QUEUE_ERR_RECV_PACKET,
     E_VIRT_QUEUE_LAST
 } VIRT_QUEUE_H_RET_VAL;
 
+int virt_queue_put_tx_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id, void *src_buf, size_t src_buf_len);
+int virt_queue_put_rx_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id, size_t src_buf_len);
 int virt_queue_kick(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id);
-int virt_queue_put_vring(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id, void *src_buf, size_t src_buf_len);
-int virt_queue_process_used_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id);
+int virt_queue_process_used_tx_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id);
+int virt_queue_process_used_rx_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id);
 int virt_queue_free_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id, uint32_t desc_idx);
 int virt_queue_process_desc_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id, uint32_t avail_idx);
 int virt_queue_process_avail_virt_queue(struct virtq_control **virtq_control ,VHOST_CLIENT_VRING vq_id);
-int virt_queue_map_uvhost_virtq_2_virtq_control(VhostClient *vhost_client);
+int virt_queue_map_uvhost_virtq_2_virtq_control(Vhost_Client *vhost_client);
 
 int virt_queue_map_all_mem_reqion_virtq(struct uvhost_virtq **virtq, VhostUserMemory *mem,
                                         size_t virtq_number);

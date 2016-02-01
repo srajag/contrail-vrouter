@@ -1,32 +1,40 @@
 
 #Testing without agent
-# you must disable agent and manually start everything
+# you must disable agent and stuff and manually start everything
 
 service supervisor-vrouter stop
 
-#added kernel  modules
+##added kernel  modules
 modprobe igb_uio
 modprobe rte_kni kthread_mode=multiple
 
-#check if you have dpdk driver bind to your NIC
+##Also you need bind igb_uio driver to interface
+#Check if you have binded modul to NIC
 /opt/contrail/bin/dpdk_nic_bind.py -s
 
-#start vrouter you should use an option which is written in file
+#Following command set driver igb_uio to interface (NIC) eth1,
+#probably you must set different parameter
+/opt/contrail/bin/dpdk_nic_bind.py -b igb_uio eth1
+
+
+##start vrouter you should use an option which is written in file
 # /etc/contrail/supervisord_vrouter_files/contrail-vrouter-dpdk.ini
 
 taskset 0x7 /usr/bin/contrail-vrouter-dpdk --no-daemon --socket-mem 1024
 
-# Probably you must change the mac address of your physical interface 
+##Set interfaces, routing and stuff
+# Probably you must change the mac address of your physical interface and PCI address 
 
 vif --add phys --mac "52:54:00:89:aa:e0" --type physical --pmd 0000:02:00.0 --vrf 0
 
 #addresses of uvhost are hardcoded in source code
 vif --add vm1 --mac "de:ad:be:ef:00:01" --type virtual --vrf 0 --id 1
 vif --add vm2 --mac "de:ad:be:ef:00:02" --type virtual --vrf 0 --id 2
+vif -l
+
 nh --create 21 --oif 1 --type 2 --smac "de:ad:be:ef:00:02" --dmac "de:ad:be:ef:00:01"  --vrf 0 --el2
 nh --create 12 --oif 2 --type 2 --smac "de:ad:be:ef:00:01" --dmac "de:ad:be:ef:00:02"  --vrf 0 --el2
 nh --list
-vif -l
 
 rt -c -n 12 -e "de:ad:be:ef:00:01" -f 1 -v 0
 rt -c -n 21 -e "de:ad:be:ef:00:02" -f 1 -v 0

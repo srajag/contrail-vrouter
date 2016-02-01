@@ -13,6 +13,9 @@
 #define VHOST_USER_HDR_SIZE (sizeof(struct virtio_net_hdr))
 #define VHOST_MEMORY_MAX_NREGIONS    8
 
+#define VHOST_CLIENT_PAGE_SIZE \
+        ALIGN(sizeof(struct uvhost_virtq) + VIRTQ_DESC_BUFF_SIZE * VIRTQ_DESC_MAX_SIZE, 1024 * 1024)
+
 #define ALIGN(v,b)   (((long int)v + (long int)b - 1)&(-(long int)b))
 
 
@@ -42,41 +45,27 @@ typedef struct {
    struct timeval tv;
 } fd_rw_t;
 
-typedef int (*AvailHandler)(void* context, void* buf, size_t size);
-typedef int (*MapHandler)(void* context, uint64_t addr);
+typedef int (*poll_func_handler)(void *context, void *src_buf, size_t *src_buf_len);
 
-struct ProcessHandler {
-    void* context;
-    AvailHandler avail_handler;
-    MapHandler  map_handler;
-};
-
-typedef int (*PollHandler)(void *context);
-
-struct AppHandler {
+struct uvhost_app_handler {
     void *context;
-    PollHandler poll_handler;
+    poll_func_handler poll_func_handler;
 };
 
-typedef enum client_status {
-    CREATED = 1,
-    INITIALIZED,
-    MEM_INITIALIZED,
-    DEVICE_CONNECTED,
-    CLEANING,
-    CLEAR,
-    UNKNOWN_ERROR,
-    LAST
-} client_status;
+typedef enum  {
+    CLIENT_TYPE_RX,
+    CLIENT_TYPE_TX,
+    CLIENT_TYPE_LAST
+
+} CLIENT_TYPE;
 
 typedef struct {
     char socket_path[UNIX_PATH_MAX];
     int socket;
     char sh_mem_path[UNIX_PATH_MAX];
     int sh_mem_fds[VHOST_MEMORY_MAX_NREGIONS];
-    client_status status;
     fd_rw_t fd_rw_list;
-    struct AppHandler vhost_net_app_handler;
+    struct uvhost_app_handler vhost_net_app_handler;
 } Client;
 
 typedef enum {
