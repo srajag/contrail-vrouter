@@ -7,7 +7,7 @@ C_OBJS = ${C_SRCS:.c=.o}
 program_OBJS = $(C_OBJS)
 
 
-CFLAGS =  -std=gnu99 -lrt -g #-Wc11-extensions -Wall -pedantic -pedantic-errors -g -lrt -D_POSIX_C_SOURCE=200112L 
+CFLAGS =  -std=gnu99 -lrt -lpcap -g #-Wc11-extensions -Wall -pedantic -pedantic-errors -g -lrt -D_POSIX_C_SOURCE=200112L 
  
 .PHONY: all clean distclean 
 

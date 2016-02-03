@@ -405,9 +405,10 @@ recv_packet(virtq_control *virtq_control, uint64_t *dst_buf, size_t *dst_buf_len
     num = virtq_control->virtq.num;
 
     if (last_used_idx != used->idx) {
-        *dst_buf = (uint64_t ) desc[used->ring[last_used_idx %num].id].addr;
-        *dst_buf_len = used->ring[last_used_idx % num].len;
+        *dst_buf = (uint64_t ) ((uintptr_t)desc[used->ring[last_used_idx %num].id].addr + (uintptr_t)sizeof(struct virtio_net_hdr));
+        *dst_buf_len = used->ring[last_used_idx % num].len - sizeof(struct virtio_net_hdr);
     } else {
+       *remove_flag = 0;
        return E_VIRT_QUEUE_ERR_RECV_PACKET;
     }
 
@@ -428,18 +429,16 @@ uvhost_poll_client_rx(void *context, void *dst_buf, size_t *dst_buf_len) {
 
     vhost_client = (Vhost_Client *) context;
 
+    virt_queue_put_rx_virt_queue(vhost_client->virtq_control,
+            vq_id, ETH_MAX_MTU);
     virt_queue_ret_val = recv_packet((vhost_client->virtq_control[vq_id]),
-                         (uint64_t *)dst_buf, dst_buf_len, &remove_flag);
-
-    //if (map_virt_queue_ret_val_to_main_val(virt_queue_ret_val) != EXIT_SUCCESS)
-     //   return map_virt_queue_ret_val_to_main_val(virt_queue_ret_val);
+            (uint64_t *)dst_buf, dst_buf_len, &remove_flag);
 
     if (remove_flag) {
         virt_queue_process_used_rx_virt_queue(vhost_client->virtq_control, vq_id);
     }
 
-    virt_queue_ret_val = virt_queue_put_rx_virt_queue(vhost_client->virtq_control,
-                             vq_id, ETH_MAX_MTU);
+
 
     return map_virt_queue_ret_val_to_main_val(virt_queue_ret_val);
 }
