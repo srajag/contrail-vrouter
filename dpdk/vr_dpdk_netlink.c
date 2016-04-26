@@ -12,6 +12,7 @@
 #include "vr_uvhost.h"
 #include "vr_uvhost_msg.h"
 
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <linux/genetlink.h>
@@ -23,7 +24,7 @@
 struct nlmsghdr *dpdk_nl_message_hdr(struct vr_message *);
 unsigned int dpdk_nl_message_len(struct vr_message *);
 
-int vr_usocket_message_write(struct vr_usocket *, struct vr_message *);
+int vr_usocket_message_write(struct vr_usocket *, struct vr_message *, unsigned int);
 int vr_nl_uvh_sock;
 
 void
@@ -38,10 +39,13 @@ vr_dpdk_netlink_wakeup(void)
 }
 
 static void
-dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
+dpdk_nl_process_response(void *u, struct nlmsghdr *nlh)
 {
+    struct vr_usocket *usockp = u;
     __u32 seq;
-    unsigned int multi_flag = 0;
+    unsigned int multi_flag = 0, prev_msg_len = 0;
+    int ret;
+    uint8_t pseudoeventfd = 1;
     bool write = true;
 
     struct vr_message *resp;
@@ -51,6 +55,7 @@ dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
     struct nlattr *resp_nla;
 
     seq = nlh->nlmsg_seq;
+
     genlh = (struct genlmsghdr *)((unsigned char *)nlh + NLMSG_HDRLEN);
 
     /* Process responses */
@@ -76,27 +81,52 @@ dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
 
         resp_genlh = (struct genlmsghdr *)((unsigned char *)resp_nlh +
                 NLMSG_HDRLEN);
+
         memcpy(resp_genlh, genlh, sizeof(*genlh));
 
         resp_nla = (struct nlattr *)((unsigned char *)resp_genlh + GENL_HDRLEN);
         resp_nla->nla_len = resp->vr_message_len;
         resp_nla->nla_type = NL_ATTR_VR_MESSAGE_PROTOCOL;
 
-        if (vr_usocket_message_write(usockp, resp) < 0) {
+        ret = vr_usocket_message_write(usockp, resp, prev_msg_len);
+        if (ret < 0) {
             write = false;
             vr_usocket_close(usockp);
+        } else {
+            prev_msg_len += ret;
         }
+    }
+
+    /* Indicate shmem is filled with responses */
+    if (usockp->usock_type == SHMEM) {
+        ret = send(usockp->usock_fd, &pseudoeventfd, USOCK_SHMEM_KICK_LEN, 0);
+        if (ret < 0)
+            vr_usocket_close(usockp);
     }
 
     return;
 }
 
 int
-dpdk_netlink_receive(void *usockp, char *nl_buf,
-        unsigned int nl_len)
+dpdk_netlink_receive(void *u)
 {
+    struct vr_usocket *usockp = (struct vr_usocket *)u;
     int ret;
     struct vr_message request;
+    char *nl_buf;
+    struct nlmsghdr *nlh;
+    unsigned int nl_len;
+
+    if (usockp->usock_type == SHMEM)
+        nl_buf = usockp->usock_shmem;
+    else
+        nl_buf = usockp->usock_rx_buf;
+
+    if (!nl_buf)
+        return -1;
+
+    nlh = (struct nlmsghdr *)nl_buf;
+    nl_len = nlh->nlmsg_len;
 
     memset(&request, 0, sizeof(request));
     request.vr_message_buf = nl_buf + HDR_LEN;
@@ -106,7 +136,7 @@ dpdk_netlink_receive(void *usockp, char *nl_buf,
     if (ret < 0)
         vr_send_response(ret);
 
-    dpdk_nl_process_response(usockp, (struct nlmsghdr *)nl_buf);
+    dpdk_nl_process_response(usockp, nlh);
 
     return 0;
 }
@@ -296,7 +326,7 @@ vr_dpdk_netlink_init(void)
     if (ret)
         return ret;
 
-    vr_dpdk.netlink_sock = vr_usocket(NETLINK, UNIX);
+    vr_dpdk.netlink_sock = vr_usocket(NETLINK, SHMEM);
     if (!vr_dpdk.netlink_sock) {
         RTE_LOG(ERR, VROUTER, "    error creating NetLink server socket:"
             " %s (%d)\n", rte_strerror(errno), errno);

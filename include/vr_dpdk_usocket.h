@@ -52,6 +52,7 @@
 #define TCP                     1
 #define UNIX                    2
 #define RAW                     3
+#define SHMEM                   4
 
 /* usocket state */
 #define ALLOCED                 0
@@ -101,6 +102,7 @@ struct vr_usocket {
     unsigned int usock_pkt_truncated;
 
     char *usock_rx_buf;
+    void *usock_shmem;
 
     struct rte_mbuf *usock_mbuf;
     struct rte_mempool *usock_mbuf_pool;
@@ -116,6 +118,11 @@ struct vr_usocket {
     struct pollfd *usock_pfds;
     pthread_t usock_owner;
 };
+
+/* 1 byte to kick the other side that shared mem is full */
+#define USOCK_SHMEM_KICK_LEN sizeof(uint8_t)
+/* Shared mem size */
+#define USOCK_SHMEM_BUF_LEN 4096
 
 void *vr_usocket(int, int);
 void vr_usocket_close(void *sock);
@@ -134,6 +141,7 @@ int vr_usocket_eventfd_write(struct vr_usocket *usockp);
 #define VR_SOCKET_DIR               "/var/run/vrouter"
 #define VR_SOCKET_DIR_MODE          (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 #define VR_NETLINK_UNIX_FILE        VR_SOCKET_DIR"/dpdk_netlink"
+#define VR_NETLINK_SHMEM_FILE        VR_SOCKET_DIR"/dpdk_shmem"
 #define VR_PACKET_UNIX_FILE         VR_SOCKET_DIR"/dpdk_pkt0"
 #define VR_PACKET_AGENT_UNIX_FILE   VR_SOCKET_DIR"/agent_pkt0"
 

@@ -736,7 +736,7 @@ void dpdk_lcore_exit(unsigned lcore_id);
 void vr_dpdk_netlink_wakeup(void);
 void dpdk_netlink_exit(void);
 int dpdk_netlink_init(void);
-int dpdk_netlink_receive(void *usockp, char *nl_buf, unsigned int nl_len);
+int dpdk_netlink_receive(void *u);
 
 /*
  * vr_dpdk_ringdev.c

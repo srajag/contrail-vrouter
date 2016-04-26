@@ -16,6 +16,7 @@
 #include <sys/eventfd.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include <sys/mman.h>
 
 #include <rte_byteorder.h>
 #include <rte_errno.h>
@@ -58,7 +59,7 @@ usock_deinit_poll(struct vr_usocket *usockp)
     if (!usockp)
         return;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(), usockp->usock_fd);
+    RTE_LOG(DEBUG, USOCK, "%s[%lx]: deinit poll FD %d\n", __func__, pthread_self(), usockp->usock_fd);
     if (usockp->usock_pfds) {
         vr_free(usockp->usock_pfds, VR_USOCK_POLL_OBJECT);
         usockp->usock_pfds = NULL;
@@ -221,6 +222,7 @@ usock_clone(struct vr_usocket *parent, int cfd)
 
     child->usock_type = parent->usock_type;
     child->usock_proto = parent->usock_proto;
+    child->usock_shmem = parent->usock_shmem;
     child->usock_fd = cfd;
 
     if (usock_bind_usockets(parent, child))
@@ -247,7 +249,7 @@ usock_unbind(struct vr_usocket *child)
         return;
 
     parent = child->usock_parent;
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: child FD %d parent %p\n", __func__,
+    RTE_LOG(DEBUG, USOCK, "%s[%lx]: unbinding child FD %d parent %p\n", __func__,
             pthread_self(), child->usock_fd, parent);
     if (!parent)
         return;
@@ -270,12 +272,12 @@ usock_close(struct vr_usocket *usockp)
     int i;
     struct vr_usocket *parent;
 
-    RTE_SET_USED(parent);
-
     if (!usockp)
         return;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(), usockp->usock_fd);
+    RTE_LOG(DEBUG, USOCK, "%s[%lx]: closing FD %d\n", __func__, pthread_self(), usockp->usock_fd);
+
+    parent = usockp->usock_parent;
     usock_unbind(usockp);
     usock_deinit_poll(usockp);
 
@@ -283,8 +285,13 @@ usock_close(struct vr_usocket *usockp)
         usock_close(usockp->usock_children[i]);
     }
 
-    RTE_LOG(DEBUG, USOCK, "%s: closing FD %d\n", __func__, usockp->usock_fd);
     close(usockp->usock_fd);
+
+    if (usockp->usock_shmem && !parent) {
+        /* It's a parent with shmem - we don't need shmem anymore. */
+        munmap(usockp->usock_shmem, USOCK_SHMEM_BUF_LEN);
+        usockp->usock_shmem = NULL;
+    }
 
     if (!usockp->usock_mbuf_pool && usockp->usock_rx_buf) {
         vr_free(usockp->usock_rx_buf, VR_USOCK_BUF_OBJECT);
@@ -539,8 +546,7 @@ usock_read_done(struct vr_usocket *usockp)
         break;
 
     case NETLINK:
-        dpdk_netlink_receive(usockp, usockp->usock_rx_buf,
-                usockp->usock_read_len);
+        dpdk_netlink_receive(usockp);
         break;
 
     default:
@@ -564,6 +570,15 @@ usock_read_init(struct vr_usocket *usockp)
                  * to the pre-allocated buffer.
                  */
                 usockp->usock_read_len = USOCK_RX_BUF_LEN;
+                usockp->usock_state = READING_DATA;
+            } else if (usockp->usock_type == SHMEM){
+                /**
+                 * For usock with shared memory we use Unix Domain Socket to
+                 * kick the other side that we've filled shmem with messages.
+                 * We don't read any header in this process, so usock_read_len
+                 * is just 1 byte and usock_state is reading data.
+                 */
+                usockp->usock_read_len = USOCK_SHMEM_KICK_LEN;
                 usockp->usock_state = READING_DATA;
             } else {
                 /**
@@ -618,6 +633,7 @@ __usock_read(struct vr_usocket *usockp)
 
     struct nlmsghdr *nlh;
     unsigned int proto = usockp->usock_proto;
+    unsigned int type = usockp->usock_type;
     char *buf = usockp->usock_rx_buf;
 
     if (toread > usockp->usock_buf_len) {
@@ -639,8 +655,9 @@ retry_read:
             pthread_self(), usockp->usock_fd, ret);
         rte_hexdump(stdout, "usock buffer dump:", buf + offset, ret);
     } else if (ret < 0) {
-        RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d read returned error %d: %s (%d)\n", __func__,
-            pthread_self(), usockp->usock_fd, ret, rte_strerror(errno), errno);
+        RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d read returned error %d: %s (%d)\n",
+                __func__, pthread_self(), usockp->usock_fd, ret,
+                rte_strerror(errno), errno);
     }
 #endif
     if (ret <= 0) {
@@ -663,12 +680,21 @@ retry_read:
     usockp->usock_read_offset = offset;
 
     if (proto == NETLINK) {
-        if (usockp->usock_type == UNIX) {
+        if (type == UNIX) {
             /* We got the whole message at once, so reading is finished. */
             usockp->usock_read_len = usockp->usock_read_offset;
+        } else if (type == SHMEM) {
+            /**
+             * If we use shared memory, socket only informs us that
+             * there are netlink messages in the shared memory.
+             * It's ready to be processed, so act like we've read everything.
+             */
+            nlh = (struct nlmsghdr *)(usockp->usock_shmem);
+            usockp->usock_read_len = nlh->nlmsg_len;
+            usockp->usock_read_offset = nlh->nlmsg_len;
         } else if (usockp->usock_state == READING_HEADER) {
             /**
-             * usock_type == TCP. usock_type == UNIX
+             * usock_type == TCP. usock_type == UNIX or SHMEM
              * will never be in a READING_HEADER state.
              */
             if (usockp->usock_read_offset == usockp->usock_read_len) {
@@ -714,6 +740,7 @@ usock_alloc(unsigned short proto, unsigned short type)
     struct vr_usocket *usockp = NULL, *child;
     bool is_socket = true;
     unsigned short sock_type;
+    void *usock_shmem = NULL;
 
     RTE_SET_USED(child);
 
@@ -724,6 +751,7 @@ usock_alloc(unsigned short proto, unsigned short type)
         break;
 
     case UNIX:
+    case SHMEM:
         domain = AF_UNIX;
         sock_type = SOCK_STREAM;
         break;
@@ -780,6 +808,31 @@ usock_alloc(unsigned short proto, unsigned short type)
         }
     }
 
+    if (type == SHMEM) {
+        int mmap_fd = open(VR_NETLINK_SHMEM_FILE, O_RDWR | O_CREAT | O_TRUNC,
+                            VR_SOCKET_DIR_MODE);
+        if (mmap_fd == -1) {
+            RTE_LOG(ERR, USOCK, "%s: opening %s for file-backed shared memory failed\n",
+                    __func__, VR_NETLINK_SHMEM_FILE);
+            return NULL;
+        }
+
+        if (ftruncate(mmap_fd, USOCK_SHMEM_BUF_LEN) == -1) {
+            RTE_LOG(ERR, USOCK, "%s: truncating %s for file-backed shared memory failed\n",
+                    __func__, VR_NETLINK_SHMEM_FILE);
+            return NULL;
+        }
+
+        usock_shmem = mmap(NULL, USOCK_SHMEM_BUF_LEN, PROT_READ | PROT_WRITE,
+                            MAP_SHARED, mmap_fd, 0);
+        close(mmap_fd);
+        if (usock_shmem == MAP_FAILED) {
+            RTE_LOG(ERR, USOCK, "%s: mmaping shared memory failed\n",
+                    __func__);
+            return NULL;
+        }
+    }
+
     usockp = vr_zalloc(sizeof(*usockp), VR_USOCK_OBJECT);
     if (!usockp)
         goto error_exit;
@@ -787,6 +840,7 @@ usock_alloc(unsigned short proto, unsigned short type)
     usockp->usock_type = type;
     usockp->usock_proto = proto;
     usockp->usock_fd = sock_fd;
+    usockp->usock_shmem = usock_shmem;
     usockp->usock_state = INITED;
 
     if (is_socket) {
@@ -895,7 +949,7 @@ valid_usock(int proto, int type)
 
     switch (proto) {
     case NETLINK:
-        if (type == TCP || type == UNIX)
+        if (type == TCP || type == UNIX || type == SHMEM)
             return true;
         break;
 
@@ -967,7 +1021,7 @@ vr_usocket_eventfd_write(struct vr_usocket *usockp)
 
 int
 vr_usocket_message_write(struct vr_usocket *usockp,
-        struct vr_message *message)
+        struct vr_message *message, unsigned int offset)
 {
     int ret;
     unsigned int len;
@@ -984,9 +1038,20 @@ vr_usocket_message_write(struct vr_usocket *usockp,
 
     buf = (unsigned char *)dpdk_nl_message_hdr(message);
     len = dpdk_nl_message_len(message);
-    ret = vr_usocket_write(usockp, buf, len);
-    if (ret == len) {
+
+    if (usockp->usock_type == SHMEM) {
+        if (!memcpy(usockp->usock_shmem + offset, buf, len)) {
+            RTE_LOG(ERR, USOCK, "%s: copying netlink data to shared memory failed\n",
+                    __func__);
+            return -1;
+        }
+        ret = len;
         vr_message_free(message);
+    } else {
+        ret = vr_usocket_write(usockp, buf, len);
+        if (ret == len) {
+            vr_message_free(message);
+        }
     }
 
     return ret;
@@ -1110,6 +1175,7 @@ vr_usocket_bind(struct vr_usocket *usockp)
         break;
 
     case UNIX:
+    case SHMEM:
         sun.sun_family = AF_UNIX;
         memset(sun.sun_path, 0, sizeof(sun.sun_path));
         strncpy(sun.sun_path, VR_NETLINK_UNIX_FILE, sizeof(sun.sun_path) - 1);
