@@ -31,8 +31,6 @@
 #include "vr_genetlink.h"
 #include "vr_os.h"
 
-#include "vr_dpdk_usocket.h"
-
 #define VROUTER_GENETLINK_FAMILY_NAME "vrouter"
 #define GENL_ID_VROUTER         (NLMSG_MIN_TYPE + 0x10)
 

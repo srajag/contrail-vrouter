@@ -51,6 +51,7 @@
 #define MEM_DEV                 "/dev/flow"
 
 static int mem_fd;
+static void *shmem;
 
 static int dvrf_set, mir_set, show_evicted_set;
 static int help_set, match_set, get_set;
@@ -1682,11 +1683,14 @@ flow_table_map(vr_flow_req *req)
 static int
 flow_make_flow_req(vr_flow_req *req)
 {
-    int ret, attr_len, error;
+    int ret, attr_len, error, i;
     struct nl_response *resp;
     static count = 0;
     static struct iovec iov[MAX_FLOW_NL_MSG_BUNCH];
     uint8_t *base, len;
+    void *shmem_ptr;
+    uint8_t pseudoeventfd = 1;
+    uint32_t nlmsg_len;
 
     base = nl_get_buf_ptr(cl);
 
@@ -1726,30 +1730,41 @@ flow_make_flow_req(vr_flow_req *req)
     if (bunch != count && more)
         return 0;
 
-    struct msghdr msg;
-    memset(&msg, 0, sizeof(msg));
-#if defined (__linux__)
-    msg.msg_name = cl->cl_sa;
-    msg.msg_namelen = cl->cl_sa_len;
-#endif
+    shmem_ptr = shmem; /* dont move original shmem pointer */
+    for (i = 0; i < count; i++) {
+        if (!memcpy(shmem_ptr, iov[i].iov_base, iov[i].iov_len))
+            printf("Copying netlink messages to shared memory failed\n");
 
-    msg.msg_iov = iov;
-    msg.msg_iovlen = count;
+        shmem_ptr += iov[i].iov_len;
+    }
 
-    ret = sendmsg(cl->cl_sock, &msg, 0);
+    /* kick vrouter */
+    ret = send(cl->cl_sock, &pseudoeventfd, USOCK_SHMEM_KICK_LEN, 0);
+
     if (ret <= 0)
         return ret;
 
-    while (count != 0) {
-        count--;
-        cl->cl_buf_offset = 0;
-        if ((ret = nl_recvmsg(cl)) > 0) {
+    /* wait for a kick that there are responses in shmem */
+    cl->cl_buf_offset = 0;
+    if (recv(cl->cl_sock, &pseudoeventfd, USOCK_SHMEM_KICK_LEN, 0) > 0) {
+        shmem_ptr = shmem; /* dont move original shmem pointer */
+        while(count != 0) {
+            count--;
+
+            nlmsg_len = ((struct nlmsghdr *)shmem_ptr)->nlmsg_len;
+            cl->cl_recv_len = nlmsg_len;
+            cl->cl_buf = shmem_ptr;
+
             resp = nl_parse_reply(cl);
             if (resp->nl_op == SANDESH_REQUEST) {
                 sandesh_decode(resp->nl_data, resp->nl_len,
                                 vr_find_sandesh_info, &ret);
             }
+
+            shmem_ptr += nlmsg_len;
         }
+    } else {
+        printf("Receiving kick from vRouter to read shared memory failed\n");
     }
 
     cl->cl_buf_offset = 0;
@@ -1793,6 +1808,45 @@ flow_table_setup(void)
 
     cl->cl_buf_offset = 0;
     return ret;
+}
+
+/* TODO: should work like flow_table_setup() + flow_table_req() + flow_table_map() */
+static int
+flow_shmem_map(void)
+{
+    /* TODO: filename should come from proper request */
+    /* TODO: this should be common for all utils that use shmem */
+    int mmap_fd = open(VR_NETLINK_SHMEM_FILE, O_RDWR | O_CREAT | O_TRUNC,
+                        VR_SOCKET_DIR_MODE);
+    if (mmap_fd == -1) {
+        printf("Opening %s for file-backed shared memory failed\n",
+                VR_NETLINK_SHMEM_FILE);
+        return -1;
+    }
+
+    if (ftruncate(mmap_fd, USOCK_SHMEM_BUF_LEN) == -1) {
+        printf("Truncating %s for file-backed shared memory failed\n",
+                VR_NETLINK_SHMEM_FILE);
+        return -1;
+    }
+
+    /* global */
+    shmem = mmap(NULL, USOCK_SHMEM_BUF_LEN, PROT_WRITE,
+                        MAP_SHARED, mmap_fd, 0);
+    close(mmap_fd);
+    if (shmem == MAP_FAILED) {
+        printf("mmaping shared memory failed\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+/* TODO this should be common for all utils */
+static int
+flow_shmem_unmap(void)
+{
+    return munmap(shmem, USOCK_SHMEM_BUF_LEN);
 }
 
 static void
@@ -2422,6 +2476,11 @@ main(int argc, char *argv[])
 
     validate_options();
 
+    /* map shmem before any request */
+    ret = flow_shmem_map();
+    if (ret < 0)
+        return ret;
+
     ret = flow_table_setup();
     if (ret < 0)
         return ret;
@@ -2449,6 +2508,10 @@ main(int argc, char *argv[])
 
         flow_do_op(flow_index, flow_cmd);
     }
+
+    ret = flow_shmem_unmap();
+    if (ret < 0)
+        return ret;
 
     return 0;
 }
