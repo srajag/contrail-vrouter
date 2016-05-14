@@ -11,6 +11,7 @@
 #include "vr_genetlink.h"
 #include "vr_uvhost.h"
 #include "vr_uvhost_msg.h"
+#include "vr_dpdk_netlink_ring.h"
 
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -288,22 +289,20 @@ error:
 int
 vr_dpdk_netlink_init(void)
 {
-    void *event_sock = NULL;
-    int ret;
+    int ret, sock_fd;
 
     RTE_LOG(INFO, VROUTER, "Starting NetLink...\n");
     ret = vr_message_transport_register(&dpdk_nl_transport);
     if (ret)
         return ret;
 
-    vr_dpdk.netlink_sock = vr_usocket(NETLINK, TCP);
-    if (!vr_dpdk.netlink_sock) {
+    sock_fd = vr_dpdk_netlink_sock_init();
+    if (sock_fd < 0) {
         RTE_LOG(ERR, VROUTER, "    error creating NetLink server socket:"
             " %s (%d)\n", rte_strerror(errno), errno);
         goto error;
     }
-    RTE_LOG(INFO, VROUTER, "    NetLink TCP socket FD is %d\n",
-            ((struct vr_usocket *)vr_dpdk.netlink_sock)->usock_fd);
+    RTE_LOG(INFO, VROUTER, "    NetLink TCP socket FD is %d\n", sock_fd);
 
     ret = vr_nl_uvhost_connect();
     if (ret != 0) {
@@ -311,25 +310,10 @@ vr_dpdk_netlink_init(void)
         goto error;
     }
 
-    /* create and bind event usock to wake up the NetLink lcore */
-    event_sock = (void *)vr_usocket(EVENT, RAW);
-    if (!event_sock) {
-        RTE_LOG(ERR, VROUTER, "    error creating NetLink event\n");
-        goto error;
-    }
-
-    if (vr_usocket_bind_usockets(vr_dpdk.netlink_sock,
-                event_sock)) {
-        RTE_LOG(ERR, VROUTER, "    error binding NetLink event\n");
-        goto error;
-    }
-    vr_dpdk.netlink_event_sock = event_sock;
-
-    return 0;
+    return sock_fd;
 
 error:
     vr_message_transport_unregister(&dpdk_nl_transport);
-    vr_usocket_close(vr_dpdk.netlink_sock);
 
     return -1;
 }
