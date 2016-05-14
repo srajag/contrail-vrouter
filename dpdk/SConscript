@@ -16,10 +16,10 @@ if env['OPT'] == 'debug':
 
 # Include/lLib paths
 env.Append(LIBPATH = [env['TOP_LIB']])
-env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
+env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core', '../utils'])
 
 # Libraries
-env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
+env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c', 'vr_netlink_ring'])
 env.Append(LIBS = ['rt', 'dl', 'pthread', 'urcu-qsbr'])
 env.Append(LINKFLAGS = env['DPDK_LINKFLAGS'])
 
