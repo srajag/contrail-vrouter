@@ -17,6 +17,7 @@
 #include "vr_dpdk.h"
 #include "vr_dpdk_lcore.h"
 #include "vr_dpdk_netlink.h"
+#include "vr_dpdk_netlink_ring.h"
 #include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
 #include "vr_uvhost.h"
@@ -1523,6 +1524,7 @@ static int
 dpdk_lcore_netlink_loop(void)
 {
     unsigned lcore_id = rte_lcore_id();
+    int netlink_sock_fd;
     RTE_LOG(DEBUG, VROUTER, "Hello from NetLink lcore %u\n", lcore_id);
 
     while (1) {
@@ -1530,8 +1532,9 @@ dpdk_lcore_netlink_loop(void)
             __func__, lcore_id);
 
         /* init the communication socket with Agent */
-        if (vr_dpdk_netlink_init() == 0)
-            vr_usocket_io(vr_dpdk.netlink_sock);
+        netlink_sock_fd = vr_dpdk_netlink_init();
+        if (netlink_sock_fd > 0)
+            vr_netlink_ring_loop(netlink_sock_fd);
 
         if (unlikely(vr_dpdk_is_stop_flag_set()))
             break;

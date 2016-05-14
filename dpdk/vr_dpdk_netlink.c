@@ -11,6 +11,7 @@
 #include "vr_genetlink.h"
 #include "vr_uvhost.h"
 #include "vr_uvhost_msg.h"
+#include "vr_dpdk_netlink_ring.h"
 
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -23,7 +24,6 @@
 struct nlmsghdr *dpdk_nl_message_hdr(struct vr_message *);
 unsigned int dpdk_nl_message_len(struct vr_message *);
 
-int vr_usocket_message_write(struct vr_usocket *, struct vr_message *);
 int vr_nl_uvh_sock;
 
 void
@@ -38,7 +38,7 @@ vr_dpdk_netlink_wakeup(void)
 }
 
 static void
-dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
+dpdk_nl_process_response(void *tx_ring, struct nlmsghdr *nlh)
 {
     __u32 seq;
     unsigned int multi_flag = 0;
@@ -82,9 +82,10 @@ dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
         resp_nla->nla_len = resp->vr_message_len;
         resp_nla->nla_type = NL_ATTR_VR_MESSAGE_PROTOCOL;
 
-        if (vr_usocket_message_write(usockp, resp) < 0) {
+        if (vr_nl_ring_message_write(tx_ring, resp) < 0) {
+            RTE_LOG(ERR, VROUTER, "%s: not enough memory to put %u bytes in netlink ring\n",
+                __func__, resp_nlh->nlmsg_len);
             write = false;
-            vr_usocket_close(usockp);
         }
     }
 
@@ -92,7 +93,7 @@ dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
 }
 
 int
-dpdk_netlink_receive(void *usockp, char *nl_buf,
+dpdk_netlink_receive(void *tx_ring, char *nl_buf,
         unsigned int nl_len)
 {
     int ret;
@@ -106,7 +107,7 @@ dpdk_netlink_receive(void *usockp, char *nl_buf,
     if (ret < 0)
         vr_send_response(ret);
 
-    dpdk_nl_process_response(usockp, (struct nlmsghdr *)nl_buf);
+    dpdk_nl_process_response(tx_ring, (struct nlmsghdr *)nl_buf);
 
     return 0;
 }
@@ -288,22 +289,20 @@ error:
 int
 vr_dpdk_netlink_init(void)
 {
-    void *event_sock = NULL;
-    int ret;
+    int ret, sock_fd;
 
     RTE_LOG(INFO, VROUTER, "Starting NetLink...\n");
     ret = vr_message_transport_register(&dpdk_nl_transport);
     if (ret)
         return ret;
 
-    vr_dpdk.netlink_sock = vr_usocket(NETLINK, TCP);
-    if (!vr_dpdk.netlink_sock) {
+    sock_fd = vr_dpdk_netlink_sock_init();
+    if (sock_fd < 0) {
         RTE_LOG(ERR, VROUTER, "    error creating NetLink server socket:"
             " %s (%d)\n", rte_strerror(errno), errno);
         goto error;
     }
-    RTE_LOG(INFO, VROUTER, "    NetLink TCP socket FD is %d\n",
-            ((struct vr_usocket *)vr_dpdk.netlink_sock)->usock_fd);
+    RTE_LOG(INFO, VROUTER, "    NetLink TCP socket FD is %d\n", sock_fd);
 
     ret = vr_nl_uvhost_connect();
     if (ret != 0) {
@@ -311,25 +310,10 @@ vr_dpdk_netlink_init(void)
         goto error;
     }
 
-    /* create and bind event usock to wake up the NetLink lcore */
-    event_sock = (void *)vr_usocket(EVENT, RAW);
-    if (!event_sock) {
-        RTE_LOG(ERR, VROUTER, "    error creating NetLink event\n");
-        goto error;
-    }
-
-    if (vr_usocket_bind_usockets(vr_dpdk.netlink_sock,
-                event_sock)) {
-        RTE_LOG(ERR, VROUTER, "    error binding NetLink event\n");
-        goto error;
-    }
-    vr_dpdk.netlink_event_sock = event_sock;
-
-    return 0;
+    return sock_fd;
 
 error:
     vr_message_transport_unregister(&dpdk_nl_transport);
-    vr_usocket_close(vr_dpdk.netlink_sock);
 
     return -1;
 }

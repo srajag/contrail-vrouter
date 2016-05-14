@@ -22,6 +22,9 @@ xml_cpppath = os.popen('xml2-config --cflags | sed \'s/\-I//g\'').read()
 # CFLAGS
 env.Append(CCFLAGS = '-g -std=gnu99')
 
+libvrnlring = 'vr_netlink_ring'
+libvrnlring_objs = [env.Object('vr_netlink_ring.lo', '../vr_netlink_ring.c')]
+env.StaticLibrary(libvrnlring, libvrnlring_objs)
 
 libvrutil = 'vrutil'
 libvrutil_objs = [env.Object('nl_util.lo', '../nl_util.c'), 
@@ -33,7 +36,7 @@ env.StaticLibrary(libvrutil, libvrutil_objs)
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../../sandesh', './vhost/lib/'])
-env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c', 'jnprvnet', 'xml2', 'pcap', 'rt', 'nl-3', 'nl-genl-3' ])
+env.Replace(LIBS = [libvrutil, libvrnlring, 'sandesh-c', 'dp_sandesh_c', 'jnprvnet', 'xml2', 'pcap', 'rt', 'nl-3', 'nl-genl-3' ])
 
 sandesh_gen = env.Program('sandesh_gen.c')
 

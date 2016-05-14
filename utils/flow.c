@@ -1715,32 +1715,6 @@ flow_table_get(void)
     return flow_make_flow_req(&flow_req);
 }
 
-static int
-flow_table_setup(void)
-{
-    int ret;
-
-    cl = nl_register_client();
-    if (!cl)
-        return -ENOMEM;
-
-    parse_ini_file();
-    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
-    if (ret <= 0)
-        return ret;
-
-    ret = nl_connect(cl, get_ip(), get_port());
-    if (ret < 0)
-        return ret;
-
-    ret = vrouter_get_family_id(cl);
-    if (ret <= 0)
-        return ret;
-
-    cl->cl_buf_offset = 0;
-    return ret;
-}
-
 static void
 flow_do_op(unsigned long flow_index, char action)
 {
@@ -1891,7 +1865,7 @@ flow_make_flow_req_perf(vr_flow_req *req)
     msg.msg_iov = iov;
     msg.msg_iovlen = count;
 
-    ret = sendmsg(cl->cl_sock, &msg, 0);
+    ret = nl_sendmsg_bunch(cl, &msg);
     if (ret <= 0)
         return ret;
 
@@ -2470,8 +2444,8 @@ main(int argc, char *argv[])
 
     validate_options();
 
-    ret = flow_table_setup();
-    if (ret < 0)
+    cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
+    if (cl < 0)
         return ret;
 
     ret = flow_table_get();

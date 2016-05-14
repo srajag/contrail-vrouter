@@ -25,10 +25,13 @@
 #include <stdint.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#include <sys/un.h>
 #include "vr_types.h"
 #include "nl_util.h"
 #include "vr_genetlink.h"
 #include "vr_os.h"
+
+#include "ini_parser.h"
 
 #define VROUTER_GENETLINK_FAMILY_NAME "vrouter"
 #define GENL_ID_VROUTER         (NLMSG_MIN_TYPE + 0x10)
@@ -461,6 +464,8 @@ nl_free(struct nl_client *cl)
 int
 nl_socket(struct nl_client *cl, int domain, int type, int protocol)
 {
+    int platform = get_platform();
+
     if (cl->cl_sock >= 0)
         return -EEXIST;
 
@@ -481,10 +486,19 @@ nl_socket(struct nl_client *cl, int domain, int type, int protocol)
     cl->cl_socket_domain = domain;
     cl->cl_socket_type = type;
 
-    if (type == SOCK_STREAM) {
-        cl->cl_recvmsg = nl_client_stream_recvmsg;
+    if (platform != DPDK_PLATFORM) {
+        cl->cl_sendmsg = nl_client_sendmsg;
+        cl->cl_sendmsg_bunch = nl_client_socket_sendmsg_bunch;
+
+        if (type == SOCK_STREAM) {
+            cl->cl_recvmsg = nl_client_stream_recvmsg;
+        } else {
+            cl->cl_recvmsg = nl_client_datagram_recvmsg;
+        }
     } else {
-        cl->cl_recvmsg = nl_client_datagram_recvmsg;
+        cl->cl_sendmsg = nl_client_ring_sendmsg;
+        cl->cl_sendmsg_bunch = nl_client_ring_sendmsg_bunch;
+        cl->cl_recvmsg = nl_client_ring_recvmsg;
     }
 
     return cl->cl_sock;
@@ -506,9 +520,7 @@ nl_connect(struct nl_client *cl, uint32_t ip, uint16_t port)
         cl->cl_sa_len = sizeof(*sa);
 
         return bind(cl->cl_sock, cl->cl_sa, cl->cl_sa_len);
-    }
-
-    if (cl->cl_socket_domain == AF_INET) {
+    } else if (cl->cl_socket_domain == AF_INET) {
         struct in_addr address;
         struct sockaddr_in *sa = malloc(sizeof(struct sockaddr_in));
         if (!sa)
@@ -521,6 +533,20 @@ nl_connect(struct nl_client *cl, uint32_t ip, uint16_t port)
         sa->sin_port = htons(port);
         cl->cl_sa = (struct sockaddr *)sa;
         cl->cl_sa_len = sizeof(*sa);
+
+        return connect(cl->cl_sock, cl->cl_sa, cl->cl_sa_len);
+    } else if (cl->cl_socket_domain == AF_UNIX) {
+        struct sockaddr_un *sun = malloc(sizeof(struct sockaddr_un));
+        if (!sun)
+            return -1;
+
+        memset(sun, 0, sizeof(*sun));
+        sun->sun_family = cl->cl_socket_domain;
+        memset(sun->sun_path, 0, sizeof(sun->sun_path));
+        strncpy(sun->sun_path, VR_NL_SOCKET_FILE, sizeof(sun->sun_path) - 1);
+
+        cl->cl_sa = (struct sockaddr *)sun;
+        cl->cl_sa_len = sizeof(*sun);
 
         return connect(cl->cl_sock, cl->cl_sa, cl->cl_sa_len);
     }
@@ -556,6 +582,25 @@ nl_client_datagram_recvmsg(struct nl_client *cl)
 
     return ret;
 }
+
+int
+nl_client_ring_recvmsg(struct nl_client *cl)
+{
+    int ret;
+
+    cl->cl_buf_offset = 0;
+
+    do {
+        ret = vr_nl_ring_deq(cl->cl_rx_ring, cl->cl_buf, cl->cl_buf_len);
+        if (ret == -ENOMEM || ret > 0)
+            break;
+    } while (ret == -ENOENT);
+
+    cl->cl_recv_len = ret;
+
+    return ret;
+}
+
 
 int
 nl_client_stream_recvmsg(struct nl_client *cl) {
@@ -609,13 +654,27 @@ nl_recvmsg(struct nl_client *cl)
 int
 nl_sendmsg(struct nl_client *cl)
 {
+    return cl->cl_sendmsg(cl);
+}
+
+int
+nl_sendmsg_bunch(struct nl_client *cl, struct msghdr *msg)
+{
+    return cl->cl_sendmsg_bunch(cl, msg);
+}
+
+int
+nl_client_sendmsg(struct nl_client *cl)
+{
     struct msghdr msg;
     struct iovec iov;
 
     memset(&msg, 0, sizeof(msg));
 #if defined (__linux__)
-    msg.msg_name = cl->cl_sa;
-    msg.msg_namelen = cl->cl_sa_len;
+    if (cl->cl_socket_domain == AF_INET) {
+        msg.msg_name = cl->cl_sa;
+        msg.msg_namelen = cl->cl_sa_len;
+    }
 #endif
 
     iov.iov_base = (void *)(cl->cl_buf);
@@ -627,6 +686,24 @@ nl_sendmsg(struct nl_client *cl)
     msg.msg_iovlen = 1;
 
     return sendmsg(cl->cl_sock, &msg, 0);
+}
+
+int
+nl_client_socket_sendmsg_bunch(struct nl_client *cl, struct msghdr *msg)
+{
+    return sendmsg(cl->cl_sock, msg, 0);
+}
+
+int
+nl_client_ring_sendmsg_bunch(struct nl_client *cl, struct msghdr *msg)
+{
+    return vr_nl_ring_msg_enq(cl->cl_tx_ring, msg);
+}
+
+int
+nl_client_ring_sendmsg(struct nl_client *cl)
+{
+    return vr_nl_ring_enq(cl->cl_tx_ring, cl->cl_buf, cl->cl_buf_offset);
 }
 
 void
@@ -681,6 +758,9 @@ nl_register_client(void)
 
     cl->cl_id = 0;
     cl->cl_sock = -1;
+
+    cl->cl_tx_ring = NULL;
+    cl->cl_rx_ring = NULL;
 
     return cl;
 
@@ -928,4 +1008,5 @@ nl_build_if_create_msg(struct nl_client *cl, struct vn_if *ifp, uint8_t ack)
 
     return 0;
 }
+
 #endif  /* __linux__ */

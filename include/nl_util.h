@@ -13,6 +13,8 @@ extern "C" {
 #include "vr_utils.h"
 #include "vr_response.h"
 
+#include "vr_netlink_ring.h"
+
 #define NL_RESP_DEFAULT_SIZE        512
 #define NL_MSG_DEFAULT_SIZE         4096
 
@@ -55,8 +57,12 @@ struct nl_client {
     int cl_socket_type;
     int cl_socket_proto;
     int (*cl_recvmsg)(struct nl_client *);
+    int (*cl_sendmsg)(struct nl_client *);
+    int (*cl_sendmsg_bunch)(struct nl_client *, struct msghdr *);
     struct sockaddr *cl_sa;
     uint32_t cl_sa_len;
+    struct vr_nl_ring_buf *cl_rx_ring;
+    struct vr_nl_ring_buf *cl_tx_ring;
 };
 
 
@@ -81,7 +87,13 @@ extern int nl_connect(struct nl_client *, uint32_t, uint16_t);
 extern int nl_sendmsg(struct nl_client *);
 extern int nl_client_datagram_recvmsg(struct nl_client *);
 extern int nl_client_stream_recvmsg(struct nl_client *);
+extern int nl_client_ring_recvmsg(struct nl_client *);
 extern int nl_recvmsg(struct nl_client *);
+extern int nl_client_sendmsg(struct nl_client *);
+extern int nl_client_socket_sendmsg_bunch(struct nl_client *, struct msghdr *);
+extern int nl_client_ring_sendmsg(struct nl_client *);
+extern int nl_client_ring_sendmsg_bunch(struct nl_client *, struct msghdr *);
+extern int nl_sendmsg(struct nl_client *);
 extern struct nl_response *nl_parse_reply(struct nl_client *);
 extern struct nl_response *nl_parse_gen_nh(struct nl_client *);
 extern struct nl_response *nl_parse_gen_mpls(struct nl_client *);

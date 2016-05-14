@@ -31,9 +31,14 @@ libvrutil_objs = [env.Object('nl_util.lo', 'nl_util.c'), env.Object('udp_util.lo
                   env.Object('ini_parser.lo', 'ini_parser.c'), env.Object('vr_util.lo', 'vr_util.c')]
 env.StaticLibrary(libvrutil, libvrutil_objs)
 
+# Build library vr_netlink_ring
+libvrnlring = 'vr_netlink_ring'
+libvrnlring_objs = [env.Object('vr_netlink_ring.lo', 'vr_netlink_ring.c')]
+env.StaticLibrary(libvrnlring, libvrnlring_objs)
+
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../sandesh'])
-env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c'])
+env.Replace(LIBS = [libvrutil, libvrnlring, 'sandesh-c', 'dp_sandesh_c'])
 
 # Build individual utils
 vif_sources = ['vif.c']
