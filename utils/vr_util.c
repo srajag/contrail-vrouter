@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <sys/mman.h>
 #include <sys/socket.h>
 #if defined(__linux__)
 #include <linux/netlink.h>
@@ -254,6 +255,52 @@ vr_sendmsg(struct nl_client *cl, void *request,
     return nl_sendmsg(cl);
 }
 
+static int
+vr_recv_fd(int sock)
+{
+    struct msghdr msg = {0};
+    struct cmsghdr *cmsg;
+    int fd;
+    char buf[CMSG_SPACE(sizeof(fd))];
+    char iov_buffer[1];
+    struct iovec iov;
+
+    /* dummy data needed for sendmsg() to actually send anything */
+    iov.iov_base = iov_buffer;
+    iov.iov_len = sizeof(iov_buffer);
+
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = buf;
+    msg.msg_controllen = sizeof(buf);
+
+    if (recvmsg(sock, &msg, 0) < 0)
+        return -1;
+
+    cmsg = CMSG_FIRSTHDR(&msg);
+    memcpy(&fd, CMSG_DATA(cmsg), sizeof(fd));
+
+    return fd;
+}
+
+static int
+vr_ring_mmap(struct nl_client *cl, int fd)
+{
+    void *shm;
+
+    shm = mmap(NULL, VR_NL_SHM_SZ, PROT_READ | PROT_WRITE,
+                MAP_SHARED | MAP_LOCKED, fd, 0);
+    if (shm == MAP_FAILED) {
+        close(fd);
+        return -1;
+    }
+
+    cl->cl_tx_ring = shm;
+    cl->cl_rx_ring = VR_NL_RING_NEXT(shm);
+
+    return 0;
+}
+
 struct nl_client *
 vr_get_nl_client(unsigned int proto)
 {
@@ -277,6 +324,16 @@ vr_get_nl_client(unsigned int proto)
     ret = nl_connect(cl, get_ip(), get_port());
     if (ret < 0)
         goto fail;
+
+    if (sock_proto) {
+        ret = vr_recv_fd(cl->cl_sock);
+        if (ret < 0)
+            goto fail;
+
+        ret = vr_ring_mmap(cl, ret);
+        if (ret < 0)
+            goto fail;
+    }
 
     if ((proto == VR_NETLINK_PROTO_DEFAULT) &&
             (vrouter_get_family_id(cl) <= 0))
