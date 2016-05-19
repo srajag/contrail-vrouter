@@ -1694,6 +1694,8 @@ flow_make_flow_req(vr_flow_req *req)
     static count = 0;
     static struct iovec iov[MAX_FLOW_NL_MSG_BUNCH];
     uint8_t *base, len;
+    int msg_len, i;
+    void *resp_ptr;
 
     base = nl_get_buf_ptr(cl);
 
@@ -1735,17 +1737,19 @@ flow_make_flow_req(vr_flow_req *req)
 
     struct msghdr msg;
     memset(&msg, 0, sizeof(msg));
-#if defined (__linux__)
-    msg.msg_name = cl->cl_sa;
-    msg.msg_namelen = cl->cl_sa_len;
-#endif
 
     msg.msg_iov = iov;
     msg.msg_iovlen = count;
 
-    ret = sendmsg(cl->cl_sock, &msg, 0);
-    if (ret <= 0)
-        return ret;
+    /* enqueue message */
+    msg_len = vr_nl_ring_msg_enq(cl->cl_tx_ring, &msg);
+    if (msg_len < 0) {
+        printf("Enqueuing netlink message to ring failed\n"
+                "\ttx_ring->head %"PRId32"\n"
+                "\ttx_ring->tail %"PRId32"\n\n",
+                cl->cl_tx_ring->head, cl->cl_tx_ring->tail);
+        return -1;
+    }
 
     while (count != 0) {
         count--;
@@ -1774,32 +1778,6 @@ flow_table_get(void)
     flow_req.fr_op = FLOW_OP_FLOW_TABLE_GET;
 
     return flow_make_flow_req(&flow_req);
-}
-
-static int
-flow_table_setup(void)
-{
-    int ret;
-
-    cl = nl_register_client();
-    if (!cl)
-        return -ENOMEM;
-
-    parse_ini_file();
-    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
-    if (ret <= 0)
-        return ret;
-
-    ret = nl_connect(cl, get_ip(), get_port());
-    if (ret < 0)
-        return ret;
-
-    ret = vrouter_get_family_id(cl);
-    if (ret <= 0)
-        return ret;
-
-    cl->cl_buf_offset = 0;
-    return ret;
 }
 
 static void
@@ -2429,8 +2407,8 @@ main(int argc, char *argv[])
 
     validate_options();
 
-    ret = flow_table_setup();
-    if (ret < 0)
+    cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
+    if (cl < 0)
         return ret;
 
     ret = flow_table_get();
