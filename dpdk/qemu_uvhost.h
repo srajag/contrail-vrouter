@@ -11,7 +11,7 @@
 #include <linux/vhost.h>
 
 #define VHOST_MEMORY_MAX_NREGIONS    8
-#define VHOST_CLIENT_MAX_VRINGS      2
+#define VHOST_CLIENT_MAX_VRINGS      8
 
 typedef enum VhostUserRequest {
     VHOST_USER_NONE = 0,
@@ -29,6 +29,11 @@ typedef enum VhostUserRequest {
     VHOST_USER_SET_VRING_KICK = 12,
     VHOST_USER_SET_VRING_CALL = 13,
     VHOST_USER_SET_VRING_ERR = 14,
+    VHOST_USER_GET_PROTOCOL_FEATURES = 15,
+    VHOST_USER_SET_PROTOCOL_FEATURES = 16,
+    VHOST_USER_GET_QUEUE_NUM = 17,
+    VHOST_USER_SET_VRING_ENABLE = 18,
+    VHOST_USER_SEND_RARP = 19,
     VHOST_USER_MAX
 } VhostUserRequest;
 
@@ -67,6 +72,9 @@ typedef struct VhostUserMsg {
  * doesn't include the variable part of the message (union above).
  */
 #define VHOST_USER_HSIZE (offsetof(VhostUserMsg, u64))
+
+#define VHOST_USER_F_PROTOCOL_FEATURES	30
+#define VHOST_USER_PROTOCOL_F_MQ	0
 
 #endif /* __QEMU_UVHOST_H__ */
 

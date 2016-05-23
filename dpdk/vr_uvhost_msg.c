@@ -31,12 +31,16 @@ typedef int (*vr_uvh_msg_handler_fn)(vr_uvh_client_t *vru_cl);
  */
 static int vr_uvmh_get_features(vr_uvh_client_t *vru_cl);
 static int vr_uvmh_set_features(vr_uvh_client_t *vru_cl);
+static int vr_uvmh_get_protocol_features(vr_uvh_client_t *vru_cl);
+static int vr_uvmh_set_protocol_features(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_num(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_base(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_call(vr_uvh_client_t *vru_cl);
+static int vr_uvhm_get_queue_num(vr_uvh_client_t *vru_cl);
+static int vr_uvhm_set_vring_enable(vr_uvh_client_t *vru_cl);
 
 static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
     NULL,
@@ -53,7 +57,12 @@ static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
     vr_uvhm_get_vring_base,
     NULL,
     vr_uvhm_set_vring_call,
-    NULL
+    NULL,
+    vr_uvmh_get_protocol_features,
+    vr_uvmh_set_protocol_features,
+    vr_uvhm_get_queue_num,
+    vr_uvhm_set_vring_enable,
+    NULL,
 };
 
 /*
@@ -209,8 +218,11 @@ vr_uvmh_get_features(vr_uvh_client_t *vru_cl)
     /* TODO: Implement VHOST_F_LOG_ALL handler */
     /* VIRTIO_NET_F_CTRL_VQ is enough for vMX and FreeBSD */
     vru_cl->vruc_msg.u64 = (1ULL << VIRTIO_NET_F_CTRL_VQ) |
+                           //(1ULL << VIRTIO_NET_F_CTRL_RX) |
                            (1ULL << VIRTIO_NET_F_CSUM) |
                            (1ULL << VIRTIO_NET_F_GUEST_CSUM) |
+                           (1ULL << VIRTIO_NET_F_MQ) |
+                           (1ULL << VHOST_USER_F_PROTOCOL_FEATURES) |
                            (1ULL << VHOST_F_LOG_ALL);
     vr_uvhost_log("    GET FEATURES: returns 0x%"PRIx64"\n",
                                             vru_cl->vruc_msg.u64);
@@ -231,6 +243,27 @@ vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
 {
     vr_uvhost_log("    SET FEATURES: 0x%"PRIx64"\n",
                                             vru_cl->vruc_msg.u64);
+
+    return 0;
+}
+
+static int
+vr_uvmh_get_protocol_features(vr_uvh_client_t *vru_cl)
+{
+    vru_cl->vruc_msg.u64 = (1ULL << VHOST_USER_PROTOCOL_F_MQ);
+    vr_uvhost_log("    GET PROTOCOL FEATURES: returns 0x%"PRIx64"\n",
+                  vru_cl->vruc_msg.u64);
+
+    vru_cl->vruc_msg.size = sizeof(vru_cl->vruc_msg.u64);
+
+    return 0;
+}
+
+static int
+vr_uvmh_set_protocol_features(vr_uvh_client_t *vru_cl)
+{
+    vr_uvhost_log("    SET PROTOCOL FEATURES: 0x%"PRIx64"\n",
+                  vru_cl->vruc_msg.u64);
 
     return 0;
 }
@@ -512,6 +545,36 @@ vr_uvhm_set_vring_call(vr_uvh_client_t *vru_cl)
     return 0;
 }
 
+static int
+vr_uvhm_set_vring_enable(vr_uvh_client_t *vru_cl)
+{
+    VhostUserMsg *vum_msg;
+    unsigned int vring_idx;
+    unsigned int queue_num;
+    bool enable;
+
+    vum_msg = &vru_cl->vruc_msg;
+    vring_idx = vum_msg->state.index;
+    enable = (bool)vum_msg->state.num;
+
+    vr_uvhost_log("Client %s: setting vring %u ready state %d\n",
+                  uvhm_client_name(vru_cl), vring_idx, enable);
+
+    uvhm_check_vring_ready(vru_cl, vring_idx);
+
+    if (vring_idx & 1) {
+        /* RX queues. Nothing to do. RX queues are always enabled in vRouter.
+         * If VM decides to use one, it will be handled appropriately. */
+    } else {
+        /* TX queues */
+        queue_num = vring_idx / 2;
+        vr_dpdk_virtio_tx_queue_enable_disable(vru_cl->vruc_idx, queue_num,
+                                               enable);
+    }
+
+    return 0;
+}
+
 /*
  * vr_uvh_cl_call_handler - calls message specific handler for messages
  * from user space vhost client.
@@ -540,6 +603,18 @@ vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
     return 0;
 }
 
+static int
+vr_uvhm_get_queue_num(vr_uvh_client_t *vru_cl)
+{
+    vru_cl->vruc_msg.u64 = VR_DPDK_VIRTIO_MAX_QUEUES;
+    vr_uvhost_log("    GET QUEUE NUM: returns 0x%"PRIx64"\n",
+                  vru_cl->vruc_msg.u64);
+
+    vru_cl->vruc_msg.size = sizeof(vru_cl->vruc_msg.u64);
+
+    return 0;
+}
+
 /*
  * vr_uvh_cl_send_reply - send a reply to the vhost user client if
  * required.
@@ -555,6 +630,8 @@ vr_uvh_cl_send_reply(int fd, vr_uvh_client_t *vru_cl)
     switch(msg->request) {
         case VHOST_USER_GET_FEATURES:
         case VHOST_USER_GET_VRING_BASE:
+        case VHOST_USER_GET_PROTOCOL_FEATURES:
+        case VHOST_USER_GET_QUEUE_NUM:
             /*
              * Send reply for these messages only.
              */
