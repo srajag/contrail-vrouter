@@ -58,7 +58,7 @@ static unsigned short dvrf;
 static int list, flow_cmd, mirror = -1;
 static unsigned long flow_index;
 static int rate, stats, perf, flush, bunch = 1;
-static bool more = false;
+static bool more = false, doing_perf = false;
 
 #define FLOW_GET_FIELD_LENGTH   30
 #define FLOW_COMPONENT_NH_COUNT 16
@@ -1695,7 +1695,6 @@ flow_make_flow_req(vr_flow_req *req)
     static struct iovec iov[MAX_FLOW_NL_MSG_BUNCH];
     uint8_t *base, len;
     int msg_len, i;
-    void *resp_ptr;
 
     base = nl_get_buf_ptr(cl);
 
@@ -1750,6 +1749,9 @@ flow_make_flow_req(vr_flow_req *req)
                 cl->cl_tx_ring->head, cl->cl_tx_ring->tail);
         return -1;
     }
+
+    if (doing_perf)
+        count = 0;
 
     while (count != 0) {
         count--;
@@ -1874,11 +1876,16 @@ exit_validate:
 
 void run_perf(void) {
     struct vr_flow_entry *fe;
+    struct nl_response *resp;
     uint32_t sip = inet_addr("1.1.1.1");
     uint32_t dip = inet_addr("2.2.2.2");
+    int ret;
     uint8_t proto = 0xFF;
     uint16_t sport = 1000;
     uint16_t nhid = 1;
+
+    /* turns off waiting for response in flow_make_flow_req() */
+    doing_perf = true;
 
     memset(&flow_req, 0, sizeof(flow_req));
     flow_req.fr_family = AF_INET;
@@ -1904,6 +1911,20 @@ void run_perf(void) {
         flow_req.fr_flow_dport = htons(i);
         flow_make_flow_req(&flow_req);
     }
+
+    /* process responses from previous requests */
+    while (i != 0) {
+        i--;
+        cl->cl_buf_offset = 0;
+        if ((ret = nl_recvmsg(cl)) > 0) {
+            resp = nl_parse_reply(cl);
+            if (resp->nl_op == SANDESH_REQUEST) {
+                sandesh_decode(resp->nl_data, resp->nl_len,
+                                vr_find_sandesh_info, &ret);
+            }
+        }
+    }
+    cl->cl_buf_offset = 0;
 
     struct timeval now;
     gettimeofday(&now, NULL);
@@ -1950,6 +1971,21 @@ void run_perf(void) {
         flow_make_flow_req(&flow_req);
     }
 
+    /* process responses from previous requests */
+    i *= 2; /* there were two requests per one loop cycle */
+    while (i != 0) {
+        i--;
+        cl->cl_buf_offset = 0;
+        if ((ret = nl_recvmsg(cl)) > 0) {
+            resp = nl_parse_reply(cl);
+            if (resp->nl_op == SANDESH_REQUEST) {
+                sandesh_decode(resp->nl_data, resp->nl_len,
+                                vr_find_sandesh_info, &ret);
+            }
+        }
+    }
+    cl->cl_buf_offset = 0;
+
     gettimeofday(&now, NULL);
     diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
     diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
@@ -1958,6 +1994,7 @@ void run_perf(void) {
 
     free(flow_req.fr_flow_ip);
 
+    doing_perf = false; /* let flow_do_op() handle responses */
     for (i = 0; i < ft->ft_num_entries; i++) {
         fe = flow_get(i);
         if (fe->fe_type != VP_TYPE_IP)
