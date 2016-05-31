@@ -92,10 +92,14 @@ vr_nl_ring_enq_ptr(struct vr_nl_ring_buf *ring, void **dst, int len)
 
     write_ptr = &ring->start[head];
 
-    if (head + hdr_len + len <= VR_NL_RING_SZ) {
-       /* data fits from current head to end of buffer */
+    if ((head >= tail && head + hdr_len + len <= VR_NL_RING_SZ) ||
+        (head < tail && tail - head < len)) {
+       /**
+        * data fits from current head to eiter end of buffer
+        * or to (tail-1) if head wrapped around.
+        */
         *dst = write_ptr + hdr_len;
-    } else if (head + hdr_len <= VR_NL_RING_SZ &&
+    } else if (head >= tail && head + hdr_len <= VR_NL_RING_SZ &&
                 hdr_len + len < tail) {
         /**
          * data fits from start to current tail.
@@ -126,7 +130,7 @@ vr_nl_ring_enq_finish(struct vr_nl_ring_buf *ring, int len)
     tail = __atomic_load_n(&ring->tail, __ATOMIC_ACQUIRE);
 
     /* check if we're writing from current head or from the start of the ring */
-    if (head + hdr_len <= VR_NL_RING_SZ &&
+    if (head > tail && head + hdr_len <= VR_NL_RING_SZ &&
                 hdr_len + len < tail)
         head = 0;
 
@@ -162,10 +166,14 @@ vr_nl_ring_msg_enq(struct vr_nl_ring_buf *ring, struct msghdr *msg)
     head = ring->head;
     tail = __atomic_load_n(&ring->tail, __ATOMIC_ACQUIRE);
 
-    if (head + hdr_len + len <= VR_NL_RING_SZ) {
-       /* data fits from current head to end of buffer */
+    if ((head >= tail && head + hdr_len + len <= VR_NL_RING_SZ) ||
+        (head < tail && tail - head < len)) {
+       /**
+        * data fits from current head to eiter end of buffer
+        * or to (tail-1) if head wrapped around.
+        */
         write_ptr = &ring->start[head];
-    } else if (head + hdr_len <= VR_NL_RING_SZ &&
+    } else if (head >= tail && head + hdr_len <= VR_NL_RING_SZ &&
                 hdr_len + len < tail) {
         /**
          * data fits from start to current tail.
@@ -253,10 +261,14 @@ vr_nl_ring_enq(struct vr_nl_ring_buf *ring, void *src, uint32_t len)
     head = ring->head;
     tail = __atomic_load_n(&ring->tail, __ATOMIC_ACQUIRE);
 
-    if (head + hdr_len + len <= VR_NL_RING_SZ) {
-       /* data fits from current head to end of buffer */
+    if ((head >= tail && head + hdr_len + len <= VR_NL_RING_SZ) ||
+        (head < tail && tail - head < len)) {
+       /**
+        * data fits from current head to eiter end of buffer
+        * or to (tail-1) if head wrapped around.
+        */
         write_ptr = &ring->start[head];
-    } else if (head + hdr_len <= VR_NL_RING_SZ &&
+    } else if (head >= tail && head + hdr_len <= VR_NL_RING_SZ &&
                 hdr_len + len < tail) {
         /**
          * data fits from start to current tail.

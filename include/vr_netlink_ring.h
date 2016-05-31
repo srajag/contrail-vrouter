@@ -68,7 +68,7 @@ struct vr_nl_ring_buf {
 } __attribute__((aligned(CACHE_LINE)));
 
 /* size in bytes of one netlink ring */
-#define VR_NL_RING_SZ       102400
+#define VR_NL_RING_SZ       (1<<29) /* 512MB */
 /* size of shared memory for mmap: TX ring + RX ring + ring headers */
 #define VR_NL_SHM_SZ        2 * (VR_NL_RING_SZ + sizeof(struct vr_nl_ring_buf))
 
