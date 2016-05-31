@@ -190,6 +190,7 @@ static void
 vr_nl_poll_ring_del(int idx)
 {
     unsigned i;
+    struct vr_nl_ring_buf *p;
 
     if (pollrings[idx]) {
         /**
@@ -200,10 +201,12 @@ vr_nl_poll_ring_del(int idx)
          * memory will be unmapped in a separate routine
          */
         for (i = 0; i < VR_NL_RING_MAX_FDS; i++) {
-            if (!munmaprings[i])
-                munmaprings[i] = pollrings[idx];
+            if (!munmaprings[i]) {
+                p = pollrings[idx];
+                pollrings[idx] = NULL;
+                munmaprings[i] = p;
+            }
         }
-        pollrings[idx] = NULL;
     } else {
         /* TODO remove after tests - this shouldnt happen */
 
